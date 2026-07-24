@@ -25,7 +25,8 @@ methods {
     function tickSpacing(bytes32) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    function _.price() external => PER_CALLEE_CONSTANT;
+    // Per-callee constant price (no price update); named so rules can reference it, matching LiquidationBoundedByLIF.spec.
+    function _.price() external => summaryPrice(calledContract) expect(uint256);
 
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
@@ -59,6 +60,8 @@ persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
 persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
 
 persistent ghost maxLifGhost(uint256, uint256) returns uint256;
+
+persistent ghost summaryPrice(address) returns uint256;
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
@@ -124,8 +127,28 @@ rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight
     assert rbdAfter <= rbdBefore;
 }
 
-// liquidate realizes bad debt: it recomputes to zero and drops totalUnits by exactly the realized
-// bad debt (src/Midnight.sol:673); the seize/repay block never touches totalUnits.
+// liquidate drops totalUnits by exactly the realized bad debt (src/Midnight.sol:673); the
+// seize/repay block never touches totalUnits. Cheap: the badDebt local is recomputed by the
+// getter verbatim, so no mulDiv axioms are needed to equate them.
+rule liquidateRealizesTotalUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
+    bytes32 id = summaryToId(market);
+
+    require market.collateralParams.length <= 2, "restrict collateralParams for loop tractability";
+    require marketIsCreated(market), "market must be created (tickSpacing > 0)";
+    require lossFactor(id) < max_uint128, "market lossFactor must not be saturated";
+    require to_mathint(debt(id, borrower)) <= to_mathint(totalUnits(id)), "position debt bounded by totalUnits";
+
+    uint256 rbdBefore = realizableBadDebt(market, id, borrower);
+    uint256 totalUnitsBefore = totalUnits(id);
+
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+
+    assert rbdBefore > 0 => to_mathint(totalUnits(id)) == to_mathint(totalUnitsBefore) - to_mathint(rbdBefore);
+}
+
+// liquidate realizes the bad debt: it recomputes to zero. The seize bound proven in
+// LiquidationBoundedByLIF.spec (imported below as a backed assumption) shows removing the seized
+// collateral, valued at maxLif, drops the maxLif-collateral-sum by at most the repaid debt.
 rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(market);
 
@@ -133,6 +156,11 @@ rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralI
     require marketIsCreated(market), "market must be created (tickSpacing > 0)";
     require lossFactor(id) < max_uint128, "market lossFactor must not be saturated";
     require to_mathint(debt(id, borrower)) <= to_mathint(totalUnits(id)), "position debt bounded by totalUnits";
+    require data.length == 0, "no liquidate callback data (prover performance; matches LiquidationBoundedByLIF.spec)";
+
+    mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
+    mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
+    require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant; precondition of the LIF bound)";
 
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
@@ -148,13 +176,13 @@ rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralI
     require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(a, b, d) * d >= a * b, "axiom";
     require forall mathint a. forall mathint b. forall mathint d. d > 0 && ghostMulDivUp(a, b, d) > 0 => (ghostMulDivUp(a, b, d) - 1) * d < a * b, "axiom";
 
-    uint256 rbdBefore = realizableBadDebt(market, id, borrower);
-    uint256 totalUnitsBefore = totalUnits(id);
+    uint256 seizedResult;
+    uint256 repaidResult;
+    seizedResult, repaidResult = liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+    // Seize bounded by LIF (proven in LiquidationBoundedByLIF.spec): the maxLif-value of the seized
+    // collateral never exceeds the repaid debt, so removing it keeps the recomputed bad debt at zero.
+    require seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif, "seize bounded by maxLif";
 
-    uint256 rbdAfter = realizableBadDebt(market, id, borrower);
-
-    assert rbdAfter == 0;
-    assert rbdBefore > 0 => to_mathint(totalUnits(id)) == to_mathint(totalUnitsBefore) - to_mathint(rbdBefore);
+    assert realizableBadDebt(market, id, borrower) == 0;
 }
