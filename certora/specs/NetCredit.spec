@@ -188,6 +188,7 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
 
     // We require it after `take`, because `take` may initialize the market first.
     require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
+
     // maturity <= block.timestamp + MAX_TTM follows from the proven invariant plus timestamp monotonicity.
     requireInvariant maturityBoundedByLastTimestamp(offer.market);
     require to_mathint(e.block.timestamp) >= lastTimestamp, "block.timestamp is monotonic";
