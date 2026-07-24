@@ -15,9 +15,6 @@ methods {
     function tickSpacing(bytes32) external returns (uint8) envfree;
 
     // Over-approximate view functions.
-    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-    function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
-    function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -83,3 +80,39 @@ strong invariant marketCollateralIsEmptyIfNotCreated(bytes32 id, address user, u
 
 strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
     !marketIsCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
+
+/// UNCREATED-MARKET BEHAVIOR RULES ///
+
+/// updatePositionView returns (0, 0, 0) when the market is not created. Its returns are derived
+/// solely from the position's credit, lastLossFactor, pendingFee, lastAccrual and the market's
+/// lossFactor, all of which are zero for an uncreated market; the Market struct argument only feeds
+/// the fee computation, which collapses to 0 once pendingFee is 0.
+rule updatePositionViewIsZeroIfMarketNotCreated(env e, Midnight.Market market, bytes32 id, address user) {
+    require currentContract.marketState[id].tickSpacing == 0; // the market is not created
+
+    requireInvariant marketCreditIsEmptyIfNotCreated(id, user);
+    requireInvariant positionLastLossFactorIsEmptyIfNotCreated(id, user);
+    requireInvariant marketLossFactorIsEmptyIfNotCreated(id);
+    requireInvariant marketPendingFeeIsEmptyIfNotCreated(id, user);
+    requireInvariant marketLastContinuousFeeAccrualIsEmptyIfNotCreated(id, user);
+
+    uint128 newCredit;
+    uint128 newPendingFee;
+    uint128 accruedFee;
+    newCredit, newPendingFee, accruedFee = updatePositionView(e, market, id, user);
+
+    assert newCredit == 0;
+    assert newPendingFee == 0;
+    assert accruedFee == 0;
+}
+
+/// isHealthy returns true when the market is not created. The borrower's debt is zero for an
+/// uncreated market, so the oracle-querying branch is skipped entirely (no external price() call,
+/// hence no havoc) and maxDebt (0) >= debt (0) holds.
+rule marketIsHealthyIfNotCreated(env e, Midnight.Market market, bytes32 id, address borrower) {
+    require currentContract.marketState[id].tickSpacing == 0; // the market is not created
+
+    requireInvariant marketDebtIsEmptyIfNotCreated(id, borrower);
+
+    assert isHealthy(e, market, id, borrower);
+}
