@@ -52,8 +52,12 @@ function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
         revert();
     }
     uint256 result = require_uint256(ghostMulDivDown(x, y, d));
+    require result * d <= x * y, "see mulDivDownRoundsDown in MulDiv.spec";
     require y <= d => result <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
     require x <= d => result <= y, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
+
+    // Identity floor(x*d/d) == x (denominator is nonzero here); pins the result exactly when y == d.
+    require y == d => result == x, "see mulDivIdentity in MulDiv.spec";
     return result;
 }
 
