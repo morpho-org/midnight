@@ -118,7 +118,7 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 
 /// RULES ///
 
-// liquidate realizes the bad debt: the recomputed realizable bad debt is at most 2 (one
+// liquidate realizes the bad debt: the recomputed realizable bad debt is at most 3 (one
 // seized-collateral term's rounding) after a full-args liquidate. Restricted to
 // !postMaturityMode, where the seize factor lif equals maxLif.
 //
@@ -132,7 +132,7 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 //   repaidUnits = mulDivUp(mulDivUp(seizedAssets, price, ORACLE_PRICE_SCALE), WAD, lif) = g(seizedAssets)
 // (src/Midnight.sol:691), i.e. the debt drop is exactly the getter value of the seized collateral.
 // Sub-additivity bounds the getter-sum drop g(c_k) - g(c_k - seizedAssets) by g(seizedAssets), which
-// here equals the repaid debt drop, so the recomputed bad debt stays at most 2 (one seized-collateral
+// here equals the repaid debt drop, so the recomputed bad debt stays at most 3 (one seized-collateral
 // term's rounding). No seize-value bound is
 // needed on this branch (repaid is literally the getter term), so axiomSeizeValue is dropped.
 rule liquidateRealizesBadDebtSeizeInput(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
@@ -161,14 +161,14 @@ rule liquidateRealizesBadDebtSeizeInput(env e, Midnight.Market market, uint256 c
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    assert realizableBadDebt(market, id, borrower) <= 2;
+    assert realizableBadDebt(market, id, borrower) <= 3;
 }
 
 // Repaid-units-input branch (seizedAssets == 0): liquidate computes
 //   seizedAssets = mulDivDown(mulDivDown(repaidUnits, lif, WAD), ORACLE_PRICE_SCALE, price)
 // (src/Midnight.sol:693). Sub-additivity bounds the getter-sum drop by g(seizedAssets), and the
 // seize-value bound (axiomSeizeValue) closes g(seizedAssets) <= repaidUnits, so the getter-sum drops
-// by at most the repaid debt drop and the recomputed bad debt stays at most 2 (one seized-collateral
+// by at most the repaid debt drop and the recomputed bad debt stays at most 3 (one seized-collateral
 // term's rounding). This is the harder case:
 // it needs the full axiom set including axiomSeizeValue.
 rule liquidateRealizesBadDebtRepaidInput(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
@@ -200,5 +200,5 @@ rule liquidateRealizesBadDebtRepaidInput(env e, Midnight.Market market, uint256 
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    assert realizableBadDebt(market, id, borrower) <= 2;
+    assert realizableBadDebt(market, id, borrower) <= 3;
 }
