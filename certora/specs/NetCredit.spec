@@ -84,8 +84,12 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     return ghostMulDivUp(a, b, d);
 }
 
+persistent ghost mapping(bytes32 => mathint) maturityOfId;
+
 function summaryToId(Midnight.Market market) returns (bytes32) {
-    return Utils.hashMarket(market);
+    bytes32 id = Utils.hashMarket(market);
+    require maturityOfId[id] == to_mathint(market.maturity), "remember the maturity of the market";
+    return id;
 }
 
 function marketIsCreated(Midnight.Market market) returns (bool) {
@@ -112,10 +116,9 @@ function netCredit(env e, Midnight.Market market, address user) returns mathint 
 invariant pendingFeeZeroAfterMaturity(Midnight.Market market, bytes32 id, address user)
     summaryToId(market) == id && lastAccrual(id, user) >= market.maturity => pendingFee(id, user) == 0;
 
-// A created market's maturity is at most MAX_TTM in the future: touchMarket enforces it at creation
-// (MaturityTooFar in Midnight.sol), maturity is immutable, and block.timestamp only increases.
-strong invariant maturityBoundedByLastTimestamp(Midnight.Market market)
-    marketIsCreated(market) => to_mathint(market.maturity) <= lastTimestamp + MAX_TTM()
+// A created market's maturity, recorded in maturityOfId at creation, is at most MAX_TTM in the future.
+strong invariant maturityBoundedById(bytes32 id)
+    tickSpacing(id) > 0 => maturityOfId[id] <= lastTimestamp + MAX_TTM()
     {
         preserved with (env e) {
             require to_mathint(e.block.timestamp) >= lastTimestamp, "block.timestamp is monotonic";
@@ -189,14 +192,9 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
     // We require it after `take`, because `take` may initialize the market first.
     require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
 
-    // maturity <= block.timestamp + MAX_TTM follows from the proven invariant plus timestamp monotonicity.
-    requireInvariant maturityBoundedByLastTimestamp(offer.market);
+    requireInvariant maturityBoundedById(summaryToId(offer.market));
     require to_mathint(e.block.timestamp) >= lastTimestamp, "block.timestamp is monotonic";
 
-    // Uncreated market: take -> touchMarket enforces this bound via MaturityTooFar
-    // (src/Midnight.sol:798). It's take-internal input validation, not a storage
-    // property, so it can't be an invariant over a market that doesn't exist yet.
-    require !marketIsCreated(offer.market) => to_mathint(offer.market.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM();
     assert continuousFee(summaryToId(offer.market)) * zeroFloorSub(offer.market.maturity, e.block.timestamp) <= WAD(), "interest <= 100%";
 
     mathint netCreditAfter = netCredit(e, offer.market, user);
