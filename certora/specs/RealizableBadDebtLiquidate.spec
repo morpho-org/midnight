@@ -148,7 +148,8 @@ rule liquidateRealizesBadDebtSeizeInput(env e, Midnight.Market market, uint256 c
     require !postMaturityMode, "non-post-maturity path: the seize factor lif equals maxLif (src/Midnight.sol:685-687)";
 
     // Soundness: nonZeroCollateralsAreActivated is proven in CollateralBitmap.spec.
-    requireInvariant nonZeroCollateralsAreActivated(id, borrower, collateralIndex);
+    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
+    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
 
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
@@ -184,7 +185,8 @@ rule liquidateRealizesBadDebtRepaidInput(env e, Midnight.Market market, uint256 
     require !postMaturityMode, "non-post-maturity path: the seize factor lif equals maxLif (src/Midnight.sol:685-687)";
 
     // Soundness: nonZeroCollateralsAreActivated is proven in CollateralBitmap.spec.
-    requireInvariant nonZeroCollateralsAreActivated(id, borrower, collateralIndex);
+    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
+    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
 
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
