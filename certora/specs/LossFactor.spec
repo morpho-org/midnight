@@ -53,6 +53,7 @@ function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
     }
     uint256 result = require_uint256(ghostMulDivDown(x, y, d));
     require result * d <= x * y, "see mulDivDownRoundsDown in MulDiv.spec";
+    require (result + 1) * d > x * y, "see mulDivDownTightBound in MulDiv.spec";
     require y <= d => result <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
     require x <= d => result <= y, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
 
@@ -69,6 +70,7 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
         revert();
     }
     uint256 result = require_uint256(ghostMulDivUp(x, y, d));
+    require result * d >= x * y, "see mulDivUpRoundsUp in MulDiv.spec";
     require result * d <= x * y + d - 1, "see mulDivUpUpperBound in MulDiv.spec";
     require y <= d => result <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
     require x <= d => result <= y, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
