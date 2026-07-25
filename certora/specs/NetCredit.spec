@@ -92,10 +92,6 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
     return id;
 }
 
-function marketIsCreated(Midnight.Market market) returns (bool) {
-    return tickSpacing(summaryToId(market)) > 0;
-}
-
 /// The up-to-date face value of a lender's position: credit - pendingFee after slashing and fee accrual.
 function netCredit(env e, Midnight.Market market, address user) returns mathint {
     bytes32 id = summaryToId(market);
