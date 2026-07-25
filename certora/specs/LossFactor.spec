@@ -22,6 +22,10 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
+    // Revert-preserving deterministic ghost summaries for mulDivDown/mulDivUp (axioms proved in MulDiv.spec).
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
     // External calls are assumed non-reentrant: this is justified as we verify properties about the function's bodies.
     // External calls are assumed non-reverting: we verify that reverts do not happen in the function's bodies.
 }
@@ -34,6 +38,37 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 
 function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
+}
+
+persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
+
+persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
+
+function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
+    if (d == 0) {
+        revert();
+    }
+    if (x * y > max_uint256) {
+        revert();
+    }
+    uint256 result = require_uint256(ghostMulDivDown(x, y, d));
+    require y <= d => result <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
+    require x <= d => result <= y, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
+    return result;
+}
+
+function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
+    if (d == 0) {
+        revert();
+    }
+    if (x * y + d - 1 > max_uint256) {
+        revert();
+    }
+    uint256 result = require_uint256(ghostMulDivUp(x, y, d));
+    require result * d <= x * y + d - 1, "see mulDivUpUpperBound in MulDiv.spec";
+    require y <= d => result <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
+    require x <= d => result <= y, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
+    return result;
 }
 
 /// The market's lossFactor is only modified by liquidate.
