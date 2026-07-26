@@ -57,29 +57,22 @@ persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
 
 persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
 
-/* Axioms proved by MulDiv.spec, used to reconstruct the Rocq integer-division argument. */
-
-/* proved in mulDivMonotoneA */
-definition axiomDownMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d);
-
-/* proved in mulDivMonotoneA */
-definition axiomUpMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
-
-/* proved in mulDivAddDownUp: floor(a1*b/d) + ceil(a2*b/d) >= floor((a1+a2)*b/d), i.e. the drop bound
-   floor((a1+a2)*b/d) - floor(a1*b/d) <= ceil(a2*b/d) (Rocq floor_drop_div_le_ceil). */
-definition axiomAddDownUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => ghostMulDivDown(a1, b, d) + ghostMulDivUp(a2, b, d) >= ghostMulDivDown(a1 + a2, b, d);
-
-/* proved in mulDivInverseUpDown: ceil(floor(a*b/d)*d/b) <= a (Rocq seized_value_drop_le_maxSeizedValue). */
-definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a;
-
-/* proved in mulDivDownRoundsDown: floor(a*b/d)*d <= a*b (Rocq floor_mul_le). */
-definition axiomDownRoundsDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b >= 0 && d > 0 => ghostMulDivDown(a, b, d) * d <= a * b;
+/* Axioms used to reconstruct the Rocq integer-division argument.
+   The two cheap rounding facts are proved over concrete mulDiv in MulDiv.spec. The single hard nonlinear step
+   (the LLTV-weighted maxDebt drop bound) is delegated to axiomMaxDebtDrop, machine-checked over the integers in
+   Rocq; assuming it here keeps the on-contract goal linear, so the prover does not have to rediscover the chain. */
 
 /* proved in mulDivUpRoundsUp: a*b <= ceil(a*b/d)*d (Rocq ceil_div_mul_ge). */
 definition axiomUpRoundsUp(mathint a, mathint b, mathint d) returns bool = a >= 0 && b >= 0 && d > 0 => a * b <= ghostMulDivUp(a, b, d) * d;
 
 /* proved in mulDivCeilLeOfMulGe: a*b <= bound*d => ceil(a*b/d) <= bound (Rocq ceil_div_le_of_mul_ge). */
 definition axiomCeilLeOfMulGe(mathint a, mathint b, mathint d, mathint bound) returns bool = a >= 0 && b >= 0 && d > 0 && a * b <= bound * d => ghostMulDivUp(a, b, d) <= bound;
+
+/* Rocq max_debt_contribution_drop_bound (rocq/maxRepaidHealthy.v:162), the one hard nonlinear step: when
+   seized is the L692 seizedAssets = floor(floor(maxRepaid*lif/WAD)*OPS/price), the LLTV-weighted maxDebt
+   contribution drops by at most ceil(maxRepaid*lif*lltv/WAD^2). Proved over the integers in Rocq; the Solidity
+   quantities are shown equal to its variables in the rule below, and the CVL bounds wire it to on-chain health. */
+definition axiomMaxDebtDrop(mathint collat, mathint seized, mathint price, mathint lltv, mathint maxRepaid, mathint lif) returns bool = price > 0 && collat >= 0 && 0 <= seized && seized <= collat && lltv >= 0 && maxRepaid >= 0 && lif >= 0 && seized == ghostMulDivDown(ghostMulDivDown(maxRepaid, lif, WAD()), ORACLE_PRICE_SCALE(), price) => ghostMulDivDown(ghostMulDivDown(collat, price, ORACLE_PRICE_SCALE()), lltv, WAD()) - ghostMulDivDown(ghostMulDivDown(collat - seized, price, ORACLE_PRICE_SCALE()), lltv, WAD()) <= ghostMulDivUp(maxRepaid, lif * lltv, WAD() * WAD());
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
@@ -234,33 +227,17 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address receiv
     // liquidate reverts independently of the RCF mechanism, so this does not narrow the generality.
     require collatBefore >= seizedOut, "seized <= collateral";
 
-    // The current and post-liquidation LLTV-weighted collateral values (single collateral).
+    // gap = debt - maxDebt > 0 (the position is unhealthy). Both are the single-collateral quantities that
+    // liquidate uses internally: maxDebt at L699 and debt (unchanged, since no bad debt) equal these.
     mathint gap = debtBefore - maxDebtContribution(collatBefore, price, lltv);
-    mathint maxSeizedValue = ghostMulDivDown(repaidUnits, lif, WAD());
-    mathint cv = ghostMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE());
-    mathint ncv = ghostMulDivDown(collatBefore - seizedOut, price, ORACLE_PRICE_SCALE());
 
-    // Axioms needed to reconstruct the Rocq argument (see rocq/maxRepaidHealthy.v, maxRepaid < debt case).
-    // Universal monotonicity backups.
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
-
-    // Fact I: the RCF cap over-repays the gap: gap * WAD^2 <= maxRepaid * (WAD^2 - lif*lltv) (ceil_div_mul_ge).
-    require axiomUpRoundsUp(gap, WAD() * WAD(), WAD() * WAD() - lif * lltv), "axiom";
-
-    // Step (a): the collateral-value drop is at most the seized value in loan units.
-    require axiomAddDownUp(collatBefore - seizedOut, seizedOut, price, ORACLE_PRICE_SCALE()), "axiom";
-    require axiomInverseUpDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price), "axiom";
-
-    // Step (b): the LLTV-weighted maxDebt drop is at most ceil(valueDrop * lltv / WAD).
-    require axiomAddDownUp(ncv, cv - ncv, lltv, WAD()), "axiom";
-
-    // Step (c): ceil is monotone, and valueDrop <= maxSeizedValue (from step (a)).
-    require axiomUpMonotoneA(cv - ncv, maxSeizedValue, lltv, WAD()), "axiom";
-
-    // Step (d): ceil(maxSeizedValue * lltv / WAD) <= maxRepaid - gap, closing the bound.
-    require axiomDownRoundsDown(repaidUnits, lif, WAD()), "axiom";
-    require axiomCeilLeOfMulGe(maxSeizedValue, lltv, WAD(), repaidUnits - gap), "axiom";
+    // Three axioms close the goal with only linear glue (see rocq/maxRepaidHealthy.v, maxRepaid < debt case):
+    // the maxDebt drop is bounded by ceil(maxRepaid*lif*lltv/WAD^2) (axiomMaxDebtDrop), the RCF cap over-repays
+    // the gap so maxRepaid*lif*lltv <= (maxRepaid - gap)*WAD^2 (axiomUpRoundsUp), hence that ceil is at most
+    // maxRepaid - gap (axiomCeilLeOfMulGe); so newMaxDebt = maxDebt - drop >= debt - maxRepaid = newDebt.
+    require axiomMaxDebtDrop(collatBefore, seizedOut, price, lltv, repaidUnits, lif), "Rocq max_debt_contribution_drop_bound";
+    require axiomUpRoundsUp(gap, WAD() * WAD(), WAD() * WAD() - lif * lltv), "proved in mulDivUpRoundsUp (Rocq ceil_div_mul_ge)";
+    require axiomCeilLeOfMulGe(repaidUnits, lif * lltv, WAD() * WAD(), repaidUnits - gap), "proved in mulDivCeilLeOfMulGe (Rocq ceil_div_le_of_mul_ge)";
 
     // newDebt >= 0 and newDebt <= newMaxDebt, i.e. the position is healthy after liquidation.
     assert isHealthyNoBitmap(globalMarket, globalId, globalBorrower), "position is healthy after liquidation at the RCF cap";
