@@ -44,8 +44,8 @@ methods {
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
 
-    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => detMulDivDown(x, y, d);
-    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => detMulDivUp(x, y, d);
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 
     // All external calls are assumed non-reentrant / non-reverting: we reason about the function bodies for safety properties.
@@ -71,35 +71,34 @@ persistent ghost maxLifGhost(uint256, uint256) returns uint256;
 
 persistent ghost summaryPrice(address) returns uint256;
 
-// Deterministic mulDiv summaries: rather than an uninterpreted ghost constrained by loose
-// monotonicity/subadditivity axioms (which let the solver pick non-arithmetic values that satisfy
-// the axioms but contradict real mulDiv, yielding spurious counterexamples), these compute the
-// EXACT value of UtilsLib.mulDivDown/mulDivUp. There is then exactly one possible value per call,
-// so the fake-value exploit is impossible and no bound axioms are needed.
-//
-// UtilsLib.mulDivDown(x, y, d) = (x * y) / d (checked 0.8 arithmetic, src/libraries/UtilsLib.sol:22-24):
-// reverts when x * y overflows uint256 or d == 0; otherwise floor(x * y / d).
-function detMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
-    mathint prod = to_mathint(x) * to_mathint(y);
-    if (prod > max_uint256 || d == 0) {
+persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
+
+persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
+
+// Loose (uninterpreted) mulDiv summaries. Because the ghost is a function, equal arguments give equal
+// values, so every non-seized collateral term cancels between liquidate's bad-debt loop and the getter.
+// The mulDiv values are otherwise constrained only by the near-linear consequences the rules e-match on
+// (monotonicity, the getter-form double sub-additivity, and the seize-value bound), each PROVEN over the
+// concrete mulDiv in MulDiv.spec. This keeps the heavy nonlinear reasoning out of the liquidate body:
+// the solver only instantiates the proven relational facts on the three collateral terms it needs
+// (g(c_k), g(c_k - seized), g(seized)), pinning the getter-sum drop without re-deriving nonlinear
+// arithmetic. The earlier deterministic (exact-value) summaries were sound but timed out; the earlier
+// single-layer loose axioms were tractable but left the g(c_k) - g(c_k - seized) drop unpinned, which
+// the solver exploited for a spurious rbd = 21. The double sub-additivity axiom below closes that gap.
+function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) {
         revert();
     }
-    return require_uint256(prod / d);
+    return require_uint256(ghostMulDivDown(a, b, d));
 }
 
-// UtilsLib.mulDivUp(x, y, d) = (x * y + (d - 1)) / d (checked 0.8 arithmetic, src/libraries/UtilsLib.sol:27-29):
-// d - 1 underflow-reverts when d == 0; x * y and x * y + (d - 1) overflow-revert when >= 2^256.
-// Since d >= 1 the numerator x * y + (d - 1) >= x * y, so a single "numerator > max_uint256" check
-// captures both the product and the sum overflow. Otherwise ceil(x * y / d).
-function detMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (d == 0) {
+function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) {
         revert();
     }
-    mathint num = to_mathint(x) * to_mathint(y) + to_mathint(d) - 1;
-    if (num > max_uint256) {
-        revert();
-    }
-    return require_uint256(num / d);
+    return require_uint256(ghostMulDivUp(a, b, d));
 }
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
@@ -109,6 +108,27 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
+
+// Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
+definition axiomUpMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
+
+// Zero collateral values to zero (proven in MulDiv.spec as mulDivZero).
+definition axiomUpZero(mathint b, mathint d) returns bool = d > 0 => ghostMulDivUp(0, b, d) == 0;
+
+// Getter-form double-mulDivUp sub-additivity (proven in MulDiv.spec as mulDivUpDoubleSubAdditive): for
+//   g(x) = mulDivUp(mulDivUp(x, price, ORACLE_PRICE_SCALE), WAD, maxLif),
+// g(a) <= g(a - s) + g(s) whenever s <= a. ORACLE_PRICE_SCALE and WAD are pinned to the getter's exact
+// constants so this e-matches the getter's/liquidate's ground terms; price (p) and maxLif (L) stay free
+// and instantiate to the seized collateral's oracle price and maxLif. Applied to the seized collateral
+// (a = c_k, s = seizedAssets) it directly bounds the getter-sum drop g(c_k) - g(c_k - seizedAssets) by
+// g(seizedAssets). This is the single relational fact that forbids the ghost from inflating the
+// seized-collateral term -- exactly the slack the earlier single-layer axioms left open (the spurious
+// g(c_k) - g(c_k - seized) >> g(seized), rbd = 21, counterexample).
+definition axiomUpDoubleSubAdditive(mathint a, mathint s, mathint p, mathint L) returns bool = 0 <= s && s <= a && 0 < L => ghostMulDivUp(ghostMulDivUp(a, p, ORACLE_PRICE_SCALE()), WAD(), L) <= ghostMulDivUp(ghostMulDivUp(a - s, p, ORACLE_PRICE_SCALE()), WAD(), L) + ghostMulDivUp(ghostMulDivUp(s, p, ORACLE_PRICE_SCALE()), WAD(), L);
+
+// Getter-form seize-value bound (proven in MulDiv.spec as mulDivSeizeValueBounded): the up-up value
+// of the down-down seized collateral never exceeds the repaid units, when seize and value share lif.
+definition axiomSeizeValue(mathint r, mathint l, mathint p, mathint sc, mathint w) returns bool = 0 < l && 0 < p && 0 < w && 0 < sc => ghostMulDivUp(ghostMulDivUp(ghostMulDivDown(ghostMulDivDown(r, l, w), sc, p), p, sc), w, l) <= r;
 
 /// INVARIANTS ///
 
@@ -124,9 +144,11 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 //
 // The rule is split along liquidate's exclusive-input branch (src/Midnight.sol:633,
 // `require repaidUnits == 0 || seizedAssets == 0`), one CI leg per branch, because the single
-// combined rule was heavy enough to be killed server-side. mulDiv is summarized deterministically
-// (detMulDivDown/detMulDivUp), so the nonlinear reasoning is done directly over the exact mulDiv
-// values with no ghost axioms and no ghost slack for the solver to exploit.
+// combined rule was heavy enough to be killed server-side. mulDiv is summarized by a loose
+// (uninterpreted) ghost, and the nonlinear reasoning is proven once, over the concrete mulDiv, in
+// MulDiv.spec; each branch then assumes only the near-linear consequences it e-matches on. The key
+// fact is the getter-form double sub-additivity g(c_k) <= g(c_k - seized) + g(seized), which pins the
+// seized-collateral drop and closes the spurious rbd = 21 the earlier single-layer axioms allowed.
 
 // Seized-assets-input branch (repaidUnits == 0): liquidate computes
 //   repaidUnits = mulDivUp(mulDivUp(seizedAssets, price, ORACLE_PRICE_SCALE), WAD, lif) = g(seizedAssets)
@@ -153,9 +175,13 @@ rule liquidateRealizesBadDebtSeizeInput(env e, Midnight.Market market, uint256 c
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
 
-    // No mulDiv axioms are assumed: detMulDivDown/detMulDivUp compute the exact mulDiv value, so the
-    // prover reasons over concrete arithmetic (monotonicity, sub-additivity and the seize-value bound
-    // all hold by construction) with no ghost slack to exploit.
+    // The near-linear consequences of the MulDiv lemmas this branch uses are assumed over the loose
+    // ghost. The seize-value bound is not needed here: repaidUnits is exactly g(seizedAssets), so the
+    // double sub-additivity alone bounds the getter-sum drop g(c_k) - g(c_k - seizedAssets) by the
+    // repaid debt drop g(seizedAssets), leaving at most one seized-collateral term's rounding.
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "monotone in first arg (mulDivMonotoneA)";
+    require forall mathint b. forall mathint d. axiomUpZero(b, d), "zero collateral values to zero (mulDivZero)";
+    require forall mathint a. forall mathint s. forall mathint p. forall mathint L. axiomUpDoubleSubAdditive(a, s, p, L), "getter-form double sub-additivity (mulDivUpDoubleSubAdditive)";
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
@@ -188,9 +214,15 @@ rule liquidateRealizesBadDebtRepaidInput(env e, Midnight.Market market, uint256 
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
 
-    // No mulDiv axioms are assumed: detMulDivDown/detMulDivUp compute the exact mulDiv value, so the
-    // prover reasons over concrete arithmetic (sub-additivity and the seize-value bound
-    // g(seizedAssets) <= repaidUnits hold by construction) with no ghost slack to exploit.
+    // The near-linear consequences of the MulDiv lemmas are assumed over the loose ghost: the double
+    // sub-additivity bounds the getter-sum drop g(c_k) - g(c_k - seizedAssets) by g(seizedAssets), and
+    // the seize-value bound closes g(seizedAssets) <= repaidUnits, so the getter-sum drops by at most
+    // the repaid debt drop. The nonlinear reasoning is proven once, over concrete mulDiv, in MulDiv.spec
+    // (mulDivUpDoubleSubAdditive, mulDivSeizeValueBounded, mulDivMonotoneA, mulDivZero).
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "monotone in first arg (mulDivMonotoneA)";
+    require forall mathint b. forall mathint d. axiomUpZero(b, d), "zero collateral values to zero (mulDivZero)";
+    require forall mathint a. forall mathint s. forall mathint p. forall mathint L. axiomUpDoubleSubAdditive(a, s, p, L), "getter-form double sub-additivity (mulDivUpDoubleSubAdditive)";
+    require forall mathint r. forall mathint l. forall mathint p. forall mathint sc. forall mathint w. axiomSeizeValue(r, l, p, sc, w), "seize-value bound (mulDivSeizeValueBounded)";
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 

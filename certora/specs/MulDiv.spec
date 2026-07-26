@@ -83,6 +83,29 @@ rule mulDivAddUpUpTight(uint256 a1, uint256 a2, uint256 b, uint256 d) {
     assert mulDivUp(a1, b, d) + mulDivUp(a2, b, d) <= mulDivUp(a1plusa2, b, d) + 1;
 }
 
+// Getter-form double-mulDivUp sub-additivity, with zero slack: for
+//   g(x) = mulDivUp(mulDivUp(x, p, S), W, L)   (the per-collateral getter term, with L >= W),
+// and s <= a,  g(a) <= g(a - s) + g(s).
+// Both ceil layers are sub-additive with zero slack (single-layer is mulDivAddUpUp above), and the
+// composition carries the same zero slack: the inner ceil gives mulDivUp(a,p,S) <= mulDivUp(a-s,p,S) +
+// mulDivUp(s,p,S) (a = (a-s) + s), then monotonicity + sub-additivity of the outer ceil close it. Used
+// by RealizableBadDebtLiquidate.spec to bound the getter-sum drop g(c_k) - g(c_k - seized) by g(seized)
+// on the single seized collateral, which is exactly the slack the loose single-layer axioms left open.
+rule mulDivUpDoubleSubAdditive(uint256 a, uint256 s, uint256 p, uint256 S, uint256 W, uint256 L) {
+    require s <= a;
+    require S > 0 && W > 0 && L >= W;
+
+    uint256 innerA = mulDivUp(a, p, S);
+    uint256 innerAS = mulDivUp(require_uint256(a - s), p, S);
+    uint256 innerS = mulDivUp(s, p, S);
+
+    uint256 ga = mulDivUp(innerA, W, L);
+    uint256 gas = mulDivUp(innerAS, W, L);
+    uint256 gs = mulDivUp(innerS, W, L);
+
+    assert to_mathint(ga) <= to_mathint(gas) + to_mathint(gs);
+}
+
 rule mulDivAddDownUp(uint256 a1, uint256 a2, uint256 b, uint256 d) {
     uint256 a1plusa2 = require_uint256(a1 + a2);
     assert mulDivDown(a1, b, d) + mulDivUp(a2, b, d) >= mulDivDown(a1plusa2, b, d);
