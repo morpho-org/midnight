@@ -224,6 +224,18 @@ rule liquidateRealizesBadDebtRepaidInput(env e, Midnight.Market market, uint256 
     require forall mathint a. forall mathint s. forall mathint p. forall mathint L. axiomUpDoubleSubAdditive(a, s, p, L), "getter-form double sub-additivity (mulDivUpDoubleSubAdditive)";
     require forall mathint r. forall mathint l. forall mathint p. forall mathint sc. forall mathint w. axiomSeizeValue(r, l, p, sc, w), "seize-value bound (mulDivSeizeValueBounded)";
 
+    // Ground instances of the derived-seize chain (seizedAssets = src/Midnight.sol:692) so the axioms
+    // above close without quantifier search on the loop-internal seized term.
+    mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
+    mathint seizedDerived = ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price);
+    mathint gSeized = ghostMulDivUp(ghostMulDivUp(seizedDerived, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
+    mathint collatK = to_mathint(collateral(id, borrower, collateralIndex));
+    mathint gCollatK = ghostMulDivUp(ghostMulDivUp(collatK, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
+    mathint gCollatKMinusSeized = ghostMulDivUp(ghostMulDivUp(collatK - seizedDerived, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
+
+    require gSeized <= to_mathint(repaidUnits), "seize-value bound instance (mulDivSeizeValueBounded)";
+    require seizedDerived <= collatK => gCollatK <= gCollatKMinusSeized + gSeized, "double sub-additivity instance (mulDivUpDoubleSubAdditive)";
+
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     assert realizableBadDebt(market, id, borrower) <= 3;
