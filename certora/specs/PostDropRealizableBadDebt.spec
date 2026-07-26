@@ -144,6 +144,12 @@ definition axiomUpDoubleSubAdditive(mathint a, mathint s, mathint p, mathint L) 
 // seize and value share lif. This closes g_p(seized) <= repaidUnits on the repaid-input branch.
 definition axiomSeizeValue(mathint r, mathint l, mathint p, mathint sc, mathint w) returns bool = 0 < l && 0 < p && 0 < w && 0 < sc => ghostMulDivUp(ghostMulDivUp(ghostMulDivDown(ghostMulDivDown(r, l, w), sc, p), p, sc), w, l) <= r;
 
+// Dropped-price seize-value bound (proven in MulDiv.spec as mulDivSeizeValueAtDroppedPriceBounded): the
+// up-up value at the DROPPED price pDrop (<= call-time price p) of the down-down seized collateral never
+// exceeds the repaid units r. Composes axiomSeizeValue (bound at p) with price monotonicity in one fact,
+// closing g_{p'}(seized) <= repaidUnits directly on the repaid-input branch.
+definition axiomSeizeValueAtDroppedPrice(mathint r, mathint l, mathint p, mathint sc, mathint w, mathint pDrop) returns bool = 0 < l && 0 < p && 0 < w && 0 < sc && 0 <= pDrop && pDrop <= p => ghostMulDivUp(ghostMulDivUp(ghostMulDivDown(ghostMulDivDown(r, l, w), sc, p), pDrop, sc), w, l) <= r;
+
 /// INVARIANTS ///
 
 // Proven in CollateralBitmap.spec; assumed here via requireInvariant (not re-proven in this spec).
@@ -251,31 +257,28 @@ rule postDropRbdLiquidateNonIncreaseRepaidInput(env e, Midnight.Market market, u
     require pDrop <= price, "the measurement price p' is a dropped price: p' <= call-time price p";
 
     // Near-linear consequences of the MulDiv lemmas, assumed over the loose ghost (each proven in
-    // MulDiv.spec): the double sub-additivity bounds the p'-coverage drop by g_{p'}(seized),
-    // monotonicity in each argument supplies the price bridge g_{p'}(seized) <= g_p(seized), and the
-    // seize-value bound closes g_p(seized) <= repaidUnits. axiomUpZero covers the emptied-collateral term.
+    // MulDiv.spec): the double sub-additivity bounds the p'-coverage drop by g_{p'}(seized), and the
+    // dropped-price seize-value bound closes g_{p'}(seized) <= repaidUnits in one step (no separate price
+    // bridge / call-time bound to chain). axiomUpZero covers the emptied-collateral term.
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "monotone in first arg (mulDivMonotoneA)";
     require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomUpMonotoneB(a, b1, b2, d), "monotone in second arg (mulDivMonotoneB)";
     require forall mathint b. forall mathint d. axiomUpZero(b, d), "zero collateral values to zero (mulDivZero)";
     require forall mathint a. forall mathint s. forall mathint p. forall mathint L. axiomUpDoubleSubAdditive(a, s, p, L), "getter-form double sub-additivity (mulDivUpDoubleSubAdditive)";
-    require forall mathint r. forall mathint l. forall mathint p. forall mathint sc. forall mathint w. axiomSeizeValue(r, l, p, sc, w), "seize-value bound (mulDivSeizeValueBounded)";
+    require forall mathint r. forall mathint l. forall mathint p. forall mathint sc. forall mathint w. forall mathint pd. axiomSeizeValueAtDroppedPrice(r, l, p, sc, w, pd), "dropped-price seize-value bound (mulDivSeizeValueAtDroppedPriceBounded)";
 
     // Ground instances of the derived-seize chain (seizedAssets = src/Midnight.sol:692) so the axioms
     // close without quantifier search on the loop-internal seized term.
     mathint seizedDerived = ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price);
     mathint innerSeizedDrop = ghostMulDivUp(seizedDerived, pDrop, ORACLE_PRICE_SCALE());
-    mathint innerSeizedP = ghostMulDivUp(seizedDerived, price, ORACLE_PRICE_SCALE());
     mathint gSeizedDrop = ghostMulDivUp(innerSeizedDrop, WAD(), maxLif);
-    mathint gSeizedP = ghostMulDivUp(innerSeizedP, WAD(), maxLif);
     mathint collatK = to_mathint(collateral(id, borrower, collateralIndex));
     mathint gCollatKDrop = ghostMulDivUp(ghostMulDivUp(collatK, pDrop, ORACLE_PRICE_SCALE()), WAD(), maxLif);
     mathint gCollatKMinusSeizedDrop = ghostMulDivUp(ghostMulDivUp(collatK - seizedDerived, pDrop, ORACLE_PRICE_SCALE()), WAD(), maxLif);
 
-    // Seize-value bound at the call-time price p: g_p(seized) <= repaidUnits. Price bridge
-    // (mulDivMonotoneB then mulDivMonotoneA, since pDrop <= price): g_{p'}(seized) <= g_p(seized).
-    // Sub-additivity at p' bounds the coverage drop by g_{p'}(seized).
-    require gSeizedP <= to_mathint(repaidUnits), "seize-value bound instance at p (mulDivSeizeValueBounded)";
-    require gSeizedDrop <= gSeizedP, "price bridge: g_{p'}(seized) <= g_p(seized) (mulDivMonotoneB then mulDivMonotoneA)";
+    // Single-step dropped-price seize-value bound: the p'-valued derived seize is at most repaidUnits
+    // (mulDivSeizeValueAtDroppedPriceBounded), collapsing the former call-time-bound + price-bridge chain.
+    // Sub-additivity at p' then bounds the coverage drop by g_{p'}(seized).
+    require gSeizedDrop <= to_mathint(repaidUnits), "dropped-price seize-value bound instance (mulDivSeizeValueAtDroppedPriceBounded)";
     require seizedDerived <= collatK => gCollatKDrop <= gCollatKMinusSeizedDrop + gSeizedDrop, "double sub-additivity instance at p' (mulDivUpDoubleSubAdditive)";
 
     mathint R = realizableBadDebtAtPrice(market, id, borrower, pDrop);
