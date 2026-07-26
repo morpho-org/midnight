@@ -39,8 +39,15 @@ definition zeroFloorSub(uint256 a, uint256 b) returns mathint = a >= b ? a - b :
 
 // Monotonic clock: the greatest block.timestamp observed so far. block.timestamp only increases,
 // so this lower-bounds every future timestamp. Persistent so callbacks cannot havoc it.
-persistent ghost mathint lastTimestamp {
-    init_state axiom lastTimestamp == 0;
+persistent ghost uint256 lastTimestamp;
+
+hook TIMESTAMP() uint newTimestamp {
+    // Safe require because timestamps are guaranteed to be increasing.
+    require newTimestamp >= lastTimestamp;
+
+    // Safe require as it corresponds to some time very far into the future.
+    require newTimestamp < 2 ^ 63;
+    lastTimestamp = newTimestamp;
 }
 
 /// SUMMARY FUNCTIONS ///
@@ -114,13 +121,7 @@ invariant pendingFeeZeroAfterMaturity(Midnight.Market market, bytes32 id, addres
 
 // A created market's maturity, recorded in maturityOfId at creation, is at most MAX_TTM in the future.
 strong invariant maturityBoundedById(bytes32 id)
-    tickSpacing(id) > 0 => maturityOfId[id] <= lastTimestamp + MAX_TTM()
-    {
-        preserved with (env e) {
-            require to_mathint(e.block.timestamp) >= lastTimestamp, "block.timestamp is monotonic";
-            lastTimestamp = to_mathint(e.block.timestamp);
-        }
-    }
+    tickSpacing(id) > 0 => maturityOfId[id] <= to_mathint(lastTimestamp) + MAX_TTM();
 
 /// RULES ///
 
@@ -189,7 +190,7 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
     require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
 
     requireInvariant maturityBoundedById(summaryToId(offer.market));
-    require to_mathint(e.block.timestamp) >= lastTimestamp, "block.timestamp is monotonic";
+    require e.block.timestamp >= lastTimestamp, "block.timestamp is monotonic";
 
     assert continuousFee(summaryToId(offer.market)) * zeroFloorSub(offer.market.maturity, e.block.timestamp) <= WAD(), "interest <= 100%";
 
