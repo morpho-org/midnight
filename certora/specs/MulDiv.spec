@@ -113,6 +113,12 @@ rule mulDivUpUpperBound(uint256 a, uint256 b, uint256 d) {
     assert mulDivUp(a, b, d) * d <= a * b + d - 1;
 }
 
+// If the exact product is at most bound * d, then the ceiling is at most bound.
+// Used by MaxRepaidHealthy.spec (axiomCeilLeOfMulGe) to bound the collateral-value drop.
+rule mulDivCeilLeOfMulGe(uint256 a, uint256 b, uint256 d, uint256 bound) {
+    assert d != 0 && a * b <= bound * d => mulDivUp(a, b, d) <= bound;
+}
+
 rule mulDivResidualBound(uint256 a, uint256 b, uint256 d) {
     assert a <= d && b <= d => a - mulDivDown(a, b, d) <= d - b;
     assert a <= d && b <= d => a - mulDivUp(a, b, d) <= d - b;
