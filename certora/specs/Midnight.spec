@@ -169,7 +169,6 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
             requireInvariant maturityBoundedById(summaryToId(offer.market));
-            require e.block.timestamp >= lastTimestamp, "block.timestamp is monotonic";
         }
     }
 

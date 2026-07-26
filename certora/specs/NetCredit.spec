@@ -190,7 +190,6 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
     require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
 
     requireInvariant maturityBoundedById(summaryToId(offer.market));
-    require e.block.timestamp >= lastTimestamp, "block.timestamp is monotonic";
 
     assert continuousFee(summaryToId(offer.market)) * zeroFloorSub(offer.market.maturity, e.block.timestamp) <= WAD(), "interest <= 100%";
 
