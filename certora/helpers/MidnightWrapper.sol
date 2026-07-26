@@ -58,4 +58,31 @@ contract MidnightWrapper is Midnight {
         }
         return badDebt;
     }
+
+    // Explicit-price variant of realizableBadDebt: identical loop, but each collateral term is valued at
+    // the EXPLICITLY PASSED `price` instead of the oracle's IOracle(...).price(). This decouples the
+    // measurement price from the price liquidate reads at call time, letting a spec measure the realizable
+    // bad debt at a DROPPED price p' <= p while liquidate still runs at p. Structurally a verbatim copy of
+    // realizableBadDebt above (same zeroFloorSub, same mulDivUp(mulDivUp(collateral_i, price,
+    // ORACLE_PRICE_SCALE), WAD, maxLif_i)), so the prover equates it with the production bad-debt math.
+    function realizableBadDebtAtPrice(Market memory market, bytes32 id, address borrower, uint256 price)
+        public
+        view
+        returns (uint256)
+    {
+        Position storage _position = position[id][borrower];
+        uint256 badDebt = _position.debt;
+        uint128 _collateralBitmap = _position.collateralBitmap;
+        while (_collateralBitmap != 0) {
+            uint256 i = UtilsLib.msb(_collateralBitmap);
+            CollateralParams memory _collateralParam = market.collateralParams[i];
+            uint256 _collateral = _position.collateral[i];
+            badDebt = badDebt.zeroFloorSub(
+                _collateral.mulDivUp(price, ORACLE_PRICE_SCALE)
+                    .mulDivUp(WAD, maxLif(_collateralParam.lltv, _collateralParam.liquidationCursor))
+            );
+            _collateralBitmap = _collateralBitmap.clearBit(i);
+        }
+        return badDebt;
+    }
 }
