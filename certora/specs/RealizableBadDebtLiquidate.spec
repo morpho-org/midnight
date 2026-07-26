@@ -200,8 +200,7 @@ rule liquidateRealizesBadDebtRepaidInput(env e, Midnight.Market market, uint256 
 
     require seizedAssets == 0, "repaid-units-input branch: seizedAssets is derived from repaidUnits (src/Midnight.sol:693)";
 
-    // single collateral: solver-tractability scope; multi-collateral follows from K=0 subadditivity (non-seized terms cancel)
-    require market.collateralParams.length == 1, "restrict collateralParams for loop tractability";
+    require market.collateralParams.length <= 2, "restrict collateralParams for loop tractability";
     require marketIsCreated(market), "market must be created (tickSpacing > 0)";
     require lossFactor(id) < max_uint128, "market lossFactor must not be saturated";
     require to_mathint(debt(id, borrower)) <= to_mathint(totalUnits(id)), "position debt bounded by totalUnits";
@@ -210,6 +209,7 @@ rule liquidateRealizesBadDebtRepaidInput(env e, Midnight.Market market, uint256 
 
     // Soundness: nonZeroCollateralsAreActivated is proven in CollateralBitmap.spec.
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
+    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
 
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
