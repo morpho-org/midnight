@@ -78,6 +78,19 @@ contract BlueBuyCallbackTest is Test {
         callback.setAuthorization(makeAddr("authorized"), true);
     }
 
+    function testSetAuthorizationRevertsIfRevokingOwner() public {
+        vm.prank(owner);
+        vm.expectRevert(IBlueBuyCallback.CannotRevokeOwnerAuthorization.selector);
+        callback.setAuthorization(owner, false);
+    }
+
+    function testSetAuthorizationAllowsGrantingOwner() public {
+        vm.prank(owner);
+        callback.setAuthorization(owner, true);
+
+        assertTrue(blue.isAuthorized(address(callback), owner));
+    }
+
     function testSetAuthorizationWithSig() public {
         uint256 ownerPrivateKey = 1;
         address signer = vm.addr(ownerPrivateKey);
@@ -139,6 +152,17 @@ contract BlueBuyCallbackTest is Test {
         Signature memory signature = _signAuthorization(2, address(signedCallback), authorization);
 
         vm.expectRevert(IBlueBuyCallback.InvalidSignature.selector);
+        signedCallback.setAuthorizationWithSig(authorization, signature);
+    }
+
+    function testSetAuthorizationWithSigRevertsIfRevokingOwner() public {
+        uint256 ownerPrivateKey = 1;
+        address signer = vm.addr(ownerPrivateKey);
+        BlueBuyCallback signedCallback = new BlueBuyCallback(signer, address(midnight), address(blue));
+        Authorization memory authorization = Authorization(signer, signer, false, 0, block.timestamp);
+        Signature memory signature = _signAuthorization(ownerPrivateKey, address(signedCallback), authorization);
+
+        vm.expectRevert(IBlueBuyCallback.CannotRevokeOwnerAuthorization.selector);
         signedCallback.setAuthorizationWithSig(authorization, signature);
     }
 
