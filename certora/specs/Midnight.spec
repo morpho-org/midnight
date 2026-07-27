@@ -64,8 +64,7 @@ hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (ui
 persistent ghost uint256 lastTimestamp;
 
 hook TIMESTAMP() uint newTimestamp {
-    // Safe require because timestamps are guaranteed to be increasing.
-    require newTimestamp >= lastTimestamp;
+    require newTimestamp >= lastTimestamp, "timestamps are guaranteed to be increasing";
 
     // Safe require as it corresponds to some time very far into the future.
     require newTimestamp < 2 ^ 63;
