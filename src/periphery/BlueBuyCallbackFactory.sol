@@ -22,7 +22,7 @@ contract BlueBuyCallbackFactory is IBlueBuyCallbackFactory {
         callbackOf[owner] = callback;
         isBlueCallback[callback] = true;
 
-        emit CreateBlueBuyCallback(owner, callback);
+        emit CreateBlueBuyCallback(owner, msg.sender, callback);
         return callback;
     }
 }
