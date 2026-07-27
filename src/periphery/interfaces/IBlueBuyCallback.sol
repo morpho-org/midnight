@@ -10,6 +10,7 @@ interface IBlueBuyCallback is IBuyCallback {
     /// ERRORS ///
     error ApproveReturnedFalse();
     error AuthorizationExpired();
+    error CannotRevokeOwnerAuthorization();
     error InconsistentLoanToken();
     error InvalidNonce();
     error InvalidSignature();
