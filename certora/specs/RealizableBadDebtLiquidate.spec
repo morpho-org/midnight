@@ -214,18 +214,17 @@ rule liquidateRealizesBadDebtRepaidInput(env e, Midnight.Market market, uint256 
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
 
-    // The near-linear consequences of the MulDiv lemmas are assumed over the loose ghost: the double
-    // sub-additivity bounds the getter-sum drop g(c_k) - g(c_k - seizedAssets) by g(seizedAssets), and
-    // the seize-value bound closes g(seizedAssets) <= repaidUnits, so the getter-sum drops by at most
-    // the repaid debt drop. The nonlinear reasoning is proven once, over concrete mulDiv, in MulDiv.spec
-    // (mulDivUpDoubleSubAdditive, mulDivSeizeValueBounded, mulDivMonotoneA, mulDivZero).
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "monotone in first arg (mulDivMonotoneA)";
-    require forall mathint b. forall mathint d. axiomUpZero(b, d), "zero collateral values to zero (mulDivZero)";
-    require forall mathint a. forall mathint s. forall mathint p. forall mathint L. axiomUpDoubleSubAdditive(a, s, p, L), "getter-form double sub-additivity (mulDivUpDoubleSubAdditive)";
-    require forall mathint r. forall mathint l. forall mathint p. forall mathint sc. forall mathint w. axiomSeizeValue(r, l, p, sc, w), "seize-value bound (mulDivSeizeValueBounded)";
+    // The near-linear consequences of the MulDiv lemmas are assumed over the loose ghost, but only as
+    // concrete (non-quantified) ground-term instances -- no `forall` axioms. The general quantified
+    // forms over unbounded mathint were the NIA blowup that timed the rule out; instantiating them once,
+    // by hand, on the exact terms the loop produces keeps the reasoning near-linear (see #1083). The
+    // double sub-additivity instance bounds the getter-sum drop g(c_k) - g(c_k - seizedAssets) by
+    // g(seizedAssets), and the seize-value instance closes g(seizedAssets) <= repaidUnits, so the
+    // getter-sum drops by at most the repaid debt drop. The nonlinear reasoning is proven once, over
+    // concrete mulDiv, in MulDiv.spec (mulDivUpDoubleSubAdditive, mulDivSeizeValueBounded).
 
-    // Ground instances of the derived-seize chain (seizedAssets = src/Midnight.sol:692) so the axioms
-    // above close without quantifier search on the loop-internal seized term.
+    // Ground instances of the derived-seize chain (seizedAssets = src/Midnight.sol:692) so the facts
+    // close without quantifier search on the loop-internal seized term.
     mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
     mathint seizedDerived = ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price);
     mathint gSeized = ghostMulDivUp(ghostMulDivUp(seizedDerived, price, ORACLE_PRICE_SCALE()), WAD(), maxLif);
