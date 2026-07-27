@@ -87,6 +87,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
     /// @dev This function is useful for bundles to query how much is available at the moment.
     /// @dev Other buy callbacks might not take all constraints into account to provide their bound, but this is fine,
     /// if the routing layer can take into account the other reasons.
+    /// @dev Under-estimates the real bound if the callback is the fee recipient of the blue market.
     function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {
         MarketParams memory marketParams = abi.decode(data, (MarketParams));
 
