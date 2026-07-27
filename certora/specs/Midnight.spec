@@ -154,7 +154,7 @@ strong invariant continuousFeeBounded(bytes32 id)
 
 // A created market's maturity, recorded in maturityOfId at creation, is at most MAX_TTM in the future.
 strong invariant maturityBoundedById(bytes32 id)
-    tickSpacing(id) > 0 => maturityOfId[id] <= to_mathint(lastTimestamp) + MAX_TTM();
+    tickSpacing(id) > 0 => maturityOfId[id] <= lastTimestamp + MAX_TTM();
 
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
     pendingFee(id, user) <= credit(id, user)
