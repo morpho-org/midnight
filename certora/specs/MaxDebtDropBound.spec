@@ -28,5 +28,10 @@ rule maxDebtContributionDropBound(uint256 collat, uint256 price, uint256 lltv, u
     uint256 curContrib = mulDivDown(mulDivDown(collat, price, ORACLE_PRICE_SCALE()), lltv, WAD());
     uint256 newContrib = mulDivDown(mulDivDown(assert_uint256(collat - seized), price, ORACLE_PRICE_SCALE()), lltv, WAD());
 
-    assert curContrib - newContrib <= mulDivUp(maxRepaid, require_uint256(lif * lltv), WAD() * WAD());
+    // lif * lltv and WAD * WAD are mathint products; cast them to pass as uint256 mulDivUp arguments. Both fit:
+    // lif <= 2 * WAD and lltv <= WAD, and WAD * WAD == 10^36.
+    uint256 lifTimesLltv = require_uint256(lif * lltv);
+    uint256 wadSquared = require_uint256(WAD() * WAD());
+
+    assert curContrib - newContrib <= mulDivUp(maxRepaid, lifTimesLltv, wadSquared);
 }
