@@ -42,8 +42,7 @@ definition zeroFloorSub(uint256 a, uint256 b) returns mathint = a >= b ? a - b :
 persistent ghost uint256 lastTimestamp;
 
 hook TIMESTAMP() uint newTimestamp {
-    // Safe require because timestamps are guaranteed to be increasing.
-    require newTimestamp >= lastTimestamp;
+    require newTimestamp >= lastTimestamp, "timestamps are guaranteed to be increasing";
 
     // Safe require as it corresponds to some time very far into the future.
     require newTimestamp < 2 ^ 63;
