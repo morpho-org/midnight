@@ -40,9 +40,9 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
 
-persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
 
-persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
 
 function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (d == 0) {
@@ -51,13 +51,11 @@ function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (x * y > max_uint256) {
         revert();
     }
-    uint256 result = require_uint256(ghostMulDivDown(x, y, d));
+    uint256 result = ghostMulDivDown(x, y, d);
     require result * d <= x * y, "see mulDivDownRoundsDown in MulDiv.spec";
     require (result + 1) * d > x * y, "see mulDivDownTightBound in MulDiv.spec";
     require y <= d => result <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
     require x <= d => result <= y, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
-
-    // Identity floor(x*d/d) == x (denominator is nonzero here); pins the result exactly when y == d.
     require y == d => result == x, "see mulDivIdentity in MulDiv.spec";
     return result;
 }
@@ -69,7 +67,7 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (x * y + d - 1 > max_uint256) {
         revert();
     }
-    uint256 result = require_uint256(ghostMulDivUp(x, y, d));
+    uint256 result = ghostMulDivUp(x, y, d);
     require result * d >= x * y, "see mulDivUpRoundsUp in MulDiv.spec";
     require result * d <= x * y + d - 1, "see mulDivUpUpperBound in MulDiv.spec";
     require y <= d => result <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
