@@ -44,8 +44,7 @@ persistent ghost uint256 lastTimestamp;
 hook TIMESTAMP() uint newTimestamp {
     require newTimestamp >= lastTimestamp, "timestamps are guaranteed to be increasing";
 
-    // Safe require as it corresponds to some time very far into the future.
-    require newTimestamp < 2 ^ 63;
+    require newTimestamp < 2 ^ 63, "safe as it corresponds to some time very far into the future.";
     lastTimestamp = newTimestamp;
 }
 
