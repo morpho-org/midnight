@@ -39,8 +39,12 @@ definition MAX_TTM() returns mathint = 100 * 365 * 86400;
 
 definition WAD() returns uint256 = 10 ^ 18;
 
+persistent ghost mapping(bytes32 => uint256) maturityOfId;
+
 function summaryToId(Midnight.Market market) returns (bytes32) {
-    return Utils.hashMarket(market);
+    bytes32 id = Utils.hashMarket(market);
+    require maturityOfId[id] == to_mathint(market.maturity), "remember the maturity of the market";
+    return id;
 }
 
 function marketIsCreated(Midnight.Market market) returns (bool) {
@@ -53,6 +57,17 @@ persistent ghost mapping(bytes32 => mathint) sumDebt {
 
 hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (uint128 oldDebt) {
     sumDebt[id] = sumDebt[id] - to_mathint(oldDebt) + to_mathint(newDebt);
+}
+
+// Monotonic clock: the greatest block.timestamp observed so far. block.timestamp only increases,
+// so this lower-bounds every future timestamp. Persistent so callbacks cannot havoc it.
+persistent ghost uint256 lastTimestamp;
+
+hook TIMESTAMP() uint newTimestamp {
+    require newTimestamp >= lastTimestamp, "timestamps are guaranteed to be increasing";
+
+    require newTimestamp < 2 ^ 63, "safe as it corresponds to some time very far into the future";
+    lastTimestamp = newTimestamp;
 }
 
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
@@ -137,6 +152,10 @@ strong invariant continuousFeeBounded(bytes32 id)
         }
     }
 
+// A created market's maturity, recorded in maturityOfId at creation, is at most MAX_TTM in the future.
+strong invariant maturityBoundedById(bytes32 id)
+    tickSpacing(id) > 0 => maturityOfId[id] <= lastTimestamp + MAX_TTM();
+
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
     pendingFee(id, user) <= credit(id, user)
     {
@@ -147,7 +166,7 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
         preserved take(Midnight.Offer offer, bytes ratifierData, uint256 unitsInput, address taker, address receiverIfTakerIsSeller, address takerCallbackAddress, bytes takerCallbackData) with (env e) {
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
-            require to_mathint(offer.market.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(); // TODO verify this cleanly
+            requireInvariant maturityBoundedById(summaryToId(offer.market));
         }
     }
 
