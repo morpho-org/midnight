@@ -39,7 +39,7 @@ definition MAX_TTM() returns mathint = 100 * 365 * 86400;
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-persistent ghost mapping(bytes32 => mathint) maturityOfId;
+persistent ghost mapping(bytes32 => uint256) maturityOfId;
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
     bytes32 id = Utils.hashMarket(market);
