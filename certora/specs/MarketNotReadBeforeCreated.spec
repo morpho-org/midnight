@@ -6,15 +6,10 @@ methods {
 
     // The following summaries are sound since they do not read market state.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
-    function TickLib.wExp(int256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
 
     function IdLib.toId(Midnight.Market memory) internal returns (bytes32) => NONDET;
-
-    function _.isRatified(Midnight.Offer, bytes, address) external => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
 }
 
 /// GHOSTS ///
@@ -112,14 +107,14 @@ filtered {
         && f.selector != sig:totalUnits(bytes32).selector
         && f.selector != sig:lossFactor(bytes32).selector
         && f.selector != sig:withdrawable(bytes32).selector
-        && f.selector != sig:continuousFee(bytes32).selector
         && f.selector != sig:continuousFeeCredit(bytes32).selector
         && f.selector != sig:settlementFeeCbps(bytes32).selector
+        && f.selector != sig:continuousFee(bytes32).selector
         && f.selector != sig:credit(bytes32, address).selector
-        && f.selector != sig:debt(bytes32, address).selector
         && f.selector != sig:pendingFee(bytes32, address).selector
-        && f.selector != sig:lastAccrual(bytes32, address).selector
         && f.selector != sig:lastLossFactor(bytes32, address).selector
+        && f.selector != sig:lastAccrual(bytes32, address).selector
+        && f.selector != sig:debt(bytes32, address).selector
         && f.selector != sig:collateralBitmap(bytes32, address).selector
         && f.selector != sig:collateral(bytes32, address, uint256).selector
         && f.selector != sig:updatePositionView(Midnight.Market, bytes32, address).selector
@@ -129,5 +124,5 @@ filtered {
 
     f(e, args);
 
-    assert !marketReadBeforeCreated[id], "a market field was read before the market was created";
+    assert !marketReadBeforeCreated[id];
 }

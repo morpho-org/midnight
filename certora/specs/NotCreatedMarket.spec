@@ -81,10 +81,10 @@ strong invariant marketCollateralIsEmptyIfNotCreated(bytes32 id, address user, u
 strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
     !marketIsCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
 
-/// UNCREATED-MARKET BEHAVIOR RULES ///
+/// NOT CREATED MARKET BEHAVIOR RULES ///
 
 rule updatePositionViewIsZeroIfMarketNotCreated(env e, Midnight.Market market, bytes32 id, address user) {
-    require currentContract.marketState[id].tickSpacing == 0; // the market is not created
+    require currentContract.marketState[id].tickSpacing == 0, "assume that the market is not created";
 
     requireInvariant marketCreditIsEmptyIfNotCreated(id, user);
     requireInvariant positionLastLossFactorIsEmptyIfNotCreated(id, user);
@@ -103,7 +103,7 @@ rule updatePositionViewIsZeroIfMarketNotCreated(env e, Midnight.Market market, b
 }
 
 rule marketIsHealthyIfNotCreated(env e, Midnight.Market market, bytes32 id, address borrower) {
-    require currentContract.marketState[id].tickSpacing == 0; // the market is not created
+    require currentContract.marketState[id].tickSpacing == 0, "assume that the market is not created";
 
     requireInvariant marketDebtIsEmptyIfNotCreated(id, borrower);
 
