@@ -49,13 +49,13 @@ contract BlueBuyCallback is IBlueBuyCallback {
     function setAuthorizationWithSig(Authorization memory authorization, Signature calldata signature) external {
         require(block.timestamp <= authorization.deadline, AuthorizationExpired());
         require(authorization.nonce == nonce++, InvalidNonce());
+        require(!(authorization.authorized == OWNER && !authorization.isAuthorized), CannotRevokeOwnerAuthorization());
 
         bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
         address signer = ecrecover(digest, signature.v, signature.r, signature.s);
         require(signer != address(0) && signer == authorization.authorizer && signer == OWNER, InvalidSignature());
-        require(!(authorization.authorized == OWNER && !authorization.isAuthorized), CannotRevokeOwnerAuthorization());
 
         emit SetAuthorizationWithSig(msg.sender, authorization.nonce);
         if (IMorpho(BLUE).isAuthorized(address(this), authorization.authorized) != authorization.isAuthorized) {
