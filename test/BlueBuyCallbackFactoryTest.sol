@@ -58,13 +58,17 @@ contract BlueBuyCallbackFactoryTest is Test {
         assertEq(emittedCallback, callback);
     }
 
-    function testCreateBlueBuyCallbackRevertsIfAlreadyDeployed(bytes32 salt) public {
-        vm.startPrank(owner);
-        factory.createBlueBuyCallback(owner, salt);
+    function testCreateBlueBuyCallbackIsIdempotent(bytes32 salt) public {
+        vm.prank(owner);
+        address callback = factory.createBlueBuyCallback(owner, salt);
 
-        vm.expectRevert();
-        factory.createBlueBuyCallback(owner, salt);
-        vm.stopPrank();
+        vm.recordLogs();
+        vm.prank(owner);
+        address callbackAgain = factory.createBlueBuyCallback(owner, salt);
+
+        assertEq(callbackAgain, callback);
+        assertEq(factory.callbackOf(owner, salt), callback);
+        assertEq(vm.getRecordedLogs().length, 0);
     }
 
     function testCreateMultipleBlueBuyCallbacksPerOwner(bytes32 salt1, bytes32 salt2) public {
