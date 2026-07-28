@@ -78,7 +78,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
         require(marketParams.loanToken == market.loanToken, InconsistentLoanToken());
 
         if (buyerAssets > 0) IMorpho(BLUE).withdraw(marketParams, buyerAssets, 0, address(this), address(this));
-        forceApproveMax(market.loanToken, MIDNIGHT);
+        safeApprove(market.loanToken, MIDNIGHT, buyerAssets);
 
         return CALLBACK_SUCCESS;
     }
