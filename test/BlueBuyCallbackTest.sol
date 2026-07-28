@@ -176,6 +176,34 @@ contract BlueBuyCallbackTest is Test {
         assertEq(result, supplyAssets);
     }
 
+    function testBuyerAssetsBoundReturnsZeroIfBuyerIsNotOwner(address buyer, uint256 supplyAssets) public {
+        vm.assume(buyer != owner);
+        supplyAssets = bound(supplyAssets, 1, 1e30);
+        deal(address(loanToken), address(this), supplyAssets);
+        require(loanToken.approve(address(blue), supplyAssets));
+        blue.supply(blueMarketParams, supplyAssets, 0, address(callback), hex"");
+
+        uint256 result = callback.buyerAssetsBound(bytes32(0), market, buyer, abi.encode(blueMarketParams));
+
+        assertEq(result, 0);
+    }
+
+    function testBuyerAssetsBoundReturnsZeroIfLoanTokenIsInconsistent(uint256 supplyAssets) public {
+        supplyAssets = bound(supplyAssets, 1, 1e30);
+
+        MarketParams memory otherMarketParams = blueMarketParams;
+        otherMarketParams.loanToken = address(otherToken);
+        blue.createMarket(otherMarketParams);
+
+        deal(address(otherToken), address(this), supplyAssets);
+        require(otherToken.approve(address(blue), supplyAssets));
+        blue.supply(otherMarketParams, supplyAssets, 0, address(callback), hex"");
+
+        uint256 result = callback.buyerAssetsBound(bytes32(0), market, owner, abi.encode(otherMarketParams));
+
+        assertEq(result, 0);
+    }
+
     function testOnBuyRevertsIfCallerIsNotMidnight(address caller) public {
         vm.assume(caller != address(midnight));
         vm.expectRevert(IBlueBuyCallback.NotMidnight.selector);

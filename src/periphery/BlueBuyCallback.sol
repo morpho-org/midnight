@@ -87,8 +87,14 @@ contract BlueBuyCallback is IBlueBuyCallback {
     /// @dev This function is useful for bundles to query how much is available at the moment.
     /// @dev Other buy callbacks might not take all constraints into account to provide their bound, but this is fine,
     /// if the routing layer can take into account the other reasons.
-    function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {
+    function buyerAssetsBound(bytes32, Market memory market, address buyer, bytes memory data)
+        external
+        view
+        returns (uint256)
+    {
+        if (buyer != OWNER) return 0;
         MarketParams memory marketParams = abi.decode(data, (MarketParams));
+        if (marketParams.loanToken != market.loanToken) return 0;
 
         (uint256 totalSupplyAssets, uint256 totalSupplyShares, uint256 totalBorrowAssets,) =
             IMorpho(BLUE).expectedMarketBalances(marketParams);
