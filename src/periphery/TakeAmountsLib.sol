@@ -46,4 +46,13 @@ library TakeAmountsLib {
         return
             offer.buy ? targetSellerAssets.mulDivUp(WAD, sellerPrice) : targetSellerAssets.mulDivDown(WAD, sellerPrice);
     }
+
+    /// @dev Returns the largest number of units whose take settles at most `buyerAssetsBound` buyer assets.
+    /// @dev buyerPrice equals offerPrice for a buy offer (sellerPrice + settlementFee), so no settlement fee is needed.
+    /// @dev Rounds down (unlike `buyerAssetsToUnits`) so that the buyer assets settled for the returned units, i.e.
+    /// units.mulDivDown(offerPrice, WAD), never exceed `buyerAssetsBound`.
+    /// @dev Assumes that offer.buy is true.
+    function unitsFromBuyerAssetsBound(Offer memory offer, uint256 buyerAssetsBound) internal pure returns (uint256) {
+        return buyerAssetsBound.mulDivDown(WAD, TickLib.tickToPrice(offer.tick));
+    }
 }
