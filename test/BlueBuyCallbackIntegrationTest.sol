@@ -38,7 +38,7 @@ contract BlueBuyCallbackIntegrationTest is BaseTest {
         blue.createMarket(blueMarketParams);
 
         BlueBuyCallbackFactory factory = new BlueBuyCallbackFactory(address(midnight), address(blue));
-        callback = BlueBuyCallback(factory.createBlueBuyCallback(lender));
+        callback = BlueBuyCallback(factory.createBlueBuyCallback(lender, bytes32(0)));
 
         market.loanToken = address(loanToken);
         market.chainId = block.chainid;

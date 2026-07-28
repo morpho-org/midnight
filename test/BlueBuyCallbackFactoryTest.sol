@@ -25,15 +25,15 @@ contract BlueBuyCallbackFactoryTest is Test {
         assertEq(factory.BLUE(), address(blue));
     }
 
-    function testCreateBlueBuyCallback() public {
+    function testCreateBlueBuyCallback(bytes32 salt) public {
         vm.prank(owner);
-        address callbackAddress = factory.createBlueBuyCallback(owner);
+        address callbackAddress = factory.createBlueBuyCallback(owner, salt);
         BlueBuyCallback callback = BlueBuyCallback(callbackAddress);
         bytes32 initCodeHash =
             keccak256(abi.encodePacked(type(BlueBuyCallback).creationCode, abi.encode(owner, midnight, address(blue))));
 
-        assertEq(callbackAddress, vm.computeCreate2Address(bytes32(0), initCodeHash, address(factory)));
-        assertEq(factory.callbackOf(owner), callbackAddress);
+        assertEq(callbackAddress, vm.computeCreate2Address(salt, initCodeHash, address(factory)));
+        assertEq(factory.callbackOf(owner, salt), callbackAddress);
         assertEq(callback.OWNER(), owner);
         assertEq(callback.MIDNIGHT(), midnight);
         assertEq(callback.BLUE(), address(blue));
@@ -41,36 +41,54 @@ contract BlueBuyCallbackFactoryTest is Test {
         assertTrue(blue.isAuthorized(callbackAddress, owner));
     }
 
-    function testCreateBlueBuyCallbackEmitsEvent() public {
+    function testCreateBlueBuyCallbackEmitsEvent(bytes32 salt) public {
         vm.recordLogs();
         vm.prank(owner);
-        factory.createBlueBuyCallback(owner);
-        address callback = factory.callbackOf(owner);
+        factory.createBlueBuyCallback(owner, salt);
+        address callback = factory.callbackOf(owner, salt);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(logs.length, 2);
         assertEq(logs[1].emitter, address(factory));
         assertEq(logs[1].topics[0], IBlueBuyCallbackFactory.CreateBlueBuyCallback.selector);
         assertEq(logs[1].topics[1], bytes32(uint256(uint160(owner))));
-        assertEq(abi.decode(logs[1].data, (address)), callback);
+        assertEq(logs[1].topics[2], bytes32(uint256(uint160(owner))));
+        (bytes32 emittedSalt, address emittedCallback) = abi.decode(logs[1].data, (bytes32, address));
+        assertEq(emittedSalt, salt);
+        assertEq(emittedCallback, callback);
     }
 
-    function testCreateBlueBuyCallbackRevertsIfAlreadyDeployed() public {
+    function testCreateBlueBuyCallbackRevertsIfAlreadyDeployed(bytes32 salt) public {
         vm.startPrank(owner);
-        factory.createBlueBuyCallback(owner);
+        factory.createBlueBuyCallback(owner, salt);
 
         vm.expectRevert();
-        factory.createBlueBuyCallback(owner);
+        factory.createBlueBuyCallback(owner, salt);
         vm.stopPrank();
     }
 
-    function testCreateBlueBuyCallbackForOtherOwner() public {
+    function testCreateMultipleBlueBuyCallbacksPerOwner(bytes32 salt1, bytes32 salt2) public {
+        vm.assume(salt1 != salt2);
+
+        vm.startPrank(owner);
+        address callback1 = factory.createBlueBuyCallback(owner, salt1);
+        address callback2 = factory.createBlueBuyCallback(owner, salt2);
+        vm.stopPrank();
+
+        assertTrue(callback1 != callback2);
+        assertEq(factory.callbackOf(owner, salt1), callback1);
+        assertEq(factory.callbackOf(owner, salt2), callback2);
+        assertTrue(factory.isBlueCallback(callback1));
+        assertTrue(factory.isBlueCallback(callback2));
+    }
+
+    function testCreateBlueBuyCallbackForOtherOwner(bytes32 salt) public {
         address caller = makeAddr("caller");
 
         vm.prank(caller);
-        factory.createBlueBuyCallback(owner);
+        factory.createBlueBuyCallback(owner, salt);
 
-        address callback = factory.callbackOf(owner);
+        address callback = factory.callbackOf(owner, salt);
         assertEq(BlueBuyCallback(callback).OWNER(), owner);
         assertTrue(blue.isAuthorized(callback, owner));
     }
