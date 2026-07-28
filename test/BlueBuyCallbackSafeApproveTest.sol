@@ -3,75 +3,63 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {BlueBuyCallback} from "../src/periphery/BlueBuyCallback.sol";
-import {IBlueBuyCallback} from "../src/periphery/interfaces/IBlueBuyCallback.sol";
+import {ApproveLib} from "../src/periphery/BlueBuyCallback/ApproveLib.sol";
 
 contract BlueBuyCallbackSafeApproveTest is Test {
     address internal spender = makeAddr("spender");
-    BlueBuyCallbackHarness internal callback;
-
-    function setUp() public {
-        callback = new BlueBuyCallbackHarness(address(new MockBlue()));
-    }
 
     function testSafeApproveSupportsNoReturnValue(uint256 value) public {
         NoReturnApproveToken token = new NoReturnApproveToken();
 
-        callback.exposedSafeApprove(address(token), spender, value);
+        this.safeApprove(address(token), spender, value);
 
-        assertEq(token.allowance(address(callback), spender), value);
+        assertEq(token.allowance(address(this), spender), value);
     }
 
     function testSafeApproveRevertsIfApproveReturnsFalse() public {
         FalseApproveToken token = new FalseApproveToken();
 
-        vm.expectRevert(IBlueBuyCallback.ApproveReturnedFalse.selector);
-        callback.exposedSafeApprove(address(token), spender, 1);
+        vm.expectRevert(ApproveLib.ApproveReturnedFalse.selector);
+        this.safeApprove(address(token), spender, 1);
     }
 
     function testSafeApproveBubblesApproveRevert() public {
         RevertingApproveToken token = new RevertingApproveToken();
 
         vm.expectRevert(RevertingApproveToken.ApproveReverted.selector);
-        callback.exposedSafeApprove(address(token), spender, 1);
+        this.safeApprove(address(token), spender, 1);
     }
 
     function testForceApproveMaxResetsExistingAllowance() public {
         USDTLikeApproveToken token = new USDTLikeApproveToken();
-        token.setAllowance(address(callback), spender, 1);
+        token.setAllowance(address(this), spender, 1);
 
-        callback.exposedForceApproveMax(address(token), spender);
+        this.forceApproveMax(address(token), spender);
 
         assertEq(token.approveCalls(), 2);
-        assertEq(token.allowance(address(callback), spender), type(uint256).max);
+        assertEq(token.allowance(address(this), spender), type(uint256).max);
     }
 
     function testForceApproveMaxSkipsLargeExistingAllowance() public {
         TrackingApproveToken token = new TrackingApproveToken();
         uint256 allowance = type(uint96).max / 2;
-        token.setAllowance(address(callback), spender, allowance);
+        token.setAllowance(address(this), spender, allowance);
 
-        callback.exposedForceApproveMax(address(token), spender);
+        this.forceApproveMax(address(token), spender);
 
         assertEq(token.approveCalls(), 0);
-        assertEq(token.allowance(address(callback), spender), allowance);
-    }
-}
-
-contract BlueBuyCallbackHarness is BlueBuyCallback {
-    constructor(address blue) BlueBuyCallback(address(this), address(0), blue) {}
-
-    function exposedSafeApprove(address token, address spender, uint256 value) external {
-        super.safeApprove(token, spender, value);
+        assertEq(token.allowance(address(this), spender), allowance);
     }
 
-    function exposedForceApproveMax(address token, address spender) external {
-        super.forceApproveMax(token, spender);
-    }
-}
+    /* HELPERS */
 
-contract MockBlue {
-    function setAuthorization(address, bool) external {}
+    function safeApprove(address token, address spender_, uint256 value) external {
+        ApproveLib.safeApprove(token, spender_, value);
+    }
+
+    function forceApproveMax(address token, address spender_) external {
+        ApproveLib.forceApproveMax(token, spender_);
+    }
 }
 
 contract NoReturnApproveToken {

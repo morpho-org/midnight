@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {IMidnight} from "../interfaces/IMidnight.sol";
+import {IMidnight} from "../../interfaces/IMidnight.sol";
 import {
     IEcrecoverAuthorizer,
     Authorization,

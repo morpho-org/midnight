@@ -26,7 +26,7 @@ import {
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
-import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
+import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer/EcrecoverAuthorizer.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
 
 /// @dev The default LLTV enabled in tests.

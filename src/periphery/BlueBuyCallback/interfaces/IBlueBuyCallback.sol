@@ -2,13 +2,12 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity >=0.5.0;
 
-import {IBuyCallback} from "../../interfaces/ICallbacks.sol";
-import {Market} from "../../interfaces/IMidnight.sol";
-import {Authorization, Signature} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {IBuyCallback} from "../../../interfaces/ICallbacks.sol";
+import {Market} from "../../../interfaces/IMidnight.sol";
+import {Authorization, Signature} from "../../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 
 interface IBlueBuyCallback is IBuyCallback {
     /// ERRORS ///
-    error ApproveReturnedFalse();
     error AuthorizationExpired();
     error InconsistentLoanToken();
     error InvalidNonce();
