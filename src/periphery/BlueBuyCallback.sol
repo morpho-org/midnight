@@ -13,7 +13,6 @@ import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
 
 interface IERC20 {
-    function allowance(address owner, address spender) external view returns (uint256);
     function approve(address spender, uint256 value) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
 }
@@ -98,15 +97,6 @@ contract BlueBuyCallback is IBlueBuyCallback {
         uint256 blueBalance = IERC20(marketParams.loanToken).balanceOf(BLUE);
 
         return UtilsLib.min(UtilsLib.min(supplyAssets, liquidity), blueBalance);
-    }
-
-    /// @dev Skips the approval entirely to save gas when the current allowance is already at least 2^95 - 1 (some
-    /// tokens like COMP and UNI on Ethereum have a max allowance of type(uint96).max).
-    /// @dev Resets to 0 before re-approving to support USDT-like tokens.
-    function forceApproveMax(address token, address spender) internal {
-        if (IERC20(token).allowance(address(this), spender) >= type(uint96).max / 2) return;
-        safeApprove(token, spender, 0);
-        safeApprove(token, spender, type(uint256).max);
     }
 
     function safeApprove(address token, address spender, uint256 value) internal {
