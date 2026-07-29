@@ -66,11 +66,11 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         // Round in favor of the borrower.
         uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentive, WAD);
 
+        emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
+
         bytes memory data = abi.encode(midnightMarket, blueMarketParams, collateralIndex, assets, incentiveAssets, user);
         IMorpho(BLUE).supplyCollateral(blueMarketParams, collateralAssets, user, data);
         if (incentiveAssets > 0) SafeTransferLib.safeTransfer(midnightMarket.loanToken, msg.sender, incentiveAssets);
-
-        emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
     }
 
     function onMorphoSupplyCollateral(uint256 collateralAssets, bytes calldata data) external {
