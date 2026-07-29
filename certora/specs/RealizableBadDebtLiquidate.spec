@@ -111,8 +111,11 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
 
 // Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
 definition axiomDownMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d);
+
 definition axiomDownMonotoneB(mathint a, mathint b1, mathint b2, mathint d) returns bool = 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => ghostMulDivDown(a, b1, d) <= ghostMulDivDown(a, b2, d);
+
 definition axiomUpMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
+
 definition axiomUpMonotoneD(mathint a, mathint b, mathint d1, mathint d2) returns bool = 0 <= a && 0 <= b && 0 < d1 && d1 <= d2 => ghostMulDivUp(a, b, d2) <= ghostMulDivUp(a, b, d1);
 
 // Zero collateral values to zero (proven in MulDiv.spec as mulDivZero).
@@ -120,7 +123,7 @@ definition axiomUpZero(mathint b, mathint d) returns bool = d > 0 => ghostMulDiv
 
 // proven in MulDiv.spec as mulDivAddUpUp:
 //   mulDivUp(a1 + a2, b, d) <= mulDivUp(a1, b, d) + mulDivUp(a2, b, d).
-definition axiomAddUpUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => ghostMulDivUp(a1+a2, b, d) <= ghostMulDivUp(a1, b, d) + ghostMulDivUp(a2, b, d);
+definition axiomAddUpUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => ghostMulDivUp(a1 + a2, b, d) <= ghostMulDivUp(a1, b, d) + ghostMulDivUp(a2, b, d);
 
 // proven in MulDiv.spec as mulDivAddUpUp:
 //   mulDivUp(mulDivDown(a,b,d),d,b) <= a
