@@ -86,7 +86,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
     /// @dev Max buyerAssets amount that the callback can handle.
     /// @dev Bundles receive the amount to take per offer from the routing layer. But the routing layer is
     /// asynchronous/offchain, and might not be up to date on the chain's latest state. To counter this, bundles can
-    /// query this function to cap their take.
+    /// query atomically this function to cap their take.
     function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {
         MarketParams memory marketParams = abi.decode(data, (MarketParams));
 
