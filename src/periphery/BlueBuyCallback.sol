@@ -10,6 +10,7 @@ import {SharesMathLib} from "../../lib/morpho-blue/src/libraries/SharesMathLib.s
 import {Market} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
+import {SafeTransferLib} from "../libraries/SafeTransferLib.sol";
 import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
 
 interface IERC20 {
@@ -59,6 +60,15 @@ contract BlueBuyCallback is IBlueBuyCallback {
         if (IMorpho(BLUE).isAuthorized(address(this), authorization.authorized) != authorization.isAuthorized) {
             IMorpho(BLUE).setAuthorization(authorization.authorized, authorization.isAuthorized);
         }
+    }
+
+    /// @dev Skims the callback's balance of `token` and sends it to the owner.
+    /// @dev This is useful to handle rewards or leftover tokens held by the callback.
+    function skim(address token) external {
+        require(msg.sender == OWNER, NotOwner());
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        SafeTransferLib.safeTransfer(token, OWNER, balance);
+        emit Skim(token, balance);
     }
 
     /// @dev Reverts if the owner position on the requested market is too small or if the liquidity on that market is

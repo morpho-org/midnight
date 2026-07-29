@@ -20,6 +20,7 @@ interface IBlueBuyCallback is IBuyCallback {
     /// EVENTS ///
     /// @dev To track authorization changes, listen to the SetAuthorization event emitted by Blue.
     event SetAuthorizationWithSig(address indexed caller, uint256 nonce);
+    event Skim(address indexed token, uint256 assets);
 
     /// STORAGE GETTERS ///
     function OWNER() external view returns (address);
@@ -34,4 +35,5 @@ interface IBlueBuyCallback is IBuyCallback {
         returns (uint256);
     function setAuthorization(address authorized, bool newIsAuthorized) external;
     function setAuthorizationWithSig(Authorization memory authorization, Signature memory signature) external;
+    function skim(address token) external;
 }
