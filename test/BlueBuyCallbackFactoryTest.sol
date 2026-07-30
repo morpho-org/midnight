@@ -52,6 +52,7 @@ contract BlueBuyCallbackFactoryTest is Test {
         assertEq(logs[1].emitter, address(factory));
         assertEq(logs[1].topics[0], IBlueBuyCallbackFactory.CreateBlueBuyCallback.selector);
         assertEq(logs[1].topics[1], bytes32(uint256(uint160(owner))));
+        assertEq(logs[1].topics[2], bytes32(uint256(uint160(owner))));
         assertEq(abi.decode(logs[1].data, (address)), callback);
     }
 
