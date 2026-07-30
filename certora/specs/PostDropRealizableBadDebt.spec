@@ -119,36 +119,30 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
 }
 
 // Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
+definition axiomDownMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d);
+
+// Monotone in the second argument (proven in MulDiv.spec as mulDivMonotoneB).
+definition axiomDownMonotoneB(mathint a, mathint b1, mathint b2, mathint d) returns bool = 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => ghostMulDivDown(a, b1, d) <= ghostMulDivDown(a, b2, d);
+
+// Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
 definition axiomUpMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
 
-// Monotone in the second argument (proven in MulDiv.spec as mulDivMonotoneB). Applied to the inner
-// mulDivUp(collateral, price, ORACLE_PRICE_SCALE): dropping the price argument from p to p' <= p cannot
-// grow the inner value, and (with axiomUpMonotoneA on the outer layer) cannot grow the getter term g.
+// Monotone in the second argument (proven in MulDiv.spec as mulDivMonotoneB).
 definition axiomUpMonotoneB(mathint a, mathint b1, mathint b2, mathint d) returns bool = 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => ghostMulDivUp(a, b1, d) <= ghostMulDivUp(a, b2, d);
 
-// Zero collateral values to zero (proven in MulDiv.spec as mulDivZero). Also covers the seized-collateral
-// bitmap-clear path: when the seize empties the collateral, the after-getter drops the term and its
-// value is g(0) = 0.
+// Monotone in the third argument (proven in MulDiv.spec as mulDivMonotoneD).
+definition axiomUpMonotoneD(mathint a, mathint b, mathint d1, mathint d2) returns bool = 0 <= a && 0 <= b && 0 < d1 && d1 <= d2 => ghostMulDivUp(a, b, d2) <= ghostMulDivUp(a, b, d1);
+
+// Zero collateral values to zero (proven in MulDiv.spec as mulDivZero).
 definition axiomUpZero(mathint b, mathint d) returns bool = d > 0 => ghostMulDivUp(0, b, d) == 0;
 
-// Getter-form double-mulDivUp sub-additivity (proven in MulDiv.spec as mulDivUpDoubleSubAdditive): for
-//   g_x(c) = mulDivUp(mulDivUp(c, x, ORACLE_PRICE_SCALE), WAD, maxLif),
-// g_x(a) <= g_x(a - s) + g_x(s) whenever s <= a. ORACLE_PRICE_SCALE and WAD are pinned to the getter's
-// exact constants so this e-matches the getter's ground terms; the price (here the measurement price p')
-// and maxLif stay free. Applied at p' to the seized collateral (a = c_k, s = seized) it bounds the
-// p'-measured coverage drop g_{p'}(c_k) - g_{p'}(c_k - seized) by g_{p'}(seized).
-definition axiomUpDoubleSubAdditive(mathint a, mathint s, mathint p, mathint L) returns bool = 0 <= s && s <= a && 0 < L => ghostMulDivUp(ghostMulDivUp(a, p, ORACLE_PRICE_SCALE()), WAD(), L) <= ghostMulDivUp(ghostMulDivUp(a - s, p, ORACLE_PRICE_SCALE()), WAD(), L) + ghostMulDivUp(ghostMulDivUp(s, p, ORACLE_PRICE_SCALE()), WAD(), L);
+// proven in MulDiv.spec as mulDivAddUpUp:
+//   mulDivUp(a1 + a2, b, d) <= mulDivUp(a1, b, d) + mulDivUp(a2, b, d).
+definition axiomAddUpUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => ghostMulDivUp(a1 + a2, b, d) <= ghostMulDivUp(a1, b, d) + ghostMulDivUp(a2, b, d);
 
-// Getter-form seize-value bound (proven in MulDiv.spec as mulDivSeizeValueBounded): the up-up value
-// (at the call-time price p) of the down-down seized collateral never exceeds the repaid units, when
-// seize and value share lif. This closes g_p(seized) <= repaidUnits on the repaid-input branch.
-definition axiomSeizeValue(mathint r, mathint l, mathint p, mathint sc, mathint w) returns bool = 0 < l && 0 < p && 0 < w && 0 < sc => ghostMulDivUp(ghostMulDivUp(ghostMulDivDown(ghostMulDivDown(r, l, w), sc, p), p, sc), w, l) <= r;
-
-// Dropped-price seize-value bound (proven in MulDiv.spec as mulDivSeizeValueAtDroppedPriceBounded): the
-// up-up value at the DROPPED price pDrop (<= call-time price p) of the down-down seized collateral never
-// exceeds the repaid units r. Composes axiomSeizeValue (bound at p) with price monotonicity in one fact,
-// closing g_{p'}(seized) <= repaidUnits directly on the repaid-input branch.
-definition axiomSeizeValueAtDroppedPrice(mathint r, mathint l, mathint p, mathint sc, mathint w, mathint pDrop) returns bool = 0 < l && 0 < p && 0 < w && 0 < sc && 0 <= pDrop && pDrop <= p => ghostMulDivUp(ghostMulDivUp(ghostMulDivDown(ghostMulDivDown(r, l, w), sc, p), pDrop, sc), w, l) <= r;
+// proven in MulDiv.spec as mulDivAddUpUp:
+//   mulDivUp(mulDivDown(a,b,d),d,b) <= a
+definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a;
 
 /// INVARIANTS ///
 
@@ -158,148 +152,62 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 
 /// RULES ///
 
-// Post-price-drop realizable bad debt cannot increase from liquidating first: with liquidate executed at
-// the call-time price p and realizable bad debt measured at a dropped price p' (= pDrop) <= p, the
-// post-liquidate p'-rbd R' is at most the do-nothing p'-rbd R. Restricted to !postMaturityMode
-// (lif == maxLif) and split along liquidate's exclusive-input branch, matching the isolated liquidate leg.
-
-// Seized-assets-input branch (repaidUnits == 0): liquidate derives the repaid debt drop
-//   repaidUnits = mulDivUp(mulDivUp(seizedAssets, p, ORACLE_PRICE_SCALE), WAD, lif) = g_p(seizedAssets)
-// (src/Midnight.sol:690). The p'-measured coverage drop g_{p'}(c_k) - g_{p'}(c_k - seizedAssets) is at
-// most g_{p'}(seizedAssets) (sub-additivity at p'), and price monotonicity gives g_{p'}(seizedAssets) <=
-// g_p(seizedAssets) = the repaid debt drop. So coverage removed at p' <= debt removed, and zeroFloorSub
-// monotonicity yields R' <= R. No seize-value bound is needed here (repaid is literally the getter term).
-rule postDropRbdLiquidateNonIncreaseSeizeInput(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, uint256 pDrop) {
+// Realizable bad debt cannot increase from liquidating before a price drop.
+// If price drop happens after a liquidate, the total bad debt is less than if the liquidate
+// never happened.
+rule postDropRbdLiquidateNonIncrease(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(market);
-
-    require repaidUnits == 0, "seized-assets-input branch: repaidUnits is derived from seizedAssets (src/Midnight.sol:690)";
-
-    require market.collateralParams.length <= 2, "restrict collateralParams for loop tractability";
-    require marketIsCreated(market), "market must be created (tickSpacing > 0)";
-    require lossFactor(id) < max_uint128, "market lossFactor must not be saturated";
-    require to_mathint(debt(id, borrower)) <= to_mathint(totalUnits(id)), "position debt bounded by totalUnits";
-    require data.length == 0, "no liquidate callback data (prover performance; matches LiquidationBoundedByLIF.spec)";
-    require !postMaturityMode, "non-post-maturity path: the seize factor lif equals maxLif (src/Midnight.sol:685-687)";
-
-    // Soundness: nonZeroCollateralsAreActivated is proven in CollateralBitmap.spec.
-    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
-    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 1);
 
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
 
     uint256 price = summaryPrice[market.collateralParams[collateralIndex].oracle];
-    require pDrop <= price, "the measurement price p' is a dropped price: p' <= call-time price p";
+    uint256 pDrop;
+    require pDrop <= price, "the dropped price is less than the initial price";
 
-    // Near-linear consequences of the MulDiv lemmas, assumed over the loose ghost (each proven in
-    // MulDiv.spec): monotonicity in each argument (mulDivMonotoneA/B) supplies the price bridge
-    // g_{p'}(seized) <= g_p(seized), and double sub-additivity (mulDivUpDoubleSubAdditive) bounds the
-    // p'-coverage drop by g_{p'}(seized). axiomUpZero (mulDivZero) covers the emptied-collateral term.
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "monotone in first arg (mulDivMonotoneA)";
-    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomUpMonotoneB(a, b1, b2, d), "monotone in second arg (mulDivMonotoneB)";
-    require forall mathint b. forall mathint d. axiomUpZero(b, d), "zero collateral values to zero (mulDivZero)";
-    require forall mathint a. forall mathint s. forall mathint p. forall mathint L. axiomUpDoubleSubAdditive(a, s, p, L), "getter-form double sub-additivity (mulDivUpDoubleSubAdditive)";
+    mathint seizedAssetsOut;
 
-    // Ground instances on the seized collateral so the axioms close without deep quantifier search.
-    // seized == seizedAssets here (input). g_p(seizedAssets) is exactly the repaid debt drop (line 690).
-    mathint innerSeizedDrop = ghostMulDivUp(seizedAssets, pDrop, ORACLE_PRICE_SCALE());
-    mathint innerSeizedP = ghostMulDivUp(seizedAssets, price, ORACLE_PRICE_SCALE());
-    mathint gSeizedDrop = ghostMulDivUp(innerSeizedDrop, WAD(), maxLif);
-    mathint gSeizedP = ghostMulDivUp(innerSeizedP, WAD(), maxLif);
-    mathint collatK = to_mathint(collateral(id, borrower, collateralIndex));
-    mathint gCollatKDrop = ghostMulDivUp(ghostMulDivUp(collatK, pDrop, ORACLE_PRICE_SCALE()), WAD(), maxLif);
-    mathint gCollatKMinusSeizedDrop = ghostMulDivUp(ghostMulDivUp(collatK - seizedAssets, pDrop, ORACLE_PRICE_SCALE()), WAD(), maxLif);
+    if (repaidUnits == 0) {
+        seizedAssetsOut = seizedAssets;
+    } else {
+        seizedAssetsOut = ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price);
+        require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
+        require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomDownMonotoneB(a, b1, b2, d), "axiom";
+        require axiomInverseUpDown(repaidUnits, maxLif, WAD()), "axiom";
+        require axiomInverseUpDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
+    }
 
-    // Price bridge (mulDivMonotoneB on the inner layer, since pDrop <= price, then mulDivMonotoneA on the
-    // outer layer). Sub-additivity at p' bounds the coverage drop by g_{p'}(seizedAssets).
-    require gSeizedDrop <= gSeizedP, "price bridge: g_{p'}(seized) <= g_p(seized) (mulDivMonotoneB then mulDivMonotoneA)";
-    require to_mathint(seizedAssets) <= collatK => gCollatKDrop <= gCollatKMinusSeizedDrop + gSeizedDrop, "double sub-additivity instance at p' (mulDivUpDoubleSubAdditive)";
+    uint256 collateralBefore = collateral(id, borrower, collateralIndex);
+    mathint collateralAfter = collateralBefore - seizedAssetsOut;
+
+    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomDownMonotoneB(a, b1, b2, d), "axiom";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
+    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomUpMonotoneB(a, b1, b2, d), "axiom";
+    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2), "axiom";
+    //require axiomUpZero(price, ORACLE_PRICE_SCALE()), "axiom";
+    //require axiomUpZero(WAD(), maxLif), "axiom";
+    //require axiomAddUpUp(collateralAfter, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
+    //require axiomAddUpUp(ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()), ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), WAD(), maxLif), "axiom";
+
+    require axiomUpZero(pDrop, ORACLE_PRICE_SCALE()), "axiom";
+    require axiomUpZero(WAD(), maxLif), "axiom";
+    require axiomAddUpUp(collateralAfter, seizedAssetsOut, pDrop, ORACLE_PRICE_SCALE()), "axiom";
+    require axiomAddUpUp(ghostMulDivUp(collateralAfter, pDrop, ORACLE_PRICE_SCALE()), ghostMulDivUp(seizedAssetsOut, pDrop, ORACLE_PRICE_SCALE()), WAD(), maxLif), "axiom";
 
     // scenario 1: price drops, then realize bad debt
     summaryPrice[market.collateralParams[collateralIndex].oracle] = pDrop;
-    mathint R = realizableBadDebt(market, id, borrower);
+    mathint badDebt1 = realizableBadDebt(market, id, borrower);
 
     // scenario 2: liquidate at initial (higher) price
     // then price drop, realize remaining debt.
     summaryPrice[market.collateralParams[collateralIndex].oracle] = price;
 
-    mathint R1 = realizableBadDebt(market, id, borrower);
+    mathint badDebt2a = realizableBadDebt(market, id, borrower);
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     summaryPrice[market.collateralParams[collateralIndex].oracle] = pDrop;
-    mathint R2 = realizableBadDebt(market, id, borrower);
+    mathint badDebt2b = realizableBadDebt(market, id, borrower);
 
-    assert R1 + R2 <= R;
-}
-
-// Repaid-units-input branch (seizedAssets == 0): liquidate derives the seized collateral
-//   seizedAssets = mulDivDown(mulDivDown(repaidUnits, lif, WAD), ORACLE_PRICE_SCALE, p)
-// (src/Midnight.sol:692). Sub-additivity at p' bounds the p'-coverage drop by g_{p'}(seized), price
-// monotonicity gives g_{p'}(seized) <= g_p(seized), and the seize-value bound closes g_p(seized) <=
-// repaidUnits (the repaid debt drop). So coverage removed at p' <= debt removed, and zeroFloorSub
-// monotonicity yields R' <= R. This is the harder case: it exercises both the seize (mulDivDown) and
-// value (mulDivUp) chains, plus the price bridge.
-rule postDropRbdLiquidateNonIncreaseRepaidInput(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, uint256 pDrop) {
-    bytes32 id = summaryToId(market);
-
-    require seizedAssets == 0, "repaid-units-input branch: seizedAssets is derived from repaidUnits (src/Midnight.sol:692)";
-
-    // single collateral: solver-tractability scope; multi-collateral follows from K=0 subadditivity (non-seized terms are identical before/after)
-    require market.collateralParams.length == 1, "restrict collateralParams for loop tractability";
-    require marketIsCreated(market), "market must be created (tickSpacing > 0)";
-    require lossFactor(id) < max_uint128, "market lossFactor must not be saturated";
-    require to_mathint(debt(id, borrower)) <= to_mathint(totalUnits(id)), "position debt bounded by totalUnits";
-    require data.length == 0, "no liquidate callback data (prover performance; matches LiquidationBoundedByLIF.spec)";
-    require !postMaturityMode, "non-post-maturity path: the seize factor lif equals maxLif (src/Midnight.sol:685-687)";
-
-    // Soundness: nonZeroCollateralsAreActivated is proven in CollateralBitmap.spec.
-    requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);
-
-    mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
-    require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
-
-    uint256 price = summaryPrice[market.collateralParams[collateralIndex].oracle];
-    require price > 0, "call-time price positive (liquidate divides by it at src/Midnight.sol:692)";
-    require pDrop <= price, "the measurement price p' is a dropped price: p' <= call-time price p";
-
-    // Near-linear consequences of the MulDiv lemmas, assumed over the loose ghost (each proven in
-    // MulDiv.spec): the double sub-additivity bounds the p'-coverage drop by g_{p'}(seized), and the
-    // dropped-price seize-value bound closes g_{p'}(seized) <= repaidUnits in one step (no separate price
-    // bridge / call-time bound to chain). axiomUpZero covers the emptied-collateral term.
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "monotone in first arg (mulDivMonotoneA)";
-    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomUpMonotoneB(a, b1, b2, d), "monotone in second arg (mulDivMonotoneB)";
-    require forall mathint b. forall mathint d. axiomUpZero(b, d), "zero collateral values to zero (mulDivZero)";
-    require forall mathint a. forall mathint s. forall mathint p. forall mathint L. axiomUpDoubleSubAdditive(a, s, p, L), "getter-form double sub-additivity (mulDivUpDoubleSubAdditive)";
-    require forall mathint r. forall mathint l. forall mathint p. forall mathint sc. forall mathint w. forall mathint pd. axiomSeizeValueAtDroppedPrice(r, l, p, sc, w, pd), "dropped-price seize-value bound (mulDivSeizeValueAtDroppedPriceBounded)";
-
-    // Ground instances of the derived-seize chain (seizedAssets = src/Midnight.sol:692) so the axioms
-    // close without quantifier search on the loop-internal seized term.
-    mathint seizedDerived = ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price);
-    mathint innerSeizedDrop = ghostMulDivUp(seizedDerived, pDrop, ORACLE_PRICE_SCALE());
-    mathint gSeizedDrop = ghostMulDivUp(innerSeizedDrop, WAD(), maxLif);
-    mathint collatK = to_mathint(collateral(id, borrower, collateralIndex));
-    mathint gCollatKDrop = ghostMulDivUp(ghostMulDivUp(collatK, pDrop, ORACLE_PRICE_SCALE()), WAD(), maxLif);
-    mathint gCollatKMinusSeizedDrop = ghostMulDivUp(ghostMulDivUp(collatK - seizedDerived, pDrop, ORACLE_PRICE_SCALE()), WAD(), maxLif);
-
-    // Single-step dropped-price seize-value bound: the p'-valued derived seize is at most repaidUnits
-    // (mulDivSeizeValueAtDroppedPriceBounded), collapsing the former call-time-bound + price-bridge chain.
-    // Sub-additivity at p' then bounds the coverage drop by g_{p'}(seized).
-    require gSeizedDrop <= to_mathint(repaidUnits), "dropped-price seize-value bound instance (mulDivSeizeValueAtDroppedPriceBounded)";
-    require seizedDerived <= collatK => gCollatKDrop <= gCollatKMinusSeizedDrop + gSeizedDrop, "double sub-additivity instance at p' (mulDivUpDoubleSubAdditive)";
-
-    // scenario 1: price drops, then realize bad debt
-    summaryPrice[market.collateralParams[collateralIndex].oracle] = pDrop;
-    mathint R = realizableBadDebt(market, id, borrower);
-
-    // scenario 2: liquidate at initial (higher) price
-    // then price drop, realize remaining debt.
-    summaryPrice[market.collateralParams[collateralIndex].oracle] = price;
-
-    mathint R1 = realizableBadDebt(market, id, borrower);
-    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
-
-    summaryPrice[market.collateralParams[collateralIndex].oracle] = pDrop;
-    mathint R2 = realizableBadDebt(market, id, borrower);
-
-    assert R1 + R2 <= R;
+    // liquidating before the price drop (scenario 2) will cause less bad debt in total.
+    assert badDebt2a + badDebt2b <= badDebt1;
 }
