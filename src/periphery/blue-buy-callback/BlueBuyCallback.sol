@@ -13,7 +13,7 @@ import {UtilsLib} from "../../libraries/UtilsLib.sol";
 import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
 import {IERC20Extended} from "./interfaces/IERC20Extended.sol";
-import {ApproveLib} from "./ApproveLib.sol";
+import {ERC20Lib} from "./ERC20Lib.sol";
 
 /// @dev This contract is meant to be used as a Midnight buy offer callback in order to park funds on a Blue market
 /// while the offer waits to be taken.
@@ -87,7 +87,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
         require(marketParams.loanToken == market.loanToken, InconsistentLoanToken());
 
         if (buyerAssets > 0) IMorpho(BLUE).withdraw(marketParams, buyerAssets, 0, address(this), address(this));
-        ApproveLib.safeApprove(market.loanToken, MIDNIGHT, buyerAssets);
+        ERC20Lib.safeApprove(market.loanToken, MIDNIGHT, buyerAssets);
 
         return CALLBACK_SUCCESS;
     }

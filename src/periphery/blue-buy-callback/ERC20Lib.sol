@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {IERC20Extended} from "./interfaces/IERC20Extended.sol";
 
-library ApproveLib {
+library ERC20Lib {
     error ApproveReturnedFalse();
 
     /// @dev Not checking the code size because Midnight's transfers do it already.

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {ApproveLib} from "../src/periphery/blue-buy-callback/ApproveLib.sol";
+import {ERC20Lib} from "../src/periphery/blue-buy-callback/ERC20Lib.sol";
 
 contract BlueBuyCallbackSafeApproveTest is Test {
     address internal spender = makeAddr("spender");
@@ -19,7 +19,7 @@ contract BlueBuyCallbackSafeApproveTest is Test {
     function testSafeApproveRevertsIfApproveReturnsFalse() public {
         FalseApproveToken token = new FalseApproveToken();
 
-        vm.expectRevert(ApproveLib.ApproveReturnedFalse.selector);
+        vm.expectRevert(ERC20Lib.ApproveReturnedFalse.selector);
         this.safeApprove(address(token), spender, 1);
     }
 
@@ -33,7 +33,7 @@ contract BlueBuyCallbackSafeApproveTest is Test {
     /* HELPERS */
 
     function safeApprove(address token, address spender_, uint256 value) external {
-        ApproveLib.safeApprove(token, spender_, value);
+        ERC20Lib.safeApprove(token, spender_, value);
     }
 }
 
