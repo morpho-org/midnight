@@ -18,6 +18,12 @@ interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
 }
 
+/// @dev This contact is meant to be used as a Midnight buy offer callback in order to park funds on a Blue market 
+/// while the offer waits to be taken.
+/// @dev The positions on the Blue markets are acquired through supplies on behalf of this contract (permissionless).
+/// @dev To withdraw the positions (if the offer expired for example), the OWNER is authorized on Blue to manage this
+/// contract's positions. The OWNER can also authorize other account (optionally with signature), typically useful for
+/// bundles contract.
 /// @dev Anyone authorized by the owner on Midnight can pull from the Blue position held by this callback contract by
 /// making the owner buy dummy credit on Midnight.
 contract BlueBuyCallback is IBlueBuyCallback {
