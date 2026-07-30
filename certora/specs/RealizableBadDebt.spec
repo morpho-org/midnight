@@ -1,15 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-// Property (issue #109):
-//   "realizableBadDebt cannot increase (without a price update). Liquidation is a special
-//    case: it should realize the bad debt and leave zero."
-//
-// realizableBadDebt(id, borrower) is the `badDebt` local computed at the top of
-// Midnight.liquidate.
-//
-// "Without a price update" is modelled by summarizing _.price() as PER_CALLEE_CONSTANT.
-
 import "BitmapSummaries.spec";
 
 using Utils as Utils;
@@ -115,7 +106,7 @@ rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight
     assert badDebtAfter <= badDebtBefore;
 }
 
-// liquidate drops totalUnits by exactly the realized bad debt. 
+// liquidate drops totalUnits by exactly the realized bad debt.
 rule liquidateRealizesTotalUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(market);
 
