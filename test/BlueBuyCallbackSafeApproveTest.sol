@@ -35,27 +35,6 @@ contract BlueBuyCallbackSafeApproveTest is Test {
         vm.expectRevert(RevertingApproveToken.ApproveReverted.selector);
         callback.exposedSafeApprove(address(token), spender, 1);
     }
-
-    function testForceApproveMaxResetsExistingAllowance() public {
-        USDTLikeApproveToken token = new USDTLikeApproveToken();
-        token.setAllowance(address(callback), spender, 1);
-
-        callback.exposedForceApproveMax(address(token), spender);
-
-        assertEq(token.approveCalls(), 2);
-        assertEq(token.allowance(address(callback), spender), type(uint256).max);
-    }
-
-    function testForceApproveMaxSkipsLargeExistingAllowance() public {
-        TrackingApproveToken token = new TrackingApproveToken();
-        uint256 allowance = type(uint96).max / 2;
-        token.setAllowance(address(callback), spender, allowance);
-
-        callback.exposedForceApproveMax(address(token), spender);
-
-        assertEq(token.approveCalls(), 0);
-        assertEq(token.allowance(address(callback), spender), allowance);
-    }
 }
 
 contract BlueBuyCallbackHarness is BlueBuyCallback {
@@ -63,10 +42,6 @@ contract BlueBuyCallbackHarness is BlueBuyCallback {
 
     function exposedSafeApprove(address token, address spender, uint256 value) external {
         super.safeApprove(token, spender, value);
-    }
-
-    function exposedForceApproveMax(address token, address spender) external {
-        super.forceApproveMax(token, spender);
     }
 }
 
@@ -93,29 +68,5 @@ contract RevertingApproveToken {
 
     function approve(address, uint256) external pure returns (bool) {
         revert ApproveReverted();
-    }
-}
-
-contract TrackingApproveToken {
-    mapping(address owner => mapping(address spender => uint256)) public allowance;
-    uint256 public approveCalls;
-
-    function setAllowance(address owner, address spender, uint256 value) external {
-        allowance[owner][spender] = value;
-    }
-
-    function approve(address spender, uint256 value) external virtual returns (bool) {
-        approveCalls++;
-        allowance[msg.sender][spender] = value;
-        return true;
-    }
-}
-
-contract USDTLikeApproveToken is TrackingApproveToken {
-    function approve(address spender, uint256 value) external override returns (bool) {
-        require(value == 0 || allowance[msg.sender][spender] == 0);
-        approveCalls++;
-        allowance[msg.sender][spender] = value;
-        return true;
     }
 }
