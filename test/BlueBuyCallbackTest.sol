@@ -169,7 +169,7 @@ contract BlueBuyCallbackTest is Test {
         assertEq(result, CALLBACK_SUCCESS);
         assertEq(loanToken.balanceOf(address(callback)), buyerAssets);
         assertEq(loanToken.balanceOf(address(blue)), 0);
-        assertEq(loanToken.allowance(address(callback), address(midnight)), type(uint256).max);
+        assertEq(loanToken.allowance(address(callback), address(midnight)), buyerAssets);
     }
 
     function testOnBuyWithdrawsAndApprovesZeroAssets() public {
