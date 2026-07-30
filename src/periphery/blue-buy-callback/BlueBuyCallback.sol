@@ -10,6 +10,7 @@ import {SharesMathLib} from "../../../lib/morpho-blue/src/libraries/SharesMathLi
 import {Market} from "../../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../../libraries/ConstantsLib.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";
+import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
 import {IERC20Extended} from "./interfaces/IERC20Extended.sol";
 import {ApproveLib} from "./ApproveLib.sol";
@@ -55,6 +56,12 @@ contract BlueBuyCallback is IBlueBuyCallback {
         if (IMorpho(BLUE).isAuthorized(address(this), authorization.authorized) != authorization.isAuthorized) {
             IMorpho(BLUE).setAuthorization(authorization.authorized, authorization.isAuthorized);
         }
+    }
+
+    function skim(address token) external {
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        SafeTransferLib.safeTransfer(token, OWNER, balance);
+        emit Skim(msg.sender, token, balance);
     }
 
     /// @dev Reverts if the owner position on the requested market is too small or if the liquidity on that market is
