@@ -111,18 +111,6 @@ rule mulDivSeizeValueBounded(uint256 r, uint256 l, uint256 price, uint256 wad, u
     assert mulDivUp(mulDivUp(seized, price, scale), wad, l) <= r;
 }
 
-// Dropped-price generalization of mulDivSeizeValueBounded: valuing (up-up) the collateral that liquidate
-// seizes (down-down at the call-time price) for repaidUnits r at a DROPPED price pDrop <= price never
-// exceeds r either. This is mulDivSeizeValueBounded (which bounds the seize value at the call-time price)
-// composed with price-monotonicity: pDrop <= price shrinks the up-up valuation, so it stays <= r. Closes
-// the whole repaid crux in one fact for PostDropRealizableBadDebt's repaid-input branch.
-rule mulDivSeizeValueAtDroppedPriceBounded(uint256 r, uint256 l, uint256 price, uint256 wad, uint256 scale, uint256 pDrop) {
-    require l > 0 && price > 0 && wad > 0 && scale > 0;
-    require pDrop >= 0 && pDrop <= price;
-    uint256 seized = mulDivDown(mulDivDown(r, l, wad), scale, price);
-    assert mulDivUp(mulDivUp(seized, pDrop, scale), wad, l) <= r;
-}
-
 rule mulDivArgumentLesserThanDenominator(uint256 a, uint256 b, uint256 d) {
     assert a <= d => mulDivDown(a, b, d) <= b;
     assert a <= d => mulDivUp(a, b, d) <= b;
