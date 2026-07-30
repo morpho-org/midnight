@@ -137,24 +137,7 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 
 /// RULES ///
 
-// liquidate realizes the bad debt: the recomputed realizable bad debt is exactly 0 after a
-// full-args liquidate. Restricted to !postMaturityMode, where the seize factor lif equals maxLif.
-//
-// The rule is split along liquidate's exclusive-input branch (src/Midnight.sol:633,
-// `require repaidUnits == 0 || seizedAssets == 0`), one CI leg per branch, because the single
-// combined rule was heavy enough to be killed server-side. mulDiv is summarized by a loose
-// (uninterpreted) ghost, and the nonlinear reasoning is proven once, over the concrete mulDiv, in
-// MulDiv.spec; each branch then assumes only the near-linear consequences it e-matches on. The key
-// fact is the getter-form super-additivity split g(c_k) <= g(c_k - seized) + g(seized) (built from
-// axiomAddUpUp applied twice, connected by the identity collateralAfter + seized = collateralBefore),
-// which pins the seized-collateral drop.
-
-// Seized-assets-input branch (repaidUnits == 0): liquidate computes
-//   repaidUnits = mulDivUp(mulDivUp(seizedAssets, price, ORACLE_PRICE_SCALE), WAD, lif) = g(seizedAssets)
-// (src/Midnight.sol:691), i.e. the debt drop is exactly the getter value of the seized collateral.
-// Super-additivity bounds the getter-sum drop g(c_k) - g(c_k - seizedAssets) by g(seizedAssets), which
-// here equals the repaid debt drop exactly, so the recomputed bad debt is exactly 0. No separate
-// seize-value bound is needed on this branch (repaid is literally the getter term).
+// liquidate realizes the bad debt and doesn't create new bad debt: the recomputed realizable bad debt is exactly 0 after a liquidate.
 rule liquidateRealizesBadDebtSeizeInput(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(market);
 

@@ -103,7 +103,7 @@ rule mulDivUpDoubleSubAdditive(uint256 a, uint256 s, uint256 p, uint256 S, uint2
     uint256 gas = mulDivUp(innerAS, W, L);
     uint256 gs = mulDivUp(innerS, W, L);
 
-    assert to_mathint(ga) <= to_mathint(gas) + to_mathint(gs);
+    assert ga <= gas + gs;
 }
 
 rule mulDivAddDownUp(uint256 a1, uint256 a2, uint256 b, uint256 d) {
