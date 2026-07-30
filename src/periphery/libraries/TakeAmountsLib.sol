@@ -2,10 +2,10 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
-import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
-import {UtilsLib} from "../libraries/UtilsLib.sol";
-import {TickLib} from "../libraries/TickLib.sol";
-import {WAD} from "../libraries/ConstantsLib.sol";
+import {IMidnight, Offer} from "../../interfaces/IMidnight.sol";
+import {UtilsLib} from "../../libraries/UtilsLib.sol";
+import {TickLib} from "../../libraries/TickLib.sol";
+import {WAD} from "../../libraries/ConstantsLib.sol";
 
 library TakeAmountsLib {
     using UtilsLib for uint256;

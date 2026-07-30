@@ -7,8 +7,8 @@ import {IMorpho, MarketParams, Authorization, Signature} from "../lib/morpho-blu
 import {AUTHORIZATION_TYPEHASH, DOMAIN_TYPEHASH} from "../lib/morpho-blue/src/libraries/ConstantsLib.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
-import {BlueBuyCallback} from "../src/periphery/BlueBuyCallback.sol";
-import {IBlueBuyCallback} from "../src/periphery/interfaces/IBlueBuyCallback.sol";
+import {BlueBuyCallback} from "../src/periphery/blue-buy-callback/BlueBuyCallback.sol";
+import {IBlueBuyCallback} from "../src/periphery/blue-buy-callback/interfaces/IBlueBuyCallback.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 
 contract BlueBuyCallbackTest is Test {
@@ -76,6 +76,19 @@ contract BlueBuyCallbackTest is Test {
     function testSetAuthorizationRevertsIfCallerIsNotOwner() public {
         vm.expectRevert(IBlueBuyCallback.NotOwner.selector);
         callback.setAuthorization(makeAddr("authorized"), true);
+    }
+
+    function testSkim(address caller, uint256 assets) public {
+        assets = bound(assets, 0, 1e30);
+        deal(address(otherToken), address(callback), assets);
+
+        vm.expectEmit(address(callback));
+        emit IBlueBuyCallback.Skim(caller, address(otherToken), assets);
+        vm.prank(caller);
+        callback.skim(address(otherToken));
+
+        assertEq(otherToken.balanceOf(address(callback)), 0);
+        assertEq(otherToken.balanceOf(owner), assets);
     }
 
     function testSetAuthorizationWithSig() public {
@@ -156,7 +169,7 @@ contract BlueBuyCallbackTest is Test {
         assertEq(result, CALLBACK_SUCCESS);
         assertEq(loanToken.balanceOf(address(callback)), buyerAssets);
         assertEq(loanToken.balanceOf(address(blue)), 0);
-        assertEq(loanToken.allowance(address(callback), address(midnight)), type(uint256).max);
+        assertEq(loanToken.allowance(address(callback), address(midnight)), buyerAssets);
     }
 
     function testOnBuyWithdrawsAndApprovesZeroAssets() public {

@@ -7,8 +7,8 @@ import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {BlueBuyCallback} from "../src/periphery/BlueBuyCallback.sol";
-import {BlueBuyCallbackFactory} from "../src/periphery/BlueBuyCallbackFactory.sol";
+import {BlueBuyCallback} from "../src/periphery/blue-buy-callback/BlueBuyCallback.sol";
+import {BlueBuyCallbackFactory} from "../src/periphery/blue-buy-callback/BlueBuyCallbackFactory.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 contract BlueBuyCallbackIntegrationTest is BaseTest {
@@ -38,7 +38,7 @@ contract BlueBuyCallbackIntegrationTest is BaseTest {
         blue.createMarket(blueMarketParams);
 
         BlueBuyCallbackFactory factory = new BlueBuyCallbackFactory(address(midnight), address(blue));
-        callback = BlueBuyCallback(factory.createBlueBuyCallback(lender));
+        callback = BlueBuyCallback(factory.createBlueBuyCallback(lender, bytes32(0)));
 
         market.loanToken = address(loanToken);
         market.chainId = block.chainid;

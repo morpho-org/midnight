@@ -2,9 +2,9 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
-import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
-import {UtilsLib} from "../libraries/UtilsLib.sol";
-import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
+import {IMidnight, Offer} from "../../interfaces/IMidnight.sol";
+import {UtilsLib} from "../../libraries/UtilsLib.sol";
+import {IBlueBuyCallback} from "../blue-buy-callback/interfaces/IBlueBuyCallback.sol";
 import {TakeAmountsLib} from "./TakeAmountsLib.sol";
 
 library ConsumableUnitsLib {

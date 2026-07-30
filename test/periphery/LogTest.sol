@@ -3,7 +3,7 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "../../lib/forge-std/src/Test.sol";
-import {Log, MAX_DATA_LENGTH} from "../../src/periphery/Log.sol";
+import {Log, MAX_DATA_LENGTH} from "../../src/periphery/log/Log.sol";
 
 contract LogTest is Test {
     address public _log;

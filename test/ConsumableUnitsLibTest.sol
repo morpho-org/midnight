@@ -6,7 +6,7 @@ import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD, CBP, maxSettlementFee as _maxSettlementFee} from "../src/libraries/ConstantsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
-import {ConsumableUnitsLib} from "../src/periphery/ConsumableUnitsLib.sol";
+import {ConsumableUnitsLib} from "../src/periphery/libraries/ConsumableUnitsLib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 /// @dev Minimal callback exposing `buyerAssetsBound` (and optionally reverting) to exercise the buy cap.
