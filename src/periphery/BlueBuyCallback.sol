@@ -87,7 +87,8 @@ contract BlueBuyCallback is IBlueBuyCallback {
     /// @dev Takers receive the amount to take per offer from the routing layer. But the routing layer is
     /// asynchronous/offchain, and might not be up to date on the chain's latest state. To counter this, takers can
     /// query atomically this function to cap their take.
-    /// @dev Ignores some static reasons why the bound might be smaller, such as wrong loan token, wrong owner... But it is easy for the routing layer to take that into account.
+    /// @dev Ignores some static reasons why the bound might be smaller, such as wrong loan token, wrong owner... But it
+    /// is easy for the routing layer to take that into account.
     /// @dev Reverts if data is not well formed.
     /// @dev Under-estimates the real bound if the callback is the fee recipient of the blue market.
     function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {
