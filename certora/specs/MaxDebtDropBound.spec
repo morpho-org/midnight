@@ -7,9 +7,11 @@
 // A single monolithic assert of the full bound (5-nested divisions in one NIA query) times out at 2h. Instead we
 // mirror the Rocq proof's decomposition (rocq/maxRepaidHealthy.v:75-247): each nested-mulDiv fact is proven as its
 // own SMALL concrete rule (<= 2 nested divisions, so the solver closes it fast), and a final composition rule
-// (maxDebtContributionDropBound) assembles them over UNINTERPRETED (ghost) mulDiv with only linear/NIA glue -- so
-// the SMT never faces the nested-division goal in one query. This is the assume-ghost / prove-concrete split used
-// by RealizableBadDebtLiquidate.spec + MulDiv.spec in PR #1079. Isolated in its own spec/conf so a hard-nonlinear
+// (maxDebtContributionDropBound) assembles them over UNINTERPRETED (ghost) mulDiv with only linear glue + modus
+// ponens -- so the SMT never faces the nested-division goal in one query, and never has to multiply a hypothesis
+// by a variable or cancel a factor (those two nonlinear steps are isolated in the pure-arithmetic helpers
+// lemmaMulMono / lemmaCancelPos). This is the assume-ghost / prove-concrete split used by
+// RealizableBadDebtLiquidate.spec + MulDiv.spec in PR #1079. Isolated in its own spec/conf so a hard-nonlinear
 // timeout cannot gate the fast MulDiv leg.
 
 methods {
@@ -75,12 +77,23 @@ rule lemmaNonneg(uint256 a, uint256 b, uint256 d) {
     assert mulDivUp(a, b, d) >= 0;
 }
 
+// Pure-arithmetic helper (no mulDiv): multiplying both sides of an inequality by a non-negative uint256 preserves it.
+// Isolates the "multiply a hypothesis by lltv" step out of the composition so its SMT goal stays linear.
+rule lemmaMulMono(uint256 x, uint256 y, uint256 c) {
+    assert x <= y => x * c <= y * c;
+}
+
+// Pure-arithmetic helper (no mulDiv): a positive common factor can be cancelled. Isolates the "cancel W" step.
+rule lemmaCancelPos(uint256 x, uint256 y, uint256 d) {
+    assert d != 0 && x * d <= y * d => x <= y;
+}
+
 /// COMPOSITION (the discharge of axiomMaxDebtDrop) ///
 
 // The LLTV-weighted maxDebt contribution drops by at most ceil(maxRepaid * lif * lltv / WAD^2) when seized is the
 // L692 seizedAssets = floor(floor(maxRepaid * lif / WAD) * OPS / price). See rocq/maxRepaidHealthy.v:162. Proven over
 // UNINTERPRETED mulDiv (ghost*), assuming each nested fact in the exact instance the concrete sub-lemmas above prove,
-// then closing with linear/NIA glue -- exactly the composition structure of the Rocq proof body (:180-246).
+// then closing with linear glue + modus ponens -- exactly the composition structure of the Rocq proof body (:180-246).
 rule maxDebtContributionDropBound(uint256 collat, uint256 price, uint256 lltv, uint256 maxRepaid, uint256 lif) {
     require price > 0, "0 < price";
     require lltv <= WAD(), "enabled lltv <= WAD";
@@ -133,18 +146,27 @@ rule maxDebtContributionDropBound(uint256 collat, uint256 price, uint256 lltv, u
     // L5.a (lemmaDownRoundsDown), instance a=maxRepaid, b=lif, d=W: maxSeizedValue*W <= maxRepaid*lif.
     require maxSeizedValue * W <= maxRepaid * lif;
 
+    // lemmaMulMono, instance x=maxSeizedValue*W, y=maxRepaid*lif, c=lltv: scale L5.a by lltv >= 0.
+    require maxSeizedValue * W <= maxRepaid * lif => maxSeizedValue * W * lltv <= maxRepaid * lif * lltv;
+
     // L5.b (lemmaUpRoundsUp), instance a=maxRepaid, b=lifTimesLltv, d=wadSquared:
-    //   maxDebtDropBound*wadSquared >= maxRepaid*lifTimesLltv.
+    //   maxDebtDropBound*wadSquared >= maxRepaid*lifTimesLltv (== maxRepaid*lif*lltv, == maxDebtDropBound*W*W).
     require maxDebtDropBound * wadSquared >= maxRepaid * lifTimesLltv;
+
+    // lemmaCancelPos, instance x=maxSeizedValue*lltv, y=maxDebtDropBound*W, d=W: cancel W>0 from the chained bound
+    //   (maxSeizedValue*lltv)*W <= (maxDebtDropBound*W)*W  ==>  maxSeizedValue*lltv <= maxDebtDropBound*W.
+    require maxSeizedValue * lltv * W <= maxDebtDropBound * W * W => maxSeizedValue * lltv <= maxDebtDropBound * W;
 
     // L5.c (lemmaCeilLeOfMulGe), instance a=maxSeizedValue, b=lltv, d=W, bound=maxDebtDropBound:
     //   maxSeizedValue*lltv <= maxDebtDropBound*W  =>  up(maxSeizedValue,lltv,W) <= maxDebtDropBound.
     require maxSeizedValue * lltv <= maxDebtDropBound * W => ghostMulDivUp(maxSeizedValue, lltv, W) <= maxDebtDropBound;
 
-    // --- linear / NIA glue (mirrors rocq/maxRepaidHealthy.v:185-246), no nested division here ---
+    // --- linear glue + modus ponens (mirrors rocq/maxRepaidHealthy.v:185-246); no nested division, no
+    // hypothesis-times-variable, no cancellation done by the SMT here (both isolated in the helpers above):
     // (a) collatValueDrop <= maxSeizedValue: from L2 (drop <= up(seized,price,S)) and L1 (up(seized,..) <= maxSeizedValue).
     // (b) up(collatValueDrop,lltv,W) <= up(maxSeizedValue,lltv,W): L4 with (a).
-    // (c) up(maxSeizedValue,lltv,W) <= maxDebtDropBound: from L5.a * lltv, L5.b, cancel W>0, then L5.c.
+    // (c) maxSeizedValue*lltv*W <= maxDebtDropBound*W*W: from (L5.a scaled by lltv) chained through L5.b; then
+    //     lemmaCancelPos gives maxSeizedValue*lltv <= maxDebtDropBound*W, and L5.c gives up(maxSeizedValue,lltv,W) <= bound.
     // (d) curContrib - newContrib <= up(collatValueDrop,lltv,W) (L3), chained through (b),(c).
 
     assert curContrib - newContrib <= maxDebtDropBound;
