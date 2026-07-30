@@ -18,9 +18,9 @@ contract BlueBuyCallbackFactory is IBlueBuyCallbackFactory {
     }
 
     function createBlueBuyCallback(address owner, bytes32 salt) external returns (address) {
-        address _callbackOf = callbackOf[owner][salt];
-        address callback =
-            _callbackOf != address(0) ? _callbackOf : address(new BlueBuyCallback{salt: salt}(owner, MIDNIGHT, BLUE));
+        address callback = callbackOf[owner][salt] != address(0)
+            ? callbackOf[owner][salt]
+            : address(new BlueBuyCallback{salt: salt}(owner, MIDNIGHT, BLUE));
         callbackOf[owner][salt] = callback;
         isBlueCallback[callback] = true;
 
