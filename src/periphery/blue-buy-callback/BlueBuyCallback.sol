@@ -13,7 +13,7 @@ import {UtilsLib} from "../../libraries/UtilsLib.sol";
 import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
 import {IERC20Extended} from "./interfaces/IERC20Extended.sol";
-import {ERC20Lib} from "./ERC20Lib.sol";
+import {ERC20Lib} from "../libraries/ERC20Lib.sol";
 
 /// @dev This contract is meant to be used as a Midnight buy offer callback in order to park funds on a Blue market
 /// while the offer waits to be taken.

@@ -2,12 +2,12 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
-import {IERC20Extended} from "./interfaces/IERC20Extended.sol";
+import {IERC20Extended} from "../blue-buy-callback/interfaces/IERC20Extended.sol";
 
 library ERC20Lib {
     error ApproveReturnedFalse();
 
-    /// @dev Not checking the code size because Midnight's transfers do it already.
+    /// @dev Not checking the code size, so should be checked elsewhere (typically Midnight checks it on transfers).
     function safeApprove(address token, address spender, uint256 value) internal {
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20Extended.approve, (spender, value)));
         if (!success) {
