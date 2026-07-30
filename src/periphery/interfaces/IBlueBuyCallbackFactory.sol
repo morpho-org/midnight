@@ -4,7 +4,7 @@ pragma solidity >=0.5.0;
 
 interface IBlueBuyCallbackFactory {
     /// EVENTS ///
-    event CreateBlueBuyCallback(address indexed owner, address callback);
+    event CreateBlueBuyCallback(address indexed caller, address indexed owner, address callback);
 
     /// STORAGE GETTERS ///
     function MIDNIGHT() external view returns (address);
