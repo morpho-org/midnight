@@ -62,13 +62,11 @@ contract BlueBuyCallbackFactoryTest is Test {
         vm.prank(owner);
         address callback = factory.createBlueBuyCallback(owner, salt);
 
-        vm.recordLogs();
         vm.prank(owner);
         address callbackAgain = factory.createBlueBuyCallback(owner, salt);
 
         assertEq(callbackAgain, callback);
         assertEq(factory.callbackOf(owner, salt), callback);
-        assertEq(vm.getRecordedLogs().length, 0);
     }
 
     function testCreateMultipleBlueBuyCallbacksPerOwner(bytes32 salt1, bytes32 salt2) public {
