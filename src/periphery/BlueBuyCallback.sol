@@ -17,7 +17,7 @@ interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
 }
 
-/// @dev This contract is meant to be used as a Midnight buy offer callback in order to park funds on a Blue market 
+/// @dev This contract is meant to be used as a Midnight buy offer callback in order to park funds on a Blue market
 /// while the offer waits to be taken.
 /// @dev The positions on the Blue markets are acquired through supplies on behalf of this contract (permissionless).
 /// @dev To withdraw the positions (if the offer expired for example), the OWNER is authorized on Blue to manage this
