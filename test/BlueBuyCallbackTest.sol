@@ -83,7 +83,7 @@ contract BlueBuyCallbackTest is Test {
         deal(address(otherToken), address(callback), assets);
 
         vm.expectEmit(address(callback));
-        emit IBlueBuyCallback.Skim(address(otherToken), assets);
+        emit IBlueBuyCallback.Skim(caller, address(otherToken), assets);
         vm.prank(caller);
         callback.skim(address(otherToken));
 

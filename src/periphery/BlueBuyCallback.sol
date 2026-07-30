@@ -64,7 +64,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
     function skim(address token) external {
         uint256 balance = IERC20(token).balanceOf(address(this));
         SafeTransferLib.safeTransfer(token, OWNER, balance);
-        emit Skim(token, balance);
+        emit Skim(msg.sender, token, balance);
     }
 
     /// @dev Reverts if the owner position on the requested market is too small or if the liquidity on that market is
