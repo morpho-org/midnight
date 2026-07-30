@@ -89,8 +89,9 @@ definition axiomLifLLTV(mathint a, mathint lif, mathint lltv) returns bool = a >
 rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight.Market market, address borrower) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     bytes32 id = summaryToId(market);
 
-    require market.collateralParams.length <= 2, "restrict collateralParams for loop tractability";
-    require !liquidationLocked(id, borrower), "scope out the locked (re-entrant) seller case";
+    // if seller is locked, they can create a position with bad debt.  In that case the position
+    // must be healthy when the lock is removed later and no bad debt can be realized.
+    require !liquidationLocked(id, borrower), "scope out the re-entrant case";
 
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
     require forall mathint a. forall mathint b. forall mathint d. axiomUpGeqDown(a, b, d), "axiom";
@@ -110,9 +111,6 @@ rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight
 rule liquidateRealizesTotalUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(market);
 
-    require market.collateralParams.length <= 2, "restrict collateralParams for loop tractability";
-    require marketIsCreated(market), "market must be created (tickSpacing > 0)";
-    require lossFactor(id) < max_uint128, "market lossFactor must not be saturated";
     require debt(id, borrower) <= totalUnits(id), "position debt bounded by totalUnits";
 
     uint256 badDebtBefore = realizableBadDebt(market, id, borrower);
