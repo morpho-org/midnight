@@ -14,6 +14,7 @@ import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
 import {IERC20Extended} from "./interfaces/IERC20Extended.sol";
 import {ApproveLib} from "./ApproveLib.sol";
 
+/// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
 /// @dev Anyone authorized by the owner on Midnight can pull from the Blue position held by this callback contract by
 /// making the owner buy dummy credit on Midnight.
 contract BlueBuyCallback is IBlueBuyCallback {
@@ -74,15 +75,19 @@ contract BlueBuyCallback is IBlueBuyCallback {
         require(marketParams.loanToken == market.loanToken, InconsistentLoanToken());
 
         if (buyerAssets > 0) IMorpho(BLUE).withdraw(marketParams, buyerAssets, 0, address(this), address(this));
-        ApproveLib.forceApproveMax(market.loanToken, MIDNIGHT);
+        ApproveLib.safeApprove(market.loanToken, MIDNIGHT, buyerAssets);
 
         return CALLBACK_SUCCESS;
     }
 
     /// @dev Max buyerAssets amount that the callback can handle.
-    /// @dev This function is useful for bundles to query how much is available at the moment.
-    /// @dev Other buy callbacks might not take all constraints into account to provide their bound, but this is fine,
-    /// if the routing layer can take into account the other reasons.
+    /// @dev Takers receive the amount to take per offer from the routing layer. But the routing layer is
+    /// asynchronous/offchain, and might not be up to date on the chain's latest state. To counter this, takers can
+    /// query atomically this function to cap their take.
+    /// @dev Ignores some static reasons why the bound might be smaller, such as wrong loan token, wrong owner... But it
+    /// is easy for the routing layer to take that into account.
+    /// @dev Reverts if data is not well formed.
+    /// @dev Under-estimates the real bound if the callback is the fee recipient of the blue market.
     function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {
         MarketParams memory marketParams = abi.decode(data, (MarketParams));
 
