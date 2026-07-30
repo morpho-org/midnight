@@ -28,9 +28,12 @@ library ConsumableUnitsLib {
         // The bound is optional: fall back to no cap when the callback does not expose `buyerAssetsBound` (the
         // staticcall fails or returns non-32-byte data because the selector is absent).
         if (offer.buy) {
-            (bool success, bytes memory returnData) = offer.callback.staticcall(
-                abi.encodeCall(IBlueBuyCallback.buyerAssetsBound, (id, offer.market, offer.maker, offer.callbackData))
-            );
+            (bool success, bytes memory returnData) = offer.callback
+                .staticcall(
+                    abi.encodeCall(
+                        IBlueBuyCallback.buyerAssetsBound, (id, offer.market, offer.maker, offer.callbackData)
+                    )
+                );
             if (success && returnData.length == 32) {
                 uint256 bound = abi.decode(returnData, (uint256));
                 units = UtilsLib.min(units, TakeAmountsLib.unitsFromBuyerAssetsBound(offer, bound));
