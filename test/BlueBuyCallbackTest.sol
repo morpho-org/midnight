@@ -78,24 +78,17 @@ contract BlueBuyCallbackTest is Test {
         callback.setAuthorization(makeAddr("authorized"), true);
     }
 
-    function testSkim(uint256 assets) public {
+    function testSkim(address caller, uint256 assets) public {
         assets = bound(assets, 0, 1e30);
         deal(address(otherToken), address(callback), assets);
 
         vm.expectEmit(address(callback));
         emit IBlueBuyCallback.Skim(address(otherToken), assets);
-        vm.prank(owner);
+        vm.prank(caller);
         callback.skim(address(otherToken));
 
         assertEq(otherToken.balanceOf(address(callback)), 0);
         assertEq(otherToken.balanceOf(owner), assets);
-    }
-
-    function testSkimRevertsIfCallerIsNotOwner(address caller) public {
-        vm.assume(caller != owner);
-        vm.expectRevert(IBlueBuyCallback.NotOwner.selector);
-        vm.prank(caller);
-        callback.skim(address(otherToken));
     }
 
     function testSetAuthorizationWithSig() public {
