@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {ERC20Lib} from "../src/periphery/blue-buy-callback/ERC20Lib.sol";
 
-contract BlueBuyCallbackSafeApproveTest is Test {
+contract ERC20LibTest is Test {
     address internal spender = makeAddr("spender");
 
     function testSafeApproveSupportsNoReturnValue(uint256 value) public {
