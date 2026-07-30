@@ -21,8 +21,8 @@ interface IERC20 {
 /// while the offer waits to be taken.
 /// @dev The positions on the Blue markets are acquired through supplies on behalf of this contract (permissionless).
 /// @dev The OWNER can withdraw this position on Blue, for example if the offer expired.
-/// @dev The OWNER can also authorize other account (optionally with signature), typically useful for
-/// bundles contract.
+/// @dev The OWNER can also authorize other accounts (optionally with signature), typically useful for
+/// bundle contracts.
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
 /// @dev Anyone authorized by the owner on Midnight can indirectly steal this contract's Blue positions.
 contract BlueBuyCallback is IBlueBuyCallback {
