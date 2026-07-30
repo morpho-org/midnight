@@ -109,6 +109,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
         safeApprove(token, spender, type(uint256).max);
     }
 
+    /// @dev Not checking the code size because Midnight's transfers do it already.
     function safeApprove(address token, address spender, uint256 value) internal {
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20.approve, (spender, value)));
         if (!success) {
