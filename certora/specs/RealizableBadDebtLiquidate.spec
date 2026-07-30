@@ -77,14 +77,6 @@ persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
 
 persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
 
-// Loose (uninterpreted) mulDiv summaries. Because the ghost is a function, equal arguments give equal
-// values, so every non-seized collateral term cancels between liquidate's bad-debt loop and the getter.
-// The mulDiv values are otherwise constrained only by the near-linear consequences the rules e-match on
-// (monotonicity, single-layer super-additivity, the round-trip inverse bound, and non-negativity), each
-// PROVEN over the concrete mulDiv in MulDiv.spec. This keeps the heavy nonlinear reasoning out of the
-// liquidate body: the solver only instantiates the proven relational facts on the collateral terms it
-// needs (g(c_k), g(c_k - seized), g(seized)), pinning the getter-sum drop without re-deriving nonlinear
-// arithmetic.
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
