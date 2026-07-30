@@ -5,9 +5,9 @@ pragma solidity ^0.8.0;
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {Vm} from "../lib/forge-std/src/Vm.sol";
 import {IMorpho} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
-import {BlueBuyCallback} from "../src/periphery/BlueBuyCallback/BlueBuyCallback.sol";
-import {BlueBuyCallbackFactory} from "../src/periphery/BlueBuyCallback/BlueBuyCallbackFactory.sol";
-import {IBlueBuyCallbackFactory} from "../src/periphery/BlueBuyCallback/interfaces/IBlueBuyCallbackFactory.sol";
+import {BlueBuyCallback} from "../src/periphery/blue-buy-callback/BlueBuyCallback.sol";
+import {BlueBuyCallbackFactory} from "../src/periphery/blue-buy-callback/BlueBuyCallbackFactory.sol";
+import {IBlueBuyCallbackFactory} from "../src/periphery/blue-buy-callback/interfaces/IBlueBuyCallbackFactory.sol";
 
 contract BlueBuyCallbackFactoryTest is Test {
     address internal midnight = makeAddr("midnight");

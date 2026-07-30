@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {ApproveLib} from "../src/periphery/BlueBuyCallback/ApproveLib.sol";
+import {ApproveLib} from "../src/periphery/blue-buy-callback/ApproveLib.sol";
 
 contract BlueBuyCallbackSafeApproveTest is Test {
     address internal spender = makeAddr("spender");

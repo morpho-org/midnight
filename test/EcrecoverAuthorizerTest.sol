@@ -8,7 +8,7 @@ import {
     Signature,
     EIP712_DOMAIN_TYPEHASH,
     AUTHORIZATION_TYPEHASH
-} from "../src/periphery/EcrecoverAuthorizer/interfaces/IEcrecoverAuthorizer.sol";
+} from "../src/periphery/ecrecover-authorizer/interfaces/IEcrecoverAuthorizer.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 bytes constant AUTHORIZATION_TYPE =

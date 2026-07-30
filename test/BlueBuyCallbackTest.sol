@@ -7,8 +7,8 @@ import {IMorpho, MarketParams, Authorization, Signature} from "../lib/morpho-blu
 import {AUTHORIZATION_TYPEHASH, DOMAIN_TYPEHASH} from "../lib/morpho-blue/src/libraries/ConstantsLib.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
-import {BlueBuyCallback} from "../src/periphery/BlueBuyCallback/BlueBuyCallback.sol";
-import {IBlueBuyCallback} from "../src/periphery/BlueBuyCallback/interfaces/IBlueBuyCallback.sol";
+import {BlueBuyCallback} from "../src/periphery/blue-buy-callback/BlueBuyCallback.sol";
+import {IBlueBuyCallback} from "../src/periphery/blue-buy-callback/interfaces/IBlueBuyCallback.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 
 contract BlueBuyCallbackTest is Test {
