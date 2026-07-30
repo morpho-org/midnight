@@ -13,7 +13,6 @@ import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
 
 interface IERC20 {
-    function allowance(address owner, address spender) external view returns (uint256);
     function approve(address spender, uint256 value) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
 }
@@ -24,8 +23,8 @@ interface IERC20 {
 /// @dev To withdraw the positions (if the offer expired for example), the OWNER is authorized on Blue to manage this
 /// contract's positions. The OWNER can also authorize other account (optionally with signature), typically useful for
 /// bundles contract.
-/// @dev Anyone authorized by the owner on Midnight can pull from the Blue position held by this callback contract by
-/// making the owner buy dummy credit on Midnight.
+/// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
+/// @dev Anyone authorized by the owner on Midnight can indirectly steal this contract's Blue positions.
 contract BlueBuyCallback is IBlueBuyCallback {
     using MarketParamsLib for MarketParams;
     using MorphoBalancesLib for IMorpho;
@@ -84,15 +83,19 @@ contract BlueBuyCallback is IBlueBuyCallback {
         require(marketParams.loanToken == market.loanToken, InconsistentLoanToken());
 
         if (buyerAssets > 0) IMorpho(BLUE).withdraw(marketParams, buyerAssets, 0, address(this), address(this));
-        forceApproveMax(market.loanToken, MIDNIGHT);
+        safeApprove(market.loanToken, MIDNIGHT, buyerAssets);
 
         return CALLBACK_SUCCESS;
     }
 
     /// @dev Max buyerAssets amount that the callback can handle.
-    /// @dev This function is useful for bundles to query how much is available at the moment.
-    /// @dev Other buy callbacks might not take all constraints into account to provide their bound, but this is fine,
-    /// if the routing layer can take into account the other reasons.
+    /// @dev Takers receive the amount to take per offer from the routing layer. But the routing layer is
+    /// asynchronous/offchain, and might not be up to date on the chain's latest state. To counter this, takers can
+    /// query atomically this function to cap their take.
+    /// @dev Ignores some static reasons why the bound might be smaller, such as wrong loan token, wrong owner... But it
+    /// is easy for the routing layer to take that into account.
+    /// @dev Reverts if data is not well formed.
+    /// @dev Under-estimates the real bound if the callback is the fee recipient of the blue market.
     function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {
         MarketParams memory marketParams = abi.decode(data, (MarketParams));
 
@@ -104,15 +107,6 @@ contract BlueBuyCallback is IBlueBuyCallback {
         uint256 blueBalance = IERC20(marketParams.loanToken).balanceOf(BLUE);
 
         return UtilsLib.min(UtilsLib.min(supplyAssets, liquidity), blueBalance);
-    }
-
-    /// @dev Skips the approval entirely to save gas when the current allowance is already at least 2^95 - 1 (some
-    /// tokens like COMP and UNI on Ethereum have a max allowance of type(uint96).max).
-    /// @dev Resets to 0 before re-approving to support USDT-like tokens.
-    function forceApproveMax(address token, address spender) internal {
-        if (IERC20(token).allowance(address(this), spender) >= type(uint96).max / 2) return;
-        safeApprove(token, spender, 0);
-        safeApprove(token, spender, type(uint256).max);
     }
 
     function safeApprove(address token, address spender, uint256 value) internal {
