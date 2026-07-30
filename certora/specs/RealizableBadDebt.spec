@@ -6,7 +6,7 @@
 //    case: it should realize the bad debt and leave zero."
 //
 // realizableBadDebt(id, borrower) is the `badDebt` local computed at the top of
-// Midnight.liquidate (src/Midnight.sol:643-657).
+// Midnight.liquidate.
 //
 // "Without a price update" is modelled by summarizing _.price() as PER_CALLEE_CONSTANT.
 
@@ -25,7 +25,7 @@ methods {
     function tickSpacing(bytes32) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    function _.price() external => PER_CALLEE_CONSTANT;
+    function _.price() external => summaryPrice[calledContract];
 
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
@@ -59,6 +59,8 @@ persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
 persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
 
 persistent ghost maxLifGhost(uint256, uint256) returns uint256;
+
+persistent ghost summaryPrice(address) returns uint256;
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
@@ -104,18 +106,16 @@ rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight
     require forall mathint a. forall mathint lif. forall mathint lltv. axiomLifLLTV(a, lif, lltv), "axiom";
     require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
 
-    uint256 rbdBefore = realizableBadDebt(market, id, borrower);
+    uint256 badDebtBefore = realizableBadDebt(market, id, borrower);
 
     f(e, args);
 
-    uint256 rbdAfter = realizableBadDebt(market, id, borrower);
+    uint256 badDebtAfter = realizableBadDebt(market, id, borrower);
 
-    assert rbdAfter <= rbdBefore;
+    assert badDebtAfter <= badDebtBefore;
 }
 
-// liquidate drops totalUnits by exactly the realized bad debt (src/Midnight.sol:673); the
-// seize/repay block never touches totalUnits. Cheap: the badDebt local is recomputed by the
-// getter verbatim, so no mulDiv axioms are needed to equate them.
+// liquidate drops totalUnits by exactly the realized bad debt. 
 rule liquidateRealizesTotalUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(market);
 
@@ -124,11 +124,11 @@ rule liquidateRealizesTotalUnits(env e, Midnight.Market market, uint256 collater
     require lossFactor(id) < max_uint128, "market lossFactor must not be saturated";
     require debt(id, borrower) <= totalUnits(id), "position debt bounded by totalUnits";
 
-    uint256 rbdBefore = realizableBadDebt(market, id, borrower);
+    uint256 badDebtBefore = realizableBadDebt(market, id, borrower);
     uint256 totalUnitsBefore = totalUnits(id);
-    assert rbdBefore <= totalUnitsBefore;
+    assert badDebtBefore <= totalUnitsBefore;
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    assert totalUnits(id) == totalUnitsBefore - rbdBefore;
+    assert totalUnits(id) == totalUnitsBefore - badDebtBefore;
 }
