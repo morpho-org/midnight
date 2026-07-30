@@ -40,7 +40,7 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function realizableBadDebtAtPrice(Midnight.Market, bytes32, address, uint256) external returns (uint256) envfree;
+    function realizableBadDebt(Midnight.Market, bytes32, address) external returns (uint256) envfree;
     function debt(bytes32, address) external returns (uint128) envfree;
     function totalUnits(bytes32) external returns (uint128) envfree;
     function lossFactor(bytes32) external returns (uint128) envfree;
@@ -51,7 +51,7 @@ methods {
 
     // Per-callee constant price (no price update): this is the call-time price p that liquidate reads.
     // The measurement price p' is decoupled from it, passed explicitly to realizableBadDebtAtPrice.
-    function _.price() external => summaryPrice(calledContract) expect(uint256);
+    function _.price() external => summaryPrice[calledContract] expect(uint256);
 
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
@@ -82,7 +82,7 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 persistent ghost maxLifGhost(uint256, uint256) returns uint256;
 
-persistent ghost summaryPrice(address) returns uint256;
+persistent ghost mapping(address => uint256) summaryPrice;
 
 persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
 
@@ -188,7 +188,7 @@ rule postDropRbdLiquidateNonIncreaseSeizeInput(env e, Midnight.Market market, ui
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
 
-    mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
+    uint256 price = summaryPrice[market.collateralParams[collateralIndex].oracle];
     require pDrop <= price, "the measurement price p' is a dropped price: p' <= call-time price p";
 
     // Near-linear consequences of the MulDiv lemmas, assumed over the loose ghost (each proven in
@@ -215,15 +215,21 @@ rule postDropRbdLiquidateNonIncreaseSeizeInput(env e, Midnight.Market market, ui
     require gSeizedDrop <= gSeizedP, "price bridge: g_{p'}(seized) <= g_p(seized) (mulDivMonotoneB then mulDivMonotoneA)";
     require to_mathint(seizedAssets) <= collatK => gCollatKDrop <= gCollatKMinusSeizedDrop + gSeizedDrop, "double sub-additivity instance at p' (mulDivUpDoubleSubAdditive)";
 
-    mathint R = realizableBadDebtAtPrice(market, id, borrower, pDrop);
+    // scenario 1: price drops, then realize bad debt
+    summaryPrice[market.collateralParams[collateralIndex].oracle] = pDrop;
+    mathint R = realizableBadDebt(market, id, borrower);
 
+    // scenario 2: liquidate at initial (higher) price
+    // then price drop, realize remaining debt.
+    summaryPrice[market.collateralParams[collateralIndex].oracle] = price;
+
+    mathint R1 = realizableBadDebt(market, id, borrower);
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    mathint Rprime = realizableBadDebtAtPrice(market, id, borrower, pDrop);
+    summaryPrice[market.collateralParams[collateralIndex].oracle] = pDrop;
+    mathint R2 = realizableBadDebt(market, id, borrower);
 
-    assert Rprime <= R;
-    // If exact <= needs rounding slack, the tolerant form (one seized-collateral term's rounding) is:
-    // assert Rprime <= R + 3;
+    assert R1 + R2 <= R;
 }
 
 // Repaid-units-input branch (seizedAssets == 0): liquidate derives the seized collateral
@@ -252,7 +258,7 @@ rule postDropRbdLiquidateNonIncreaseRepaidInput(env e, Midnight.Market market, u
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
 
-    mathint price = summaryPrice(market.collateralParams[collateralIndex].oracle);
+    uint256 price = summaryPrice[market.collateralParams[collateralIndex].oracle];
     require price > 0, "call-time price positive (liquidate divides by it at src/Midnight.sol:692)";
     require pDrop <= price, "the measurement price p' is a dropped price: p' <= call-time price p";
 
@@ -281,13 +287,19 @@ rule postDropRbdLiquidateNonIncreaseRepaidInput(env e, Midnight.Market market, u
     require gSeizedDrop <= to_mathint(repaidUnits), "dropped-price seize-value bound instance (mulDivSeizeValueAtDroppedPriceBounded)";
     require seizedDerived <= collatK => gCollatKDrop <= gCollatKMinusSeizedDrop + gSeizedDrop, "double sub-additivity instance at p' (mulDivUpDoubleSubAdditive)";
 
-    mathint R = realizableBadDebtAtPrice(market, id, borrower, pDrop);
+    // scenario 1: price drops, then realize bad debt
+    summaryPrice[market.collateralParams[collateralIndex].oracle] = pDrop;
+    mathint R = realizableBadDebt(market, id, borrower);
 
+    // scenario 2: liquidate at initial (higher) price
+    // then price drop, realize remaining debt.
+    summaryPrice[market.collateralParams[collateralIndex].oracle] = price;
+
+    mathint R1 = realizableBadDebt(market, id, borrower);
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    mathint Rprime = realizableBadDebtAtPrice(market, id, borrower, pDrop);
+    summaryPrice[market.collateralParams[collateralIndex].oracle] = pDrop;
+    mathint R2 = realizableBadDebt(market, id, borrower);
 
-    assert Rprime <= R;
-    // If exact <= needs rounding slack, the tolerant form (one seized-collateral term's rounding) is:
-    // assert Rprime <= R + 3;
+    assert R1 + R2 <= R;
 }
