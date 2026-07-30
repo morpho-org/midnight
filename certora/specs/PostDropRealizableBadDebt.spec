@@ -3,35 +3,14 @@
 
 // Property: liquidating ahead of an oracle price drop cannot worsen the post-drop realizable bad debt.
 //
-// Concretely: liquidate runs at the pre-drop call-time price p (the price it reads from the oracle),
-// while realizable bad debt is *measured* at a DROPPED price p' <= p. The claim is
-//   R' <= R,
-// where R = do-nothing post-drop rbd (measured at p' before liquidate) and R' = post-liquidate
-// post-drop rbd (measured at p' after liquidate). I.e. having liquidated first never leaves MORE
-// realizable bad debt at the dropped price than doing nothing.
+// Concretely:  In the reference scenario there is no liquidation just a price drop and the
+// bad debt is measured at the dropped price pDrop.
+// In the second scenario there was a liquidate at some price >= pDrop before the price drop.
+// The total bad debt in the second scenario (the bad debt before measured at initial price plus
+// the additional bad debt after liquidating measured a the dropped price) must not exceed the
+// bad debt in the reference scenario without a liquidation.
 //
-// Measurement at the decoupled price p' uses realizableBadDebtAtPrice (certora/helpers/MidnightWrapper.sol),
-// a verbatim structural copy of the realizableBadDebt getter that values each active collateral at an
-// explicitly passed price instead of reading IOracle(...).price(). Per active collateral c it subtracts
-//   g_x(c) = mulDivUp(mulDivUp(c, x, ORACLE_PRICE_SCALE), WAD, maxLif)
-// where x is the passed measurement price. The iterated zeroFloorSub equals zeroFloorSub(debt, sum of
-// terms), so rbd is monotone: more debt removed or less coverage removed cannot increase it.
-//
-// Proof (single seized collateral c_k -> c_k - seized, debt reduced by >= repaidUnits):
-//   coverage-removed at p' = g_{p'}(c_k) - g_{p'}(c_k - seized)
-//                          <= g_{p'}(seized)         [getter-form double sub-additivity, at p']
-//                          <= g_{p}(seized)          [getter-form price monotonicity, p' <= p]
-//                          <= repaidUnits            [seize-value bound at p / repaid = g_p(seized)]
-//                          <= debt-removed.
-// Since coverage-removed <= debt-removed, zeroFloorSub monotonicity gives R' <= R with no slack.
-//
-// This reuses #1079's seize-value bound and double sub-additivity lemmas, and adds the price
-// monotonicity of the getter term (g is non-decreasing in the price argument), which is what bridges
-// the p'-measured coverage drop to the p-priced seize/repay logic liquidate actually executes.
-//
-// Restricted, like the isolated liquidate leg it builds on, to the non-post-maturity path
-// (require !postMaturityMode, where lif == maxLif, src/Midnight.sol:685-687), a single seized
-// collateral, and split along liquidate's exclusive-input branch (repaidUnits == 0 || seizedAssets == 0).
+// This shows that timely liquidations before a price drop are never disadvantageous to the creditors.
 
 import "BitmapSummaries.spec";
 
@@ -88,12 +67,6 @@ persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
 
 persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
 
-// Loose (uninterpreted) mulDiv summaries, identical to RealizableBadDebtLiquidate.spec: because the ghost
-// is a function, equal arguments give equal values, so every unchanged collateral term is identical
-// between the before-getter and the after-getter measurements. The mulDiv values are otherwise
-// constrained only by the near-linear consequences the rule e-matches on (monotonicity in each argument,
-// getter-form double sub-additivity, and the seize-value bound), each PROVEN over the concrete mulDiv in
-// MulDiv.spec. This keeps the heavy nonlinear reasoning out of the liquidate body.
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
@@ -144,12 +117,6 @@ definition axiomAddUpUp(mathint a1, mathint a2, mathint b, mathint d) returns bo
 //   mulDivUp(mulDivDown(a,b,d),d,b) <= a
 definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a;
 
-/// INVARIANTS ///
-
-// Proven in CollateralBitmap.spec; assumed here via requireInvariant (not re-proven in this spec).
-strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
-    collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].collateralBitmap, collateralIndex));
-
 /// RULES ///
 
 // Realizable bad debt cannot increase from liquidating before a price drop.
@@ -184,10 +151,6 @@ rule postDropRbdLiquidateNonIncrease(env e, Midnight.Market market, uint256 coll
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
     require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomUpMonotoneB(a, b1, b2, d), "axiom";
     require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2), "axiom";
-    //require axiomUpZero(price, ORACLE_PRICE_SCALE()), "axiom";
-    //require axiomUpZero(WAD(), maxLif), "axiom";
-    //require axiomAddUpUp(collateralAfter, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
-    //require axiomAddUpUp(ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()), ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), WAD(), maxLif), "axiom";
 
     require axiomUpZero(pDrop, ORACLE_PRICE_SCALE()), "axiom";
     require axiomUpZero(WAD(), maxLif), "axiom";
@@ -208,6 +171,6 @@ rule postDropRbdLiquidateNonIncrease(env e, Midnight.Market market, uint256 coll
     summaryPrice[market.collateralParams[collateralIndex].oracle] = pDrop;
     mathint badDebt2b = realizableBadDebt(market, id, borrower);
 
-    // liquidating before the price drop (scenario 2) will cause less bad debt in total.
+    // liquidating before the price drop (scenario 2) will cause less total bad debt than scenario 1.
     assert badDebt2a + badDebt2b <= badDebt1;
 }
