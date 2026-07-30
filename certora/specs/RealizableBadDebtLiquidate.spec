@@ -1,28 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-// Property (issue #109), liquidate case:
-//   "Liquidation realizes the bad debt and leaves zero."
-//
-// This is the hard, full-args counterpart of the rules in RealizableBadDebt.spec: after a
-// liquidate with arbitrary seizedAssets/repaidUnits, realizableBadDebt recomputes to exactly zero.
-// It is isolated in its own spec (and CI leg) because it needs the getter-form mulDivUp
-// value-drop bound, which is heavy for the solver.
-//
-// realizableBadDebt(id, borrower) is the `badDebt` local computed at the top of
-// Midnight.liquidate (src/Midnight.sol:643-657), and per active collateral c it subtracts
-//   g(c) = mulDivUp(mulDivUp(c, price, ORACLE_PRICE_SCALE), WAD, maxLif).
-// Liquidate seizes from a single collateral (c_k -> c_k - seizedAssets) and repays repaidUnits.
-// The proof: the getter-sum drop g(c_k) - g(c_k - seizedAssets) is at most g(seizedAssets)
-// (mulDivUp is additive: apply the single-layer super-additivity lemma mulDivAddUpUp on both the
-// price/scale and WAD/maxLif layers, connected by the exact identity c_k = (c_k - seizedAssets) +
-// seizedAssets), and g(seizedAssets) <= repaidUnits (seize-value bound), so the getter-sum drops
-// by at least the debt drop and the recomputed bad debt is exactly zero.
-//
-// The rule is restricted to the non-post-maturity path (require !postMaturityMode), where the
-// seize factor lif equals maxLif (src/Midnight.sol:685-687); the post-maturity path (lif < maxLif)
-// is left for follow-up.
-
 import "BitmapSummaries.spec";
 
 using Utils as Utils;
@@ -144,8 +122,7 @@ rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralI
         require axiomInverseUpDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
     }
 
-    uint256 collateralBefore = collateral(id, borrower, collateralIndex);
-    mathint collateralAfter = collateralBefore - seizedAssetsOut;
+    mathint collateralAfter = collateral(id, borrower, collateralIndex) - seizedAssetsOut;
 
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
     require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2), "axiom";
