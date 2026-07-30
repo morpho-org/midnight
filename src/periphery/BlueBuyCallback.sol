@@ -18,8 +18,7 @@ interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
 }
 
-/// @dev Anyone authorized by the owner on Midnight can take on behalf of the owner on Midnight with this contract as
-/// buyerCallback, which will effectively pull the Blue position held by this callback contract.
+/// @dev Anyone authorized by the owner on Midnight can indirectly steal this contract's Blue positions.
 contract BlueBuyCallback is IBlueBuyCallback {
     using MarketParamsLib for MarketParams;
     using MorphoBalancesLib for IMorpho;
