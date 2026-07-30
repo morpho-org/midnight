@@ -63,7 +63,6 @@ contract BlueBuyCallback is IBlueBuyCallback {
     }
 
     /// @dev Skims the callback's balance of `token` and sends it to the owner.
-    /// @dev Permissionless: anyone can call, funds always go to the owner. Useful to handle rewards or leftover tokens.
     function skim(address token) external {
         uint256 balance = IERC20(token).balanceOf(address(this));
         SafeTransferLib.safeTransfer(token, OWNER, balance);
