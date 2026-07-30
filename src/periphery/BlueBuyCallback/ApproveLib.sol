@@ -7,6 +7,7 @@ import {IERC20Extended} from "./interfaces/IERC20Extended.sol";
 library ApproveLib {
     error ApproveReturnedFalse();
 
+    /// @dev Not checking the code size because Midnight's transfers do it already.
     function safeApprove(address token, address spender, uint256 value) internal {
         (bool success, bytes memory returndata) = token.call(abi.encodeCall(IERC20Extended.approve, (spender, value)));
         if (!success) {
