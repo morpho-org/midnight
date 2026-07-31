@@ -9,7 +9,7 @@ import {WAD} from "../../libraries/ConstantsLib.sol";
 import {IdLib} from "../../libraries/IdLib.sol";
 import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";
-import {IBlueFallbackRolling} from "./IBlueFallbackRolling.sol";
+import {IBlueFallbackRolling, Config} from "./IBlueFallbackRolling.sol";
 import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
@@ -27,32 +27,30 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    /// @param incentive The caller incentive as a WAD-scaled percentage of the debt rolled.
-    function setConfig(bytes32 midnightId, bytes32 blueId, uint64 start, uint64 incentive, bool enabled)
-        external
-        override
-    {
-        require(incentive <= WAD, IncentiveTooHigh());
+    /// @param config.incentive The caller incentive as a WAD-scaled percentage of the debt rolled.
+    function setConfig(Config memory config, bool enabled) external override {
+        require(config.incentive <= WAD, IncentiveTooHigh());
 
-        isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, incentive))] = enabled;
+        isConfig[msg.sender][keccak256(abi.encode(config))] = enabled;
 
-        emit SetConfig(msg.sender, midnightId, blueId, start, incentive, enabled);
+        emit SetConfig(msg.sender, config.midnightId, config.blueId, config.start, config.incentive, enabled);
     }
 
     function roll(
         Market memory midnightMarket,
         MarketParams memory blueMarketParams,
         address user,
-        uint64 start,
-        uint64 incentive,
+        Config memory config,
         uint256 assets
     ) external override {
-        bytes32 midnightId = IdLib.toId(midnightMarket);
-        bytes32 blueId = Id.unwrap(blueMarketParams.id());
-        require(isConfig[user][keccak256(abi.encode(midnightId, blueId, start, incentive))], NotConfigured());
+        // The ids must be derived from the markets given here, not merely trusted from `config`, so that a config
+        // cannot be reused to roll into a market it was not set up for.
+        require(IdLib.toId(midnightMarket) == config.midnightId, InconsistentMidnightId());
+        require(Id.unwrap(blueMarketParams.id()) == config.blueId, InconsistentBlueId());
+        require(isConfig[user][keccak256(abi.encode(config))], NotConfigured());
         require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
-        require(block.timestamp >= start, NotStarted());
-        uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
+        require(block.timestamp >= config.start, NotStarted());
+        uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(config.midnightId, user);
         require(UtilsLib.countBits(collateralBitmap) == 1, IncorrectActivatedCollateral());
         uint256 collateralIndex = UtilsLib.msb(collateralBitmap);
         require(
@@ -61,12 +59,12 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         );
 
         // Round in favor of the Midnight position.
-        uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
-            .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
+        uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(config.midnightId, user, collateralIndex)
+            .mulDivDown(assets, IMidnight(MIDNIGHT).debt(config.midnightId, user));
         // Round in favor of the borrower.
-        uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentive, WAD);
+        uint256 incentiveAssets = UtilsLib.mulDivDown(assets, config.incentive, WAD);
 
-        emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
+        emit Roll(msg.sender, user, config.midnightId, config.blueId, assets, collateralAssets, incentiveAssets);
 
         bytes memory data = abi.encode(midnightMarket, blueMarketParams, collateralIndex, assets, incentiveAssets, user);
         IMorpho(BLUE).supplyCollateral(blueMarketParams, collateralAssets, user, data);

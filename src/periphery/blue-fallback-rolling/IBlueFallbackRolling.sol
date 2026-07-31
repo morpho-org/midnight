@@ -6,12 +6,21 @@ import {IMorphoSupplyCollateralCallback} from "../../../lib/morpho-blue/src/inte
 import {MarketParams} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {Market} from "../../interfaces/IMidnight.sol";
 
+struct Config {
+    bytes32 midnightId;
+    bytes32 blueId;
+    uint64 start;
+    uint64 incentive;
+}
+
 interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     /// ERRORS ///
     error IncentiveTooHigh();
     error IncorrectActivatedCollateral();
+    error InconsistentBlueId();
     error InconsistentCollateralToken();
     error InconsistentLoanToken();
+    error InconsistentMidnightId();
     error NotBlue();
     error NotConfigured();
     error NotStarted();
@@ -41,13 +50,12 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     function isConfig(address user, bytes32 configId) external view returns (bool);
 
     /// FUNCTIONS ///
-    function setConfig(bytes32 midnightId, bytes32 blueId, uint64 start, uint64 incentive, bool enabled) external;
+    function setConfig(Config memory config, bool enabled) external;
     function roll(
         Market memory midnightMarket,
         MarketParams memory blueMarketParams,
         address user,
-        uint64 start,
-        uint64 incentive,
+        Config memory config,
         uint256 assets
     ) external;
 }
