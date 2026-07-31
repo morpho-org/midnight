@@ -27,7 +27,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    /// @param config.incentive The caller incentive as a WAD-scaled percentage of the debt rolled.
     function setConfig(Config memory config, bool enabled) external override {
         require(config.incentive <= WAD, IncentiveTooHigh());
 
