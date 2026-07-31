@@ -13,7 +13,7 @@ methods {
     function collateral(bytes32, address, uint256) external returns (uint128) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    // Per-callee constant price (no price update); named so the rule can reference it, matching LiquidationBoundedByLIF.spec.
+    // No price update.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
@@ -92,7 +92,7 @@ definition axiomUpZero(mathint b, mathint d) returns bool = d > 0 => ghostMulDiv
 
 // proven in MulDiv.spec as mulDivAddUpUp:
 //   mulDivUp(a1 + a2, b, d) <= mulDivUp(a1, b, d) + mulDivUp(a2, b, d).
-definition axiomAddUpUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => ghostMulDivUp(a1 + a2, b, d) <= ghostMulDivUp(a1, b, d) + ghostMulDivUp(a2, b, d);
+definition axiomAddUpUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 && a1 + a2 < 2^256 => ghostMulDivUp(a1 + a2, b, d) <= ghostMulDivUp(a1, b, d) + ghostMulDivUp(a2, b, d);
 
 // proven in MulDiv.spec as mulDivAddUpUp:
 //   mulDivUp(mulDivDown(a,b,d),d,b) <= a
