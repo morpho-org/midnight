@@ -9,10 +9,6 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function realizableBadDebt(Midnight.Market, bytes32, address) external returns (uint256) envfree;
-    function debt(bytes32, address) external returns (uint128) envfree;
-    function totalUnits(bytes32) external returns (uint128) envfree;
-    function lossFactor(bytes32) external returns (uint128) envfree;
-    function liquidationLocked(bytes32, address) external returns (bool) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
     function collateral(bytes32, address, uint256) external returns (uint128) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;

@@ -11,7 +11,6 @@ methods {
     function realizableBadDebt(Midnight.Market, bytes32, address) external returns (uint256) envfree;
     function debt(bytes32, address) external returns (uint128) envfree;
     function totalUnits(bytes32) external returns (uint128) envfree;
-    function lossFactor(bytes32) external returns (uint128) envfree;
     function liquidationLocked(bytes32, address) external returns (bool) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
@@ -19,9 +18,11 @@ methods {
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+    // Safe because the protocol doesn't use `toMarket`
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
-    function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
 
+     // Over-approximate the following functions.
+    function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
@@ -29,9 +30,6 @@ methods {
     // All external calls are assumed non-reentrant / non-reverting: we reason about the function bodies for safety properties.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function _.isRatified(Midnight.Offer, bytes, address) external => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
@@ -42,8 +40,6 @@ methods {
 /// SUMMARIES / GHOSTS ///
 
 definition WAD() returns uint256 = 10 ^ 18;
-
-definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
 
@@ -111,7 +107,7 @@ rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight
 rule liquidateRealizesTotalUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     bytes32 id = summaryToId(market);
 
-    require debt(id, borrower) <= totalUnits(id), "position debt bounded by totalUnits";
+    require debt(id, borrower) <= totalUnits(id), "proven by totalUnitsEqualsSumNegativeDebtPlusWithdrawable";
 
     uint256 badDebtBefore = realizableBadDebt(market, id, borrower);
     uint256 totalUnitsBefore = totalUnits(id);
