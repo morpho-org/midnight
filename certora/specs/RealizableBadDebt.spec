@@ -18,10 +18,11 @@ methods {
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+
     // Safe because the protocol doesn't use `toMarket`
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
-     // Over-approximate the following functions.
+    // Over-approximate the following functions.
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
@@ -73,12 +74,6 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
 
-definition axiomUpMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
-
-definition axiomUpGeqDown(mathint a, mathint b, mathint d) returns bool = d > 0 => ghostMulDivUp(a, b, d) >= ghostMulDivDown(a, b, d);
-
-definition axiomLifLLTV(mathint a, mathint lif, mathint lltv) returns bool = a >= 0 && lltv * lif <= WAD() * WAD() => ghostMulDivUp(a, lltv, WAD()) <= ghostMulDivUp(a, WAD(), lif);
-
 /// RULES ///
 
 // No non-liquidate function may increase realizableBadDebt of a position.
@@ -89,9 +84,14 @@ rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight
     // must be healthy when the lock is removed later and no bad debt can be realized.
     require !liquidationLocked(id, borrower), "scope out the re-entrant case";
 
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a. forall mathint b. forall mathint d. axiomUpGeqDown(a, b, d), "axiom";
-    require forall mathint a. forall mathint lif. forall mathint lltv. axiomLifLLTV(a, lif, lltv), "axiom";
+    // mulDivUp is monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "mulDivUp is monotone in the first argument";
+
+    // mulDivUp is at least mulDivDown (proven in MulDiv.spec as mulDivUpGeqMulDivDown).
+    require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(a, b, d) >= ghostMulDivDown(a, b, d), "mulDivUp is at least mulDivDown";
+
+    // If lltv * lif <= WAD^2 then mulDivUp(a, lltv, WAD) <= mulDivUp(a, WAD, lif).
+    require forall mathint a. forall mathint lif. forall mathint lltv. a >= 0 && lltv * lif <= WAD() * WAD() => ghostMulDivUp(a, lltv, WAD()) <= ghostMulDivUp(a, WAD(), lif), "if lltv * lif <= WAD^2 then mulDivUp(a, lltv, WAD) <= mulDivUp(a, WAD, lif)";
     require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
 
     uint256 badDebtBefore = realizableBadDebt(market, id, borrower);
