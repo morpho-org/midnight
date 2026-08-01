@@ -131,3 +131,17 @@ rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralI
 
     assert realizableBadDebt(market, id, borrower) == 0;
 }
+
+// liquidating one position does not increase the realizable bad debt of a different position.
+rule liquidateDoesNotIncreaseOtherRealizableBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market measuredMarket, address measuredBorrower) {
+    bytes32 id = summaryToId(market);
+    bytes32 measuredId = summaryToId(measuredMarket);
+
+    require measuredId != id || measuredBorrower != borrower;
+
+    uint256 rbdBefore = realizableBadDebt(measuredMarket, measuredId, measuredBorrower);
+
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+
+    assert realizableBadDebt(measuredMarket, measuredId, measuredBorrower) <= rbdBefore;
+}
