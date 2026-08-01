@@ -121,11 +121,11 @@ rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralI
 
     // proven in MulDiv.spec as mulDivAddUpUp:
     //   mulDivUp(a1 + a2, b, d) <= mulDivUp(a1, b, d) + mulDivUp(a2, b, d).
-    require collateralAfter >= 0 && seizedAssetsOut >= 0 && price >= 0 && ORACLE_PRICE_SCALE() > 0 && collateralAfter + seizedAssetsOut < 2 ^ 256 => ghostMulDivUp(collateralAfter + seizedAssetsOut, price, ORACLE_PRICE_SCALE()) <= ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) + ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
+    require collateralAfter >= 0 && seizedAssetsOut >= 0 && price >= 0 && ORACLE_PRICE_SCALE() > 0 => ghostMulDivUp(collateralAfter + seizedAssetsOut, price, ORACLE_PRICE_SCALE()) <= ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) + ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
 
     // proven in MulDiv.spec as mulDivAddUpUp:
     //   mulDivUp(a1 + a2, b, d) <= mulDivUp(a1, b, d) + mulDivUp(a2, b, d).
-    require ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) >= 0 && ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()) >= 0 && WAD() >= 0 && maxLif > 0 && ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) + ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()) < 2 ^ 256 => ghostMulDivUp(ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) + ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), WAD(), maxLif) <= ghostMulDivUp(ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()), WAD(), maxLif) + ghostMulDivUp(ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), WAD(), maxLif), "axiom";
+    require ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) >= 0 && ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()) >= 0 && WAD() >= 0 && maxLif > 0 => ghostMulDivUp(ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) + ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), WAD(), maxLif) <= ghostMulDivUp(ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()), WAD(), maxLif) + ghostMulDivUp(ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), WAD(), maxLif), "axiom";
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
