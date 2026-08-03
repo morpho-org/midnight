@@ -84,14 +84,11 @@ rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight
     // must be healthy when the lock is removed later and no bad debt can be realized.
     require !liquidationLocked(id, borrower), "scope out the re-entrant case";
 
-    // mulDivUp is monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "mulDivUp is monotone in the first argument";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA)";
 
-    // mulDivUp is at least mulDivDown (proven in MulDiv.spec as mulDivUpGeqMulDivDown).
-    require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(a, b, d) >= ghostMulDivDown(a, b, d), "mulDivUp is at least mulDivDown";
+    require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(a, b, d) >= ghostMulDivDown(a, b, d), "Rounding up is at least rounding down (proven in MulDiv.spec as mulDivUpGeqMulDivDown)";
 
-    // If lltv * lif <= WAD^2 then mulDivUp(a, lltv, WAD) <= mulDivUp(a, WAD, lif).
-    require forall mathint a. forall mathint lif. forall mathint lltv. a >= 0 && lltv * lif <= WAD() * WAD() => ghostMulDivUp(a, lltv, WAD()) <= ghostMulDivUp(a, WAD(), lif), "if lltv * lif <= WAD^2 then mulDivUp(a, lltv, WAD) <= mulDivUp(a, WAD, lif)";
+    require forall mathint a. forall mathint lif. forall mathint lltv. a >= 0 && lltv * lif <= WAD() * WAD() => ghostMulDivUp(a, lltv, WAD()) <= ghostMulDivUp(a, WAD(), lif), "maxLif is at most 1/lltv";
     require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
 
     uint256 badDebtBefore = realizableBadDebt(market, id, borrower);

@@ -90,42 +90,28 @@ rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralI
     } else {
         seizedAssetsOut = ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price);
     
-        // Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
-        require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d), "axiom";
+        require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d), "Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA)";
     
-        // Monotone in the second argument (proven in MulDiv.spec as mulDivMonotoneB).
-        require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => ghostMulDivDown(a, b1, d) <= ghostMulDivDown(a, b2, d), "axiom";
+        require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => ghostMulDivDown(a, b1, d) <= ghostMulDivDown(a, b2, d), "Monotone in the second argument (proven in MulDiv.spec as mulDivMonotoneB)";
     
-        // proven in MulDiv.spec as mulDivInverseUpDown:
-        //   mulDivUp(mulDivDown(a,b,d),d,b) <= a
-        require repaidUnits >= 0 && maxLif > 0 && WAD() > 0 => ghostMulDivUp(ghostMulDivDown(repaidUnits, maxLif, WAD()), WAD(), maxLif) <= repaidUnits, "axiom";
+        require forall mathint a. forall mathint b. forall mathint d. a >= 0 && b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a, "Round-trip up-after-down is bounded (proven in MulDiv.spec as mulDivInverseUpDown)";
     
-        // proven in MulDiv.spec as mulDivInverseUpDown:
-        //   mulDivUp(mulDivDown(a,b,d),d,b) <= a
-        require ghostMulDivDown(repaidUnits, maxLif, WAD()) >= 0 && ORACLE_PRICE_SCALE() > 0 && price > 0 => ghostMulDivUp(ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price), price, ORACLE_PRICE_SCALE()) <= ghostMulDivDown(repaidUnits, maxLif, WAD()), "axiom";
+        require forall mathint a. forall mathint b. forall mathint d. a >= 0 && b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a, "Round-trip up-after-down is bounded (proven in MulDiv.spec as mulDivInverseUpDown)";
     }
 
     mathint collateralAfter = collateral(id, borrower, collateralIndex) - seizedAssetsOut;
 
-    // Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "axiom";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA)";
 
-    // Monotone in the third argument (proven in MulDiv.spec as mulDivMonotoneD).
-    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. 0 <= a && 0 <= b && 0 < d1 && d1 <= d2 => ghostMulDivUp(a, b, d2) <= ghostMulDivUp(a, b, d1), "axiom";
+    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. 0 <= a && 0 <= b && 0 < d1 && d1 <= d2 => ghostMulDivUp(a, b, d2) <= ghostMulDivUp(a, b, d1), "Antitone in the denominator (proven in MulDiv.spec as mulDivMonotoneD)";
 
-    // Zero collateral values to zero (proven in MulDiv.spec as mulDivZero).
-    require ORACLE_PRICE_SCALE() > 0 => ghostMulDivUp(0, price, ORACLE_PRICE_SCALE()) == 0, "axiom";
+    require forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(0, b, d) == 0, "Zero numerator gives zero (proven in MulDiv.spec as mulDivZero)";
 
-    // Zero collateral values to zero (proven in MulDiv.spec as mulDivZero).
-    require maxLif > 0 => ghostMulDivUp(0, WAD(), maxLif) == 0, "axiom";
+    require forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(0, b, d) == 0, "Zero numerator gives zero (proven in MulDiv.spec as mulDivZero)";
 
-    // proven in MulDiv.spec as mulDivAddUpUp:
-    //   mulDivUp(a1 + a2, b, d) <= mulDivUp(a1, b, d) + mulDivUp(a2, b, d).
-    require collateralAfter >= 0 && seizedAssetsOut >= 0 && price >= 0 && ORACLE_PRICE_SCALE() > 0 => ghostMulDivUp(collateralAfter + seizedAssetsOut, price, ORACLE_PRICE_SCALE()) <= ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) + ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => ghostMulDivUp(a1 + a2, b, d) <= ghostMulDivUp(a1, b, d) + ghostMulDivUp(a2, b, d), "Sub-additive in the numerator (proven in MulDiv.spec as mulDivAddUpUp)";
 
-    // proven in MulDiv.spec as mulDivAddUpUp:
-    //   mulDivUp(a1 + a2, b, d) <= mulDivUp(a1, b, d) + mulDivUp(a2, b, d).
-    require ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) >= 0 && ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()) >= 0 && WAD() >= 0 && maxLif > 0 => ghostMulDivUp(ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) + ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), WAD(), maxLif) <= ghostMulDivUp(ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()), WAD(), maxLif) + ghostMulDivUp(ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), WAD(), maxLif), "axiom";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => ghostMulDivUp(a1 + a2, b, d) <= ghostMulDivUp(a1, b, d) + ghostMulDivUp(a2, b, d), "Sub-additive in the numerator (proven in MulDiv.spec as mulDivAddUpUp)";
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
