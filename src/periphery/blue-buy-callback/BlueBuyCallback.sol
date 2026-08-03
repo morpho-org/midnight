@@ -18,12 +18,12 @@ import {ERC20Lib} from "../libraries/ERC20Lib.sol";
 /// @dev This contract is meant to be used as a Midnight buy offer callback in order to park funds on a Blue market
 /// while the offer waits to be taken.
 /// @dev The positions on the Blue markets are acquired through supplies on behalf of this contract (permissionless).
-/// @dev The OWNER can withdraw this position on Blue, for example if the offer expired.
-/// @dev The OWNER can also authorize other accounts (optionally with signature), typically useful for
+/// @dev The owner can withdraw this position on Blue, for example if the offer expired.
+/// @dev The owner can also authorize other accounts (optionally with signature), typically useful for
 /// bundle contracts.
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
 /// @dev Anyone authorized by the owner on Midnight can pull this contract's Blue positions through a take on Midnight
-/// on behalf of OWNER.
+/// on behalf of owner.
 /// @dev An account authorized on Blue to act on behalf of this contract can notably borrow on its behalf, which
 /// is not the expected use-case, but it is not explicitly prevented because it does not affect onBuy.
 contract BlueBuyCallback is IBlueBuyCallback {
@@ -31,23 +31,23 @@ contract BlueBuyCallback is IBlueBuyCallback {
     using MorphoBalancesLib for IMorpho;
     using SharesMathLib for uint256;
 
-    address public immutable OWNER;
-    address public immutable MIDNIGHT;
-    address public immutable BLUE;
+    address public immutable owner;
+    address public immutable midnight;
+    address public immutable blue;
     uint256 public nonce;
 
     constructor(address _owner, address _midnight, address _blue) {
-        OWNER = _owner;
-        MIDNIGHT = _midnight;
-        BLUE = _blue;
+        owner = _owner;
+        midnight = _midnight;
+        blue = _blue;
 
-        IMorpho(BLUE).setAuthorization(OWNER, true);
+        IMorpho(blue).setAuthorization(owner, true);
     }
 
     function setAuthorization(address authorized, bool newIsAuthorized) external {
-        require(msg.sender == OWNER, NotOwner());
-        if (IMorpho(BLUE).isAuthorized(address(this), authorized) != newIsAuthorized) {
-            IMorpho(BLUE).setAuthorization(authorized, newIsAuthorized);
+        require(msg.sender == owner, NotOwner());
+        if (IMorpho(blue).isAuthorized(address(this), authorized) != newIsAuthorized) {
+            IMorpho(blue).setAuthorization(authorized, newIsAuthorized);
         }
     }
 
@@ -59,18 +59,18 @@ contract BlueBuyCallback is IBlueBuyCallback {
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
         address signer = ecrecover(digest, signature.v, signature.r, signature.s);
-        require(signer != address(0) && signer == authorization.authorizer && signer == OWNER, InvalidSignature());
+        require(signer != address(0) && signer == authorization.authorizer && signer == owner, InvalidSignature());
 
         emit SetAuthorizationWithSig(msg.sender, authorization.nonce);
-        if (IMorpho(BLUE).isAuthorized(address(this), authorization.authorized) != authorization.isAuthorized) {
-            IMorpho(BLUE).setAuthorization(authorization.authorized, authorization.isAuthorized);
+        if (IMorpho(blue).isAuthorized(address(this), authorization.authorized) != authorization.isAuthorized) {
+            IMorpho(blue).setAuthorization(authorization.authorized, authorization.isAuthorized);
         }
     }
 
     /// @dev Useful to handle rewards that the callback earned through its Blue positions.
     function skim(address token) external {
         uint256 balance = IERC20Extended(token).balanceOf(address(this));
-        SafeTransferLib.safeTransfer(token, OWNER, balance);
+        SafeTransferLib.safeTransfer(token, owner, balance);
         emit Skim(msg.sender, token, balance);
     }
 
@@ -85,13 +85,13 @@ contract BlueBuyCallback is IBlueBuyCallback {
         address buyer,
         bytes memory data
     ) external returns (bytes32) {
-        require(msg.sender == MIDNIGHT, NotMidnight());
-        require(buyer == OWNER, NotOwnerBuyer());
+        require(msg.sender == midnight, NotMidnight());
+        require(buyer == owner, NotOwnerBuyer());
         MarketParams memory marketParams = abi.decode(data, (MarketParams));
         require(marketParams.loanToken == market.loanToken, InconsistentLoanToken());
 
-        if (buyerAssets > 0) IMorpho(BLUE).withdraw(marketParams, buyerAssets, 0, address(this), address(this));
-        ERC20Lib.safeApprove(market.loanToken, MIDNIGHT, buyerAssets);
+        if (buyerAssets > 0) IMorpho(blue).withdraw(marketParams, buyerAssets, 0, address(this), address(this));
+        ERC20Lib.safeApprove(market.loanToken, midnight, buyerAssets);
 
         return CALLBACK_SUCCESS;
     }
@@ -108,11 +108,11 @@ contract BlueBuyCallback is IBlueBuyCallback {
         MarketParams memory marketParams = abi.decode(data, (MarketParams));
 
         (uint256 totalSupplyAssets, uint256 totalSupplyShares, uint256 totalBorrowAssets,) =
-            IMorpho(BLUE).expectedMarketBalances(marketParams);
-        uint256 supplyAssets = IMorpho(BLUE).position(marketParams.id(), address(this)).supplyShares
+            IMorpho(blue).expectedMarketBalances(marketParams);
+        uint256 supplyAssets = IMorpho(blue).position(marketParams.id(), address(this)).supplyShares
             .toAssetsDown(totalSupplyAssets, totalSupplyShares);
         uint256 liquidity = totalSupplyAssets - totalBorrowAssets;
-        uint256 blueBalance = IERC20Extended(marketParams.loanToken).balanceOf(BLUE);
+        uint256 blueBalance = IERC20Extended(marketParams.loanToken).balanceOf(blue);
 
         return UtilsLib.min(UtilsLib.min(supplyAssets, liquidity), blueBalance);
     }

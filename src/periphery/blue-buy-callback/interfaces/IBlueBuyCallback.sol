@@ -22,9 +22,9 @@ interface IBlueBuyCallback is IBuyCallback {
     event Skim(address indexed caller, address indexed token, uint256 assets);
 
     /// STORAGE GETTERS ///
-    function OWNER() external view returns (address);
-    function MIDNIGHT() external view returns (address);
-    function BLUE() external view returns (address);
+    function owner() external view returns (address);
+    function midnight() external view returns (address);
+    function blue() external view returns (address);
     function nonce() external view returns (uint256);
 
     /// FUNCTIONS ///

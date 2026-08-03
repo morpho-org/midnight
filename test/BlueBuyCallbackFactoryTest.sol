@@ -21,8 +21,8 @@ contract BlueBuyCallbackFactoryTest is Test {
     }
 
     function testConstructor() public view {
-        assertEq(factory.MIDNIGHT(), midnight);
-        assertEq(factory.BLUE(), address(blue));
+        assertEq(factory.midnight(), midnight);
+        assertEq(factory.blue(), address(blue));
     }
 
     function testCreateBlueBuyCallback(bytes32 salt) public {
@@ -34,9 +34,9 @@ contract BlueBuyCallbackFactoryTest is Test {
 
         assertEq(callbackAddress, vm.computeCreate2Address(salt, initCodeHash, address(factory)));
         assertEq(factory.callbackOf(owner, salt), callbackAddress);
-        assertEq(callback.OWNER(), owner);
-        assertEq(callback.MIDNIGHT(), midnight);
-        assertEq(callback.BLUE(), address(blue));
+        assertEq(callback.owner(), owner);
+        assertEq(callback.midnight(), midnight);
+        assertEq(callback.blue(), address(blue));
         assertTrue(factory.isBlueCallback(callbackAddress));
         assertTrue(blue.isAuthorized(callbackAddress, owner));
     }
@@ -91,7 +91,7 @@ contract BlueBuyCallbackFactoryTest is Test {
         factory.createBlueBuyCallback(owner, salt);
 
         address callback = factory.callbackOf(owner, salt);
-        assertEq(BlueBuyCallback(callback).OWNER(), owner);
+        assertEq(BlueBuyCallback(callback).owner(), owner);
         assertTrue(blue.isAuthorized(callback, owner));
     }
 
