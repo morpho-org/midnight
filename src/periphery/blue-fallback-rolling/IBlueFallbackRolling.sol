@@ -10,6 +10,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     /// ERRORS ///
     error IncentiveTooHigh();
     error IncorrectActivatedCollateral();
+    error InvalidMaxLtv();
     error InconsistentCollateralToken();
     error InconsistentLoanToken();
     error LtvExceeded();

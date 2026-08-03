@@ -16,7 +16,7 @@ contract BlueFallbackRollingTest is BaseTest {
     uint256 internal constant BLUE_LLTV = 0.86e18;
     uint64 internal constant INCENTIVE = 0.001e18;
     uint64 internal constant MAX_INCENTIVE = 1e18;
-    uint256 internal constant MAX_LTV = type(uint256).max;
+    uint256 internal constant MAX_LTV = 0.8e18;
     uint256 internal constant DEBT = 10_000e18;
 
     address internal keeper = makeAddr("keeper");
@@ -225,6 +225,16 @@ contract BlueFallbackRollingTest is BaseTest {
         vm.expectRevert(IBlueFallbackRolling.LtvExceeded.selector);
         vm.prank(keeper);
         fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, tightMaxLtv, DEBT);
+    }
+
+    function testRollRevertsWhenMaxLtvIsAboveLltv() public {
+        uint256 invalidMaxLtv = BLUE_LLTV;
+        vm.prank(borrower);
+        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, invalidMaxLtv, true);
+
+        vm.expectRevert(IBlueFallbackRolling.InvalidMaxLtv.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, invalidMaxLtv, DEBT);
     }
 
     function configId(uint64 _start, uint64 incentive, uint256 _maxLtv) internal view returns (bytes32) {

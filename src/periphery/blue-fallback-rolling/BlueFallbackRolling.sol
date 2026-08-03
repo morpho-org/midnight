@@ -52,6 +52,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint256 maxLtv,
         uint256 assets
     ) external override {
+        require(maxLtv < blueMarketParams.lltv, InvalidMaxLtv());
         bytes32 midnightId = IdLib.toId(midnightMarket);
         bytes32 blueId = Id.unwrap(blueMarketParams.id());
         require(isConfig[user][keccak256(abi.encode(midnightId, blueId, start, incentive, maxLtv))], NotConfigured());
@@ -100,7 +101,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
     }
 
     function requireMaxLtv(MarketParams memory marketParams, address sender, uint256 maxLtv) internal view {
-        if (maxLtv >= marketParams.lltv) return;
         Position memory position = IMorpho(BLUE).position(marketParams.id(), sender);
         if (position.borrowShares == 0) return;
         BlueMarket memory market = IMorpho(BLUE).market(marketParams.id());
