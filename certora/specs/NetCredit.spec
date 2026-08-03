@@ -10,6 +10,7 @@ methods {
     function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
+    function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Deterministic hash preserves market-to-id relationship without adding assumptions.
@@ -35,6 +36,17 @@ definition MAX_TTM() returns mathint = 100 * 365 * 86400;
 definition WAD() returns uint256 = 10 ^ 18;
 
 definition zeroFloorSub(uint256 a, uint256 b) returns mathint = a >= b ? a - b : 0;
+
+// Monotonic clock: the greatest block.timestamp observed so far. block.timestamp only increases,
+// so this lower-bounds every future timestamp. Persistent so callbacks cannot havoc it.
+persistent ghost uint256 lastTimestamp;
+
+hook TIMESTAMP() uint newTimestamp {
+    require newTimestamp >= lastTimestamp, "timestamps are guaranteed to be increasing";
+
+    require newTimestamp < 2 ^ 63, "safe as it corresponds to some time very far into the future.";
+    lastTimestamp = newTimestamp;
+}
 
 /// SUMMARY FUNCTIONS ///
 
@@ -77,8 +89,12 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     return ghostMulDivUp(a, b, d);
 }
 
+persistent ghost mapping(bytes32 => mathint) maturityOfId;
+
 function summaryToId(Midnight.Market market) returns (bytes32) {
-    return Utils.hashMarket(market);
+    bytes32 id = Utils.hashMarket(market);
+    require maturityOfId[id] == to_mathint(market.maturity), "remember the maturity of the market";
+    return id;
 }
 
 /// The up-to-date face value of a lender's position: credit - pendingFee after slashing and fee accrual.
@@ -100,6 +116,10 @@ function netCredit(env e, Midnight.Market market, address user) returns mathint 
 /// This implies that the net credit is equal to the credit once a position has been accrued at or after maturity.
 invariant pendingFeeZeroAfterMaturity(Midnight.Market market, bytes32 id, address user)
     summaryToId(market) == id && lastAccrual(id, user) >= market.maturity => pendingFee(id, user) == 0;
+
+// A created market's maturity, recorded in maturityOfId at creation, is at most MAX_TTM in the future.
+strong invariant maturityBoundedById(bytes32 id)
+    tickSpacing(id) > 0 => maturityOfId[id] <= to_mathint(lastTimestamp) + MAX_TTM();
 
 /// RULES ///
 
@@ -166,7 +186,9 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
 
     // We require it after `take`, because `take` may initialize the market first.
     require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
-    require offer.market.maturity <= e.block.timestamp + MAX_TTM(), "Maturity not too far in the future";
+
+    requireInvariant maturityBoundedById(summaryToId(offer.market));
+
     assert continuousFee(summaryToId(offer.market)) * zeroFloorSub(offer.market.maturity, e.block.timestamp) <= WAD(), "interest <= 100%";
 
     mathint netCreditAfter = netCredit(e, offer.market, user);

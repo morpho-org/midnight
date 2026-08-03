@@ -16,8 +16,8 @@ Anyone authorized to act for the owner on Midnight can trigger this callback thr
 
 ### `BlueBuyCallbackFactory`
 
-Deploys one deterministic `BlueBuyCallback` for an owner using `CREATE2` with a zero salt.
-The owner is included in the creation code, so different owners get different callback addresses.
+Deploys a deterministic `BlueBuyCallback` for an owner using `CREATE2` with a caller-provided salt, so an owner can have several callbacks.
+The owner is included in the creation code and combined with the salt, so different owners or salts get different callback addresses.
 
 The factory records callbacks in `callbackOf` and `isBlueCallback`.
 
