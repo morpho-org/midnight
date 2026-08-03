@@ -2,7 +2,13 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {IMorpho, Id, MarketParams, Market as BlueMarket, Position} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {
+    IMorpho,
+    Id,
+    MarketParams,
+    Market as BlueMarket,
+    Position
+} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {MarketParamsLib} from "../../../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
 import {SharesMathLib} from "../../../lib/morpho-blue/src/libraries/SharesMathLib.sol";
 import {IMidnight, Market} from "../../interfaces/IMidnight.sol";

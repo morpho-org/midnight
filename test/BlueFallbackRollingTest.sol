@@ -83,7 +83,9 @@ contract BlueFallbackRollingTest is BaseTest {
         vm.prank(borrower);
         blue.setAuthorization(address(fallbackContract), true);
         vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, MAX_LTV, true);
+        fallbackContract.setConfig(
+            toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, MAX_LTV, true
+        );
     }
 
     function testAnyoneCanRollBorrowerToBlue() public {
@@ -124,7 +126,9 @@ contract BlueFallbackRollingTest is BaseTest {
     function testCannotRollBeforeStart() public {
         uint64 futureStart = uint64(vm.getBlockTimestamp() + 1);
         vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), futureStart, INCENTIVE, MAX_LTV, true);
+        fallbackContract.setConfig(
+            toId(midnightMarket), Id.unwrap(blueMarketParams.id()), futureStart, INCENTIVE, MAX_LTV, true
+        );
 
         vm.expectRevert(IBlueFallbackRolling.NotStarted.selector);
         vm.prank(keeper);
@@ -142,7 +146,9 @@ contract BlueFallbackRollingTest is BaseTest {
     function testRollRevertsForInconsistentLoanToken() public {
         blueMarketParams.loanToken = makeAddr("otherLoanToken");
         vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, MAX_LTV, true);
+        fallbackContract.setConfig(
+            toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, MAX_LTV, true
+        );
 
         vm.expectRevert(IBlueFallbackRolling.InconsistentLoanToken.selector);
         vm.prank(keeper);
@@ -186,19 +192,25 @@ contract BlueFallbackRollingTest is BaseTest {
         uint64 incentive = MAX_INCENTIVE + 1;
 
         vm.expectRevert(IBlueFallbackRolling.IncentiveTooHigh.selector);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, incentive, MAX_LTV, true);
+        fallbackContract.setConfig(
+            toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, incentive, MAX_LTV, true
+        );
     }
 
     function testSetConfigAllowsOneIncentive() public {
         vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, MAX_INCENTIVE, MAX_LTV, true);
+        fallbackContract.setConfig(
+            toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, MAX_INCENTIVE, MAX_LTV, true
+        );
 
         assertTrue(fallbackContract.isConfig(borrower, configId(start, MAX_INCENTIVE, MAX_LTV)));
     }
 
     function testSetConfigCanDisable() public {
         vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, MAX_LTV, false);
+        fallbackContract.setConfig(
+            toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, MAX_LTV, false
+        );
 
         assertFalse(fallbackContract.isConfig(borrower, configId(start, INCENTIVE, MAX_LTV)));
 
@@ -220,7 +232,9 @@ contract BlueFallbackRollingTest is BaseTest {
     function testRollRevertsWhenMaxLtvExceeded() public {
         uint256 tightMaxLtv = BLUE_LLTV / 2;
         vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, tightMaxLtv, true);
+        fallbackContract.setConfig(
+            toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, tightMaxLtv, true
+        );
 
         vm.expectRevert(IBlueFallbackRolling.LtvExceeded.selector);
         vm.prank(keeper);
@@ -230,7 +244,9 @@ contract BlueFallbackRollingTest is BaseTest {
     function testRollRevertsWhenMaxLtvIsAboveLltv() public {
         uint256 invalidMaxLtv = BLUE_LLTV;
         vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, invalidMaxLtv, true);
+        fallbackContract.setConfig(
+            toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, invalidMaxLtv, true
+        );
 
         vm.expectRevert(IBlueFallbackRolling.InvalidMaxLtv.selector);
         vm.prank(keeper);
