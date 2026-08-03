@@ -3,31 +3,14 @@
 
 import "BitmapSummaries.spec";
 
-// On-contract version of the Rocq theorem max_repaid_liquidation_leaves_healthy (rocq/maxRepaidHealthy.v):
-// in the RCF-active regime (!postMaturityMode && lltv < WAD), liquidating an unhealthy position at the RCF
-// cap repaid = maxRepaid (see src/Midnight.sol:699) restores health (newDebt <= newMaxDebt, newDebt >= 0).
-// This is the RESTORATION direction; Healthiness.spec proves the PRESERVATION direction.
-// Single-collateral: the Rocq otherCollatContribution is 0 here (the market has one collateral).
-//
-// This is a SINGLE self-contained rule: the LLTV-weighted maxDebt-drop bound (Rocq
-// max_debt_contribution_drop_bound, rocq/maxRepaidHealthy.v:162) is DERIVED INLINE from primitive mulDiv
-// facts + linear glue, rather than assumed as a bare axiom. The nonlinear atoms stay opaque via
-// ghost-summarized mulDiv; the only nonlinear facts the solver uses are the tight primitive floor/ceil
-// bounds (each proven over concrete mulDiv in MulDiv.spec), applied at the specific ground instances below,
-// plus the two isolated pure-arithmetic moves (multiply-by-nonnegative, cancel-positive). Everything else
-// is linear composition, so the drop bound and the final health conclusion are assembled without the solver
-// ever facing a nested-division goal or multiplying/cancelling a variable inside a nonlinear goal.
-
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
-    function collateralBitmap(bytes32 id, address user) external returns (uint128) envfree;
     function debt(bytes32 id, address user) external returns (uint128) envfree;
     function isHealthyNoBitmap(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function maxRepaidFor(Midnight.Market, bytes32, uint256, address) external returns (uint256) envfree;
     function badDebtFor(Midnight.Market, bytes32, address) external returns (uint256) envfree;
-    function liquidationLocked(bytes32, address) external returns (bool) envfree;
 
     // Assumption: price does not change during the rule (same value in maxRepaidFor, in liquidate and in the
     // post-state isHealthyNoBitmap). Deterministic per oracle address, as in Healthiness.spec.
@@ -45,14 +28,9 @@ methods {
     // assumed below (see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec).
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 
-    // No reentrancy is modeled for this direction: transfers move external ERC20 balances only, never the
-    // borrower's position storage, so summarizing them as no-ops is sound. The callback is disabled below.
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function _.transferFrom(address from, address to, uint256 amount) external => NONDET;
-    function _.transfer(address to, uint256 amount) external => NONDET;
-    function _.canLiquidate(address) external => NONDET;
-    function _.onLiquidate(address liquidator, bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, bytes data, uint256 badDebt) external => NONDET;
+    // Assume no reentrancy: callbacks and tokens do not re-enter Midnight.
+    // This is justified because the properties we verify are about the effect of each function's own body on
+    // the state, not the effect of the full transaction including callbacks.
 }
 
 /// SUMMARY ///
@@ -63,25 +41,25 @@ definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 persistent ghost summaryPrice(address) returns uint256;
 
-persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
 
-persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
 
 /* Primitive tight rounding facts, each proven over concrete mulDiv in MulDiv.spec and used below ONLY at
    specific ground instances (never as background foralls, to keep the query linear). */
 
-/* proved in mulDivUpRoundsUp: a*b <= ceil(a*b/d)*d (Rocq ceil_div_mul_ge). */
-definition axiomUpRoundsUp(mathint a, mathint b, mathint d) returns bool = a >= 0 && b >= 0 && d > 0 => a * b <= ghostMulDivUp(a, b, d) * d;
+/* Proved in mulDivUpRoundsUp: a*b <= ceil(a*b/d)*d. */
+definition axiomUpRoundsUp(uint256 a, uint256 b, uint256 d) returns bool = d > 0 => a * b <= ghostMulDivUp(a, b, d) * d;
 
-/* proved in mulDivCeilLeOfMulGe: a*b <= bound*d => ceil(a*b/d) <= bound (Rocq ceil_div_le_of_mul_ge). */
-definition axiomCeilLeOfMulGe(mathint a, mathint b, mathint d, mathint bound) returns bool = a >= 0 && b >= 0 && d > 0 && a * b <= bound * d => ghostMulDivUp(a, b, d) <= bound;
+/* Proved in mulDivCeilLeOfMulGe: a*b <= bound*d => ceil(a*b/d) <= bound. */
+definition axiomCeilLeOfMulGe(uint256 a, uint256 b, uint256 d, uint256 bound) returns bool = d > 0 && a * b <= bound * d => ghostMulDivUp(a, b, d) <= bound;
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
         revert();
     }
-    return require_uint256(ghostMulDivDown(a, b, d));
+    return ghostMulDivDown(a, b, d);
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
@@ -89,7 +67,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (overflow || d == 0) {
         revert();
     }
-    return require_uint256(ghostMulDivUp(a, b, d));
+    return ghostMulDivUp(a, b, d);
 }
 
 // Global market machinery (mirrors Healthiness.spec): pins the market so that IdLib.toId is deterministic and
@@ -123,8 +101,6 @@ persistent ghost address globalMarketLiquidatorGate;
 
 persistent ghost bytes32 globalId;
 
-persistent ghost address globalBorrower;
-
 definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < globalMarketCollateralLength => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].liquidationCursor == globalMarketCollateralLiquidationCursor[index]);
 
 function equalsGlobalMarket(Midnight.Market market) returns (bool) {
@@ -148,164 +124,93 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 }
 
 // Single-collateral maxDebt contribution: floor(floor(collat * price / OPS) * lltv / WAD).
-function maxDebtContribution(uint256 collat, mathint price, uint256 lltv) returns mathint {
+function maxDebtContribution(uint256 collat, uint256 price, uint256 lltv) returns uint256 {
     return ghostMulDivDown(ghostMulDivDown(collat, price, ORACLE_PRICE_SCALE()), lltv, WAD());
 }
 
-//// RULE //////
+/// RULE ///
 
 // Liquidating an unhealthy position at the RCF cap restores its health, in the single-collateral,
-// RCF-active (!postMaturityMode && lltv < WAD), no-bad-debt regime. This is the on-contract analog of the
-// Rocq theorem max_repaid_liquidation_leaves_healthy, maxRepaid < debt case (newDebt = debt - maxRepaid > 0).
+// RCF-active (!postMaturityMode && lltv < WAD), no-bad-debt regime, in the maxRepaid < debt case
+// (newDebt = debt - maxRepaid > 0).
 // The maxDebt-drop bound is DERIVED INLINE (see the "INLINE DROP-BOUND DERIVATION" block below).
-rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address receiver, address callback, bytes data) {
+rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrower, address receiver, address callback, bytes data) {
     // Post-state health is read bitmap-free; combined with single-collateral this avoids bitmap iteration.
     Midnight.Market globalMarket = getGlobalMarket();
 
-    // Single collateral: the Rocq otherCollatContribution is 0.
+    // Single collateral, so there is no contribution from other collateral.
     require globalMarketCollateralLength == 1, "single-collateral market";
-    require collateralIndex == 0, "the only collateral index";
 
     uint256 lltv = globalMarketCollateralLLTV[collateralIndex];
     uint256 lif = maxLifGhost(lltv, globalMarketCollateralLiquidationCursor[collateralIndex]);
 
-    // RCF-active regime.
     require lltv < WAD(), "RCF is active only for lltv < WAD";
-
-    // maxLif <= 2 * WAD is enforced at market creation (see Midnight.sol:810); it bounds the drop terms below.
-    require lif <= 2 * WAD(), "maxLif <= 2 * WAD (Midnight.sol:810)";
-
-    // maxLif * lltv <= 0.999 * WAD * WAD is enforced at market creation for lltv < WAD (see Midnight.sol:698,
-    // createdMarketsRespectMaxLifBound in CreatedMarkets.spec); it makes the L699 denominator strictly positive.
-    require lltv * lif <= 999 * 10 ^ 15 * WAD(), "maxLif * lltv <= 0.999 * WAD * WAD";
-
-    // lltv * maxLif <= WAD * WAD (see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec).
-    require lltv * lif <= WAD() * WAD(), "lltv * maxLif <= WAD * WAD";
+    require lltv * lif <= 999 * 10 ^ 15 * WAD(), "maxLif * lltv <= 0.999 * WAD * WAD, (see Midnight.sol:698, createdMarketsRespectMaxLifBound in CreatedMarkets.spec, it makes the L699 denominator strictly positive)";
 
     address oracle = globalMarket.collateralParams[collateralIndex].oracle;
-    mathint price = summaryPrice(oracle);
+    uint256 price = summaryPrice(oracle);
 
-    // 0 < price (Rocq hypothesis); otherwise the mulDiv by price reverts and the case is vacuous.
-    require price > 0, "positive price";
+    require price > 0, "positive price; otherwise mulDiv by price reverts and the case is vacuous";
 
-    // Single-collateral bitmap: only collateralIndex is activated, so the liquidate maxDebt loop and the
-    // array-based maxRepaidFor / isHealthyNoBitmap all range over exactly {collateralIndex}.
-    uint128 bitmap = collateralBitmap(globalId, globalBorrower);
-    require summaryGetBit(bitmap, collateralIndex), "collateral is activated (see nonZeroCollateralsAreActivated)";
-    require forall uint256 otherBit. otherBit != collateralIndex => !summaryGetBit(bitmap, otherBit), "single-collateral: only collateralIndex activated";
+    // On a non-reverting liquidation, the sole market collateral is activated and no out-of-range bitmap bit
+    // can be set. The call also enforces that the borrower is not liquidation-locked.
+    require currentContract.marketState[globalId].tickSpacing != 0, "market is already created, so touchMarket is a no-op that returns globalId";
+    require badDebtFor(globalMarket, globalId, borrower) == 0, "no bad debt is realized, so liquidate's debt at L699 equals maxRepaidFor's pre-liquidation debt";
+    require !isHealthyNoBitmap(globalMarket, globalId, borrower), "unhealthy pre-state: maxDebt < debt due to the strict RCF trigger at Midnight.sol:661";
 
-    // Borrower must not be liquidation-locked (see Midnight.sol:660).
-    require !liquidationLocked(globalId, globalBorrower), "borrower not locked";
-
-    // No callback, so onLiquidate is skipped and no reentrancy occurs.
-    require callback == 0, "no liquidate callback";
-
-    // No liquidator gate, so canLiquidate is skipped (see Midnight.sol:635-638).
-    require globalMarketLiquidatorGate == 0, "no liquidator gate";
-
-    // Market is already created, so touchMarket is a no-op that returns globalId.
-    require currentContract.marketState[globalId].tickSpacing != 0, "market already created";
-
-    // No bad debt is realized: liquidate does not reduce _position.debt before the L699 cap computation, so the
-    // debt used at L699 equals the pre-liquidation debt read by maxRepaidFor (Rocq assumes no bad-debt path).
-    require badDebtFor(globalMarket, globalId, globalBorrower) == 0, "no bad debt realized";
-
-    // Unhealthy pre-state: maxDebt < debt (Rocq maxDebt <= debt with the strict RCF trigger of Midnight.sol:661).
-    require !isHealthyNoBitmap(globalMarket, globalId, globalBorrower), "unhealthy before liquidation";
-
-    uint256 collatBefore = collateral(globalId, globalBorrower, collateralIndex);
-    uint256 debtBefore = debt(globalId, globalBorrower);
+    uint256 collatBefore = collateral(globalId, borrower, collateralIndex);
+    uint256 debtBefore = debt(globalId, borrower);
 
     // Pin repaid to the RCF cap. maxRepaidFor reproduces Midnight.sol:699 exactly, so repaidUnits equals the
     // maxRepaid recomputed inside liquidate and the RCF require (Midnight.sol:700-705) passes on its first
     // disjunct (repaidUnits <= maxRepaid), independently of the dust waiver.
-    uint256 repaidUnits = maxRepaidFor(globalMarket, globalId, collateralIndex, globalBorrower);
+    uint256 repaidUnits = maxRepaidFor(globalMarket, globalId, collateralIndex, borrower);
 
-    // Interesting case: maxRepaid < debt (repaid = maxRepaid, newDebt = debt - maxRepaid > 0). The maxRepaid >= debt
-    // case gives repaid = debt, newDebt = 0, which is trivially healthy.
-    require repaidUnits < debtBefore, "maxRepaid < debt case";
+    require repaidUnits < debtBefore, "maxRepaid < debt case: repaid = maxRepaid and newDebt > 0 (the maxRepaid >= debt case gives newDebt = 0, which is trivially healthy)";
 
     uint256 seizedOut;
     uint256 repaidOut;
-    seizedOut, repaidOut = liquidate(e, globalMarket, collateralIndex, 0, repaidUnits, globalBorrower, false, receiver, callback, data);
+    seizedOut, repaidOut = liquidate(e, globalMarket, collateralIndex, 0, repaidUnits, borrower, false, receiver, callback, data);
 
-    // The seized collateral must not exceed the current collateral (Rocq seizedAssets <= collat); otherwise
-    // liquidate reverts independently of the RCF mechanism, so this does not narrow the generality.
-    require collatBefore >= seizedOut, "seized <= collateral";
+    uint256 collatAfter = assert_uint256(collatBefore - seizedOut);
 
     // gap = debt - maxDebt > 0 (the position is unhealthy). Both are the single-collateral quantities that
     // liquidate uses internally: maxDebt at L699 and debt (unchanged, since no bad debt) equal these.
-    mathint gap = debtBefore - maxDebtContribution(collatBefore, price, lltv);
+    uint256 gap = assert_uint256(debtBefore - maxDebtContribution(collatBefore, price, lltv));
 
     ///// INLINE DROP-BOUND DERIVATION /////
-    // Establishes: curContrib - newContrib <= maxDebtDropBound (Rocq max_debt_contribution_drop_bound,
-    // rocq/maxRepaidHealthy.v:162). Ghost-form quantities mirror the single-collateral definitions; liquidate
-    // computes seizedOut = floor(floor(repaid*lif/WAD)*OPS/price) at Midnight.sol:692, so seizedOut IS the ghost
-    // term ghostMulDivDown(maxSeizedValue, OPS, price) below. Each fact is a primitive rounding bound or a
-    // derived mulDiv identity proven over concrete mulDiv in MulDiv.spec (rule name cited), or an isolated
-    // pure-arithmetic move; the composition uses only linear glue.
+    // Establishes: curContrib - newContrib <= maxDebtDropBound. Ghost-form quantities mirror the
+    // single-collateral definitions; liquidate computes seizedOut = floor(floor(repaid*lif/WAD)*OPS/price) at
+    // Midnight.sol:692, so seizedOut IS the ghost term ghostMulDivDown(maxSeizedValue, OPS, price) below. Each
+    // fact is a primitive rounding bound or a derived mulDiv identity proven over concrete mulDiv in
+    // MulDiv.spec (rule name cited); the composition uses arithmetic glue.
 
-    mathint W = WAD();
-    mathint S = ORACLE_PRICE_SCALE();
+    uint256 W = WAD();
+    uint256 S = ORACLE_PRICE_SCALE();
 
-    mathint maxSeizedValue = ghostMulDivDown(repaidUnits, lif, W);
+    uint256 maxSeizedValue = ghostMulDivDown(repaidUnits, lif, W);
 
     // liquidate's L692 seizedAssets: seizedOut == ghostMulDivDown(maxSeizedValue, S, price).
-    mathint curCollatValue = ghostMulDivDown(collatBefore, price, S);
-    mathint newCollatValue = ghostMulDivDown(collatBefore - seizedOut, price, S);
-    mathint collatValueDrop = curCollatValue - newCollatValue;
+    uint256 curCollatValue = ghostMulDivDown(collatBefore, price, S);
+    uint256 newCollatValue = ghostMulDivDown(collatAfter, price, S);
+    require newCollatValue <= curCollatValue, "mulDivMonotoneA with collatAfter <= collatBefore, so the collateral-value drop is non-negative (MulDiv.spec)";
+    uint256 collatValueDrop = assert_uint256(curCollatValue - newCollatValue);
 
-    mathint curContrib = ghostMulDivDown(curCollatValue, lltv, W);
-    mathint newContrib = ghostMulDivDown(newCollatValue, lltv, W);
+    uint256 curContrib = ghostMulDivDown(curCollatValue, lltv, W);
+    uint256 newContrib = ghostMulDivDown(newCollatValue, lltv, W);
 
-    mathint lifTimesLltv = lif * lltv;
-    mathint wadSquared = W * W;
-    mathint maxDebtDropBound = ghostMulDivUp(repaidUnits, lifTimesLltv, wadSquared);
+    uint256 lifTimesLltv = assert_uint256(lif * lltv);
+    uint256 maxDebtDropBound = ghostMulDivUp(repaidUnits, lifTimesLltv, S);
 
-    // Non-negativity of the ghost values (MulDiv.spec: mulDiv of non-negatives is non-negative).
-    require maxSeizedValue >= 0 && seizedOut >= 0;
-    require curCollatValue >= 0 && newCollatValue >= 0;
-    require curContrib >= 0 && newContrib >= 0;
-    require maxDebtDropBound >= 0;
+    require ghostMulDivUp(seizedOut, price, S) <= maxSeizedValue, "L1: mulDivInverseUpDown with a=maxSeizedValue, b=S, d=price (MulDiv.spec)";
+    require curCollatValue <= newCollatValue + ghostMulDivUp(seizedOut, price, S), "L2: mulDivAddDownUp with a1=collatAfter, a2=seizedOut, b=price, d=S (MulDiv.spec)";
+    require curContrib <= newContrib + ghostMulDivUp(collatValueDrop, lltv, W), "L3: mulDivAddDownUp with a1=newCollatValue, a2=collatValueDrop, b=lltv, d=W (MulDiv.spec)";
+    require collatValueDrop <= maxSeizedValue => ghostMulDivUp(collatValueDrop, lltv, W) <= ghostMulDivUp(maxSeizedValue, lltv, W), "L4: mulDivMonotoneA with a1=collatValueDrop, a2=maxSeizedValue, b=lltv, d=W (MulDiv.spec)";
+    require maxSeizedValue * W <= repaidUnits * lif, "L5.a: mulDivDownRoundsDown with a=repaidUnits, b=lif, d=W (MulDiv.spec)";
+    require maxDebtDropBound * S >= repaidUnits * lifTimesLltv, "L5.b: mulDivUpRoundsUp with a=repaidUnits, b=lifTimesLltv, d=WAD^2 (MulDiv.spec)";
+    require maxSeizedValue * lltv <= maxDebtDropBound * W => ghostMulDivUp(maxSeizedValue, lltv, W) <= maxDebtDropBound, "L5.c: mulDivCeilLeOfMulGe with a=maxSeizedValue, b=lltv, d=W, bound=maxDebtDropBound (MulDiv.spec)";
 
-    // L1 (MulDiv.spec: mulDivInverseUpDown), instance a=maxSeizedValue, b=S, d=price, seizedOut=down(a,b,d):
-    //   up(down(maxSeizedValue,S,price),price,S) == up(seizedOut,price,S) <= maxSeizedValue.
-    require ghostMulDivUp(seizedOut, price, S) <= maxSeizedValue;
-
-    // L2 (MulDiv.spec: mulDivAddDownUp), instance a1=collatBefore-seizedOut, a2=seizedOut, b=price, d=S:
-    //   curCollatValue <= newCollatValue + up(seizedOut,price,S).
-    require curCollatValue <= newCollatValue + ghostMulDivUp(seizedOut, price, S);
-
-    // newCollatValue <= curCollatValue (MulDiv.spec: mulDivMonotoneA, collat-seized <= collat): drop is >= 0.
-    require newCollatValue <= curCollatValue;
-
-    // L3 (MulDiv.spec: mulDivAddDownUp), instance a1=newCollatValue, a2=collatValueDrop, b=lltv, d=W:
-    //   curContrib <= newContrib + up(collatValueDrop,lltv,W).
-    require curContrib <= newContrib + ghostMulDivUp(collatValueDrop, lltv, W);
-
-    // L4 (MulDiv.spec: mulDivMonotoneA), instance a1=collatValueDrop, a2=maxSeizedValue, b=lltv, d=W.
-    require collatValueDrop <= maxSeizedValue => ghostMulDivUp(collatValueDrop, lltv, W) <= ghostMulDivUp(maxSeizedValue, lltv, W);
-
-    // L5.a (MulDiv.spec: mulDivDownRoundsDown), instance a=repaidUnits, b=lif, d=W: maxSeizedValue*W <= repaid*lif.
-    require maxSeizedValue * W <= repaidUnits * lif;
-
-    // Pure-arith (MulDiv.spec: mulDivMonotoneA analog lemmaMulMono), scale L5.a by lltv >= 0.
-    require maxSeizedValue * W <= repaidUnits * lif => maxSeizedValue * W * lltv <= repaidUnits * lif * lltv;
-
-    // L5.b (MulDiv.spec: mulDivUpRoundsUp), instance a=repaidUnits, b=lifTimesLltv, d=wadSquared:
-    //   maxDebtDropBound*wadSquared >= repaid*lifTimesLltv (== repaid*lif*lltv == maxDebtDropBound*W*W).
-    require maxDebtDropBound * wadSquared >= repaidUnits * lifTimesLltv;
-
-    // Pure-arith (lemmaCancelPos), cancel W>0: (maxSeizedValue*lltv)*W <= (maxDebtDropBound*W)*W
-    //   ==> maxSeizedValue*lltv <= maxDebtDropBound*W.
-    require maxSeizedValue * lltv * W <= maxDebtDropBound * W * W => maxSeizedValue * lltv <= maxDebtDropBound * W;
-
-    // L5.c (MulDiv.spec: mulDivCeilLeOfMulGe), instance a=maxSeizedValue, b=lltv, d=W, bound=maxDebtDropBound:
-    //   maxSeizedValue*lltv <= maxDebtDropBound*W  =>  up(maxSeizedValue,lltv,W) <= maxDebtDropBound.
-    require maxSeizedValue * lltv <= maxDebtDropBound * W => ghostMulDivUp(maxSeizedValue, lltv, W) <= maxDebtDropBound;
-
-    // Linear glue (mirrors rocq/maxRepaidHealthy.v:185-246), no nested division, no hypothesis-times-variable,
-    // no cancellation done by the SMT here (both isolated above):
+    // Linear glue, with no nested division:
     //   (a) collatValueDrop <= maxSeizedValue: from L2 (drop <= up(seizedOut,..)) and L1 (up(seizedOut,..) <= msv).
     //   (b) up(collatValueDrop,lltv,W) <= up(maxSeizedValue,lltv,W): L4 with (a).
     //   (c) up(maxSeizedValue,lltv,W) <= maxDebtDropBound: (L5.a scaled by lltv) chained through L5.b, then the W
@@ -317,9 +222,10 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address receiv
     // (Midnight.sol:699), maxRepaid*lif*lltv <= (maxRepaid - gap)*WAD^2 (axiomUpRoundsUp on gap), hence
     // maxDebtDropBound = ceil(maxRepaid*lif*lltv/WAD^2) <= maxRepaid - gap (axiomCeilLeOfMulGe). Combined with
     // the drop bound: newMaxDebt = maxDebt - drop >= debt - maxRepaid = newDebt.
-    require axiomUpRoundsUp(gap, WAD() * WAD(), WAD() * WAD() - lif * lltv), "proved in mulDivUpRoundsUp (Rocq ceil_div_mul_ge)";
-    require axiomCeilLeOfMulGe(repaidUnits, lif * lltv, WAD() * WAD(), repaidUnits - gap), "proved in mulDivCeilLeOfMulGe (Rocq ceil_div_le_of_mul_ge)";
+    uint256 rcfDenominator = assert_uint256(S - lifTimesLltv);
+    require axiomUpRoundsUp(gap, S, rcfDenominator), "proved in mulDivUpRoundsUp";
+    uint256 repaidExcess = assert_uint256(repaidUnits - gap);
+    require axiomCeilLeOfMulGe(repaidUnits, lifTimesLltv, S, repaidExcess), "proved in mulDivCeilLeOfMulGe";
 
-    // newDebt >= 0 and newDebt <= newMaxDebt, i.e. the position is healthy after liquidation.
-    assert isHealthyNoBitmap(globalMarket, globalId, globalBorrower), "position is healthy after liquidation at the RCF cap";
+    assert isHealthyNoBitmap(globalMarket, globalId, borrower);
 }
