@@ -2,10 +2,12 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {IMorpho, Id, MarketParams} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {IMorpho, Id, MarketParams, Market as BlueMarket, Position} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {MarketParamsLib} from "../../../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
+import {SharesMathLib} from "../../../lib/morpho-blue/src/libraries/SharesMathLib.sol";
 import {IMidnight, Market} from "../../interfaces/IMidnight.sol";
-import {WAD} from "../../libraries/ConstantsLib.sol";
+import {IOracle} from "../../interfaces/IOracle.sol";
+import {WAD, ORACLE_PRICE_SCALE} from "../../libraries/ConstantsLib.sol";
 import {IdLib} from "../../libraries/IdLib.sol";
 import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";
@@ -15,7 +17,9 @@ import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
+    using SharesMathLib for uint256;
     using UtilsLib for uint128;
+    using UtilsLib for uint256;
 
     address public immutable override MIDNIGHT;
     address public immutable override BLUE;
@@ -28,15 +32,15 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
     }
 
     /// @param incentive The caller incentive as a WAD-scaled percentage of the debt rolled.
-    function setConfig(bytes32 midnightId, bytes32 blueId, uint64 start, uint64 incentive, bool enabled)
+    function setConfig(bytes32 midnightId, bytes32 blueId, uint64 start, uint64 incentive, uint256 maxLtv, bool enabled)
         external
         override
     {
         require(incentive <= WAD, IncentiveTooHigh());
 
-        isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, incentive))] = enabled;
+        isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, incentive, maxLtv))] = enabled;
 
-        emit SetConfig(msg.sender, midnightId, blueId, start, incentive, enabled);
+        emit SetConfig(msg.sender, midnightId, blueId, start, incentive, maxLtv, enabled);
     }
 
     function roll(
@@ -45,11 +49,12 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         address user,
         uint64 start,
         uint64 incentive,
+        uint256 maxLtv,
         uint256 assets
     ) external override {
         bytes32 midnightId = IdLib.toId(midnightMarket);
         bytes32 blueId = Id.unwrap(blueMarketParams.id());
-        require(isConfig[user][keccak256(abi.encode(midnightId, blueId, start, incentive))], NotConfigured());
+        require(isConfig[user][keccak256(abi.encode(midnightId, blueId, start, incentive, maxLtv))], NotConfigured());
         require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
         require(block.timestamp >= start, NotStarted());
         uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
@@ -71,6 +76,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         bytes memory data = abi.encode(midnightMarket, blueMarketParams, collateralIndex, assets, incentiveAssets, user);
         IMorpho(BLUE).supplyCollateral(blueMarketParams, collateralAssets, user, data);
         if (incentiveAssets > 0) SafeTransferLib.safeTransfer(midnightMarket.loanToken, msg.sender, incentiveAssets);
+
+        requireMaxLtv(blueMarketParams, user, maxLtv);
     }
 
     function onMorphoSupplyCollateral(uint256 collateralAssets, bytes calldata data) external {
@@ -90,5 +97,16 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         IMidnight(MIDNIGHT).repay(midnightMarket, assets, user, address(0), hex"");
         IMidnight(MIDNIGHT).withdrawCollateral(midnightMarket, collateralIndex, collateralAssets, user, address(this));
         SafeApproveLib.forceApproveMax(blueMarketParams.collateralToken, BLUE);
+    }
+
+    function requireMaxLtv(MarketParams memory marketParams, address sender, uint256 maxLtv) internal view {
+        if (maxLtv >= marketParams.lltv) return;
+        Position memory position = IMorpho(BLUE).position(marketParams.id(), sender);
+        if (position.borrowShares == 0) return;
+        BlueMarket memory market = IMorpho(BLUE).market(marketParams.id());
+        uint256 borrowed = uint256(position.borrowShares).toAssetsUp(market.totalBorrowAssets, market.totalBorrowShares);
+        uint256 price = IOracle(marketParams.oracle).price();
+        uint256 maxBorrow = uint256(position.collateral).mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(maxLtv, WAD);
+        require(borrowed <= maxBorrow, LtvExceeded());
     }
 }
