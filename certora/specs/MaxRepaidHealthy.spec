@@ -7,7 +7,16 @@ import "BitmapSummaries.spec";
 // in the RCF-active regime (!postMaturityMode && lltv < WAD), liquidating an unhealthy position at the RCF
 // cap repaid = maxRepaid (see src/Midnight.sol:699) restores health (newDebt <= newMaxDebt, newDebt >= 0).
 // This is the RESTORATION direction; Healthiness.spec proves the PRESERVATION direction.
-// Single-collateral first: the Rocq otherCollatContribution is 0 here (the market has one collateral).
+// Single-collateral: the Rocq otherCollatContribution is 0 here (the market has one collateral).
+//
+// This is a SINGLE self-contained rule: the LLTV-weighted maxDebt-drop bound (Rocq
+// max_debt_contribution_drop_bound, rocq/maxRepaidHealthy.v:162) is DERIVED INLINE from primitive mulDiv
+// facts + linear glue, rather than assumed as a bare axiom. The nonlinear atoms stay opaque via
+// ghost-summarized mulDiv; the only nonlinear facts the solver uses are the tight primitive floor/ceil
+// bounds (each proven over concrete mulDiv in MulDiv.spec), applied at the specific ground instances below,
+// plus the two isolated pure-arithmetic moves (multiply-by-nonnegative, cancel-positive). Everything else
+// is linear composition, so the drop bound and the final health conclusion are assembled without the solver
+// ever facing a nested-division goal or multiplying/cancelling a variable inside a nonlinear goal.
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -27,7 +36,8 @@ methods {
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
-    // Summarize mulDivDown and mulDivUp deterministically; the axioms about them are proved in MulDiv.spec.
+    // Summarize mulDivDown and mulDivUp deterministically; the tight rounding facts about them are proved
+    // over concrete mulDiv in MulDiv.spec and injected below only at the specific instances the rule needs.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
@@ -57,22 +67,14 @@ persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
 
 persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
 
-/* Axioms used to reconstruct the Rocq integer-division argument.
-   The two cheap rounding facts are proved over concrete mulDiv in MulDiv.spec. The single hard nonlinear step
-   (the LLTV-weighted maxDebt drop bound) is delegated to axiomMaxDebtDrop, machine-checked over the integers in
-   Rocq; assuming it here keeps the on-contract goal linear, so the prover does not have to rediscover the chain. */
+/* Primitive tight rounding facts, each proven over concrete mulDiv in MulDiv.spec and used below ONLY at
+   specific ground instances (never as background foralls, to keep the query linear). */
 
 /* proved in mulDivUpRoundsUp: a*b <= ceil(a*b/d)*d (Rocq ceil_div_mul_ge). */
 definition axiomUpRoundsUp(mathint a, mathint b, mathint d) returns bool = a >= 0 && b >= 0 && d > 0 => a * b <= ghostMulDivUp(a, b, d) * d;
 
 /* proved in mulDivCeilLeOfMulGe: a*b <= bound*d => ceil(a*b/d) <= bound (Rocq ceil_div_le_of_mul_ge). */
 definition axiomCeilLeOfMulGe(mathint a, mathint b, mathint d, mathint bound) returns bool = a >= 0 && b >= 0 && d > 0 && a * b <= bound * d => ghostMulDivUp(a, b, d) <= bound;
-
-/* Rocq max_debt_contribution_drop_bound (rocq/maxRepaidHealthy.v:162), the one hard nonlinear step: when
-   seized is the L692 seizedAssets = floor(floor(maxRepaid*lif/WAD)*OPS/price), the LLTV-weighted maxDebt
-   contribution drops by at most ceil(maxRepaid*lif*lltv/WAD^2). Proved over the integers in Rocq; the Solidity
-   quantities are shown equal to its variables in the rule below, and the CVL bounds wire it to on-chain health. */
-definition axiomMaxDebtDrop(mathint collat, mathint seized, mathint price, mathint lltv, mathint maxRepaid, mathint lif) returns bool = price > 0 && collat >= 0 && 0 <= seized && seized <= collat && lltv >= 0 && maxRepaid >= 0 && lif >= 0 && seized == ghostMulDivDown(ghostMulDivDown(maxRepaid, lif, WAD()), ORACLE_PRICE_SCALE(), price) => ghostMulDivDown(ghostMulDivDown(collat, price, ORACLE_PRICE_SCALE()), lltv, WAD()) - ghostMulDivDown(ghostMulDivDown(collat - seized, price, ORACLE_PRICE_SCALE()), lltv, WAD()) <= ghostMulDivUp(maxRepaid, lif * lltv, WAD() * WAD());
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
@@ -155,6 +157,7 @@ function maxDebtContribution(uint256 collat, mathint price, uint256 lltv) return
 // Liquidating an unhealthy position at the RCF cap restores its health, in the single-collateral,
 // RCF-active (!postMaturityMode && lltv < WAD), no-bad-debt regime. This is the on-contract analog of the
 // Rocq theorem max_repaid_liquidation_leaves_healthy, maxRepaid < debt case (newDebt = debt - maxRepaid > 0).
+// The maxDebt-drop bound is DERIVED INLINE (see the "INLINE DROP-BOUND DERIVATION" block below).
 rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address receiver, address callback, bytes data) {
     // Post-state health is read bitmap-free; combined with single-collateral this avoids bitmap iteration.
     Midnight.Market globalMarket = getGlobalMarket();
@@ -168,6 +171,9 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address receiv
 
     // RCF-active regime.
     require lltv < WAD(), "RCF is active only for lltv < WAD";
+
+    // maxLif <= 2 * WAD is enforced at market creation (see Midnight.sol:810); it bounds the drop terms below.
+    require lif <= 2 * WAD(), "maxLif <= 2 * WAD (Midnight.sol:810)";
 
     // maxLif * lltv <= 0.999 * WAD * WAD is enforced at market creation for lltv < WAD (see Midnight.sol:698,
     // createdMarketsRespectMaxLifBound in CreatedMarkets.spec); it makes the L699 denominator strictly positive.
@@ -231,11 +237,86 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address receiv
     // liquidate uses internally: maxDebt at L699 and debt (unchanged, since no bad debt) equal these.
     mathint gap = debtBefore - maxDebtContribution(collatBefore, price, lltv);
 
-    // Three axioms close the goal with only linear glue (see rocq/maxRepaidHealthy.v, maxRepaid < debt case):
-    // the maxDebt drop is bounded by ceil(maxRepaid*lif*lltv/WAD^2) (axiomMaxDebtDrop), the RCF cap over-repays
-    // the gap so maxRepaid*lif*lltv <= (maxRepaid - gap)*WAD^2 (axiomUpRoundsUp), hence that ceil is at most
-    // maxRepaid - gap (axiomCeilLeOfMulGe); so newMaxDebt = maxDebt - drop >= debt - maxRepaid = newDebt.
-    require axiomMaxDebtDrop(collatBefore, seizedOut, price, lltv, repaidUnits, lif), "Rocq max_debt_contribution_drop_bound";
+    ///// INLINE DROP-BOUND DERIVATION /////
+    // Establishes: curContrib - newContrib <= maxDebtDropBound (Rocq max_debt_contribution_drop_bound,
+    // rocq/maxRepaidHealthy.v:162). Ghost-form quantities mirror the single-collateral definitions; liquidate
+    // computes seizedOut = floor(floor(repaid*lif/WAD)*OPS/price) at Midnight.sol:692, so seizedOut IS the ghost
+    // term ghostMulDivDown(maxSeizedValue, OPS, price) below. Each fact is a primitive rounding bound or a
+    // derived mulDiv identity proven over concrete mulDiv in MulDiv.spec (rule name cited), or an isolated
+    // pure-arithmetic move; the composition uses only linear glue.
+
+    mathint W = WAD();
+    mathint S = ORACLE_PRICE_SCALE();
+
+    mathint maxSeizedValue = ghostMulDivDown(repaidUnits, lif, W);
+
+    // liquidate's L692 seizedAssets: seizedOut == ghostMulDivDown(maxSeizedValue, S, price).
+    mathint curCollatValue = ghostMulDivDown(collatBefore, price, S);
+    mathint newCollatValue = ghostMulDivDown(collatBefore - seizedOut, price, S);
+    mathint collatValueDrop = curCollatValue - newCollatValue;
+
+    mathint curContrib = ghostMulDivDown(curCollatValue, lltv, W);
+    mathint newContrib = ghostMulDivDown(newCollatValue, lltv, W);
+
+    mathint lifTimesLltv = lif * lltv;
+    mathint wadSquared = W * W;
+    mathint maxDebtDropBound = ghostMulDivUp(repaidUnits, lifTimesLltv, wadSquared);
+
+    // Non-negativity of the ghost values (MulDiv.spec: mulDiv of non-negatives is non-negative).
+    require maxSeizedValue >= 0 && seizedOut >= 0;
+    require curCollatValue >= 0 && newCollatValue >= 0;
+    require curContrib >= 0 && newContrib >= 0;
+    require maxDebtDropBound >= 0;
+
+    // L1 (MulDiv.spec: mulDivInverseUpDown), instance a=maxSeizedValue, b=S, d=price, seizedOut=down(a,b,d):
+    //   up(down(maxSeizedValue,S,price),price,S) == up(seizedOut,price,S) <= maxSeizedValue.
+    require ghostMulDivUp(seizedOut, price, S) <= maxSeizedValue;
+
+    // L2 (MulDiv.spec: mulDivAddDownUp), instance a1=collatBefore-seizedOut, a2=seizedOut, b=price, d=S:
+    //   curCollatValue <= newCollatValue + up(seizedOut,price,S).
+    require curCollatValue <= newCollatValue + ghostMulDivUp(seizedOut, price, S);
+
+    // newCollatValue <= curCollatValue (MulDiv.spec: mulDivMonotoneA, collat-seized <= collat): drop is >= 0.
+    require newCollatValue <= curCollatValue;
+
+    // L3 (MulDiv.spec: mulDivAddDownUp), instance a1=newCollatValue, a2=collatValueDrop, b=lltv, d=W:
+    //   curContrib <= newContrib + up(collatValueDrop,lltv,W).
+    require curContrib <= newContrib + ghostMulDivUp(collatValueDrop, lltv, W);
+
+    // L4 (MulDiv.spec: mulDivMonotoneA), instance a1=collatValueDrop, a2=maxSeizedValue, b=lltv, d=W.
+    require collatValueDrop <= maxSeizedValue => ghostMulDivUp(collatValueDrop, lltv, W) <= ghostMulDivUp(maxSeizedValue, lltv, W);
+
+    // L5.a (MulDiv.spec: mulDivDownRoundsDown), instance a=repaidUnits, b=lif, d=W: maxSeizedValue*W <= repaid*lif.
+    require maxSeizedValue * W <= repaidUnits * lif;
+
+    // Pure-arith (MulDiv.spec: mulDivMonotoneA analog lemmaMulMono), scale L5.a by lltv >= 0.
+    require maxSeizedValue * W <= repaidUnits * lif => maxSeizedValue * W * lltv <= repaidUnits * lif * lltv;
+
+    // L5.b (MulDiv.spec: mulDivUpRoundsUp), instance a=repaidUnits, b=lifTimesLltv, d=wadSquared:
+    //   maxDebtDropBound*wadSquared >= repaid*lifTimesLltv (== repaid*lif*lltv == maxDebtDropBound*W*W).
+    require maxDebtDropBound * wadSquared >= repaidUnits * lifTimesLltv;
+
+    // Pure-arith (lemmaCancelPos), cancel W>0: (maxSeizedValue*lltv)*W <= (maxDebtDropBound*W)*W
+    //   ==> maxSeizedValue*lltv <= maxDebtDropBound*W.
+    require maxSeizedValue * lltv * W <= maxDebtDropBound * W * W => maxSeizedValue * lltv <= maxDebtDropBound * W;
+
+    // L5.c (MulDiv.spec: mulDivCeilLeOfMulGe), instance a=maxSeizedValue, b=lltv, d=W, bound=maxDebtDropBound:
+    //   maxSeizedValue*lltv <= maxDebtDropBound*W  =>  up(maxSeizedValue,lltv,W) <= maxDebtDropBound.
+    require maxSeizedValue * lltv <= maxDebtDropBound * W => ghostMulDivUp(maxSeizedValue, lltv, W) <= maxDebtDropBound;
+
+    // Linear glue (mirrors rocq/maxRepaidHealthy.v:185-246), no nested division, no hypothesis-times-variable,
+    // no cancellation done by the SMT here (both isolated above):
+    //   (a) collatValueDrop <= maxSeizedValue: from L2 (drop <= up(seizedOut,..)) and L1 (up(seizedOut,..) <= msv).
+    //   (b) up(collatValueDrop,lltv,W) <= up(maxSeizedValue,lltv,W): L4 with (a).
+    //   (c) up(maxSeizedValue,lltv,W) <= maxDebtDropBound: (L5.a scaled by lltv) chained through L5.b, then the W
+    //       cancel, then L5.c.
+    //   (d) curContrib - newContrib <= up(collatValueDrop,lltv,W) (L3) <= (b) <= (c) = maxDebtDropBound.
+
+    ///// FINAL HEALTH GLUE /////
+    // The RCF cap over-repays the gap: with repaidUnits == maxRepaid == ceil(gap*WAD^2/(WAD^2 - lif*lltv))
+    // (Midnight.sol:699), maxRepaid*lif*lltv <= (maxRepaid - gap)*WAD^2 (axiomUpRoundsUp on gap), hence
+    // maxDebtDropBound = ceil(maxRepaid*lif*lltv/WAD^2) <= maxRepaid - gap (axiomCeilLeOfMulGe). Combined with
+    // the drop bound: newMaxDebt = maxDebt - drop >= debt - maxRepaid = newDebt.
     require axiomUpRoundsUp(gap, WAD() * WAD(), WAD() * WAD() - lif * lltv), "proved in mulDivUpRoundsUp (Rocq ceil_div_mul_ge)";
     require axiomCeilLeOfMulGe(repaidUnits, lif * lltv, WAD() * WAD(), repaidUnits - gap), "proved in mulDivCeilLeOfMulGe (Rocq ceil_div_le_of_mul_ge)";
 
