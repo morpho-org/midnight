@@ -85,14 +85,14 @@ persistent ghost mulOverflow(mathint, mathint) returns bool {
 }
 
 function summaryMulDivDownWithRevert(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (d == 0 || x * y >= 2^256) {
+    if (d == 0 || x * y >= 2 ^ 256) {
         revert();
     }
     return require_uint256(summaryMulDivDownGhost(x, y, d));
 }
 
 function summaryMulDivUpWithRevert(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (d == 0 || x * y + d - 1 >= 2^256) {
+    if (d == 0 || x * y + d - 1 >= 2 ^ 256) {
         revert();
     }
     return require_uint256(summaryMulDivUpGhost(x, y, d));
