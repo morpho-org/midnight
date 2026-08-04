@@ -72,6 +72,18 @@ rule mulDivAddDownUp(uint256 a1, uint256 a2, uint256 b, uint256 d) {
     assert mulDivDown(a1, b, d) + mulDivUp(a2, b, d) >= mulDivDown(a1plusa2, b, d);
 }
 
+// Increasing the first argument by at most delta increases mulDivDown by at most mulDivUp(delta, b, d).
+rule mulDivDownBoundedIncrease(uint256 a1, uint256 a2, uint256 delta, uint256 b, uint256 d) {
+    assert a1 <= a2 + delta => mulDivDown(a1, b, d) <= mulDivDown(a2, b, d) + mulDivUp(delta, b, d);
+}
+
+// Rounding down the first scaling step cannot increase the result of a second scaling rounded up.
+rule mulDivDownUpComposition(uint256 a, uint256 b, uint256 c, uint256 d) {
+    uint256 bc = require_uint256(b * c);
+    uint256 dSquared = require_uint256(d * d);
+    assert mulDivUp(mulDivDown(a, b, d), c, d) <= mulDivUp(a, bc, dSquared);
+}
+
 rule mulDivInverseDownUp(uint256 a, uint256 b, uint256 d) {
     assert a <= mulDivDown(mulDivUp(a, b, d), d, b);
 }
@@ -114,7 +126,7 @@ rule mulDivUpUpperBound(uint256 a, uint256 b, uint256 d) {
 }
 
 // If the exact product is at most bound * d, then the ceiling is at most bound.
-// Used by MaxRepaidHealthy.spec (axiomCeilLeOfMulGe) to bound the collateral-value drop.
+// Used by MaxRepaidHealthy.spec (axiomCeilLeOfMulGe) for its final max-debt-drop bound.
 rule mulDivCeilLeOfMulGe(uint256 a, uint256 b, uint256 d, uint256 bound) {
     assert d != 0 && a * b <= bound * d => mulDivUp(a, b, d) <= bound;
 }
