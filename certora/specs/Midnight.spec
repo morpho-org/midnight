@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 using Utils as Utils;
 
@@ -8,15 +9,15 @@ methods {
     function withdrawable(bytes32 id) external returns (uint128) envfree;
     function totalUnits(bytes32 id) external returns (uint128) envfree;
     function claimableSettlementFee(address token) external returns (uint256) envfree;
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
-    function debtOf(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
+    function debt(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 
@@ -36,8 +37,14 @@ definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
 definition MAX_TTM() returns mathint = 100 * 365 * 86400;
 
+definition WAD() returns uint256 = 10 ^ 18;
+
+persistent ghost mapping(bytes32 => uint256) maturityOfId;
+
 function summaryToId(Midnight.Market market) returns (bytes32) {
-    return Utils.hashMarket(market);
+    bytes32 id = Utils.hashMarket(market);
+    require maturityOfId[id] == to_mathint(market.maturity), "remember the maturity of the market";
+    return id;
 }
 
 function marketIsCreated(Midnight.Market market) returns (bool) {
@@ -50,6 +57,17 @@ persistent ghost mapping(bytes32 => mathint) sumDebt {
 
 hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (uint128 oldDebt) {
     sumDebt[id] = sumDebt[id] - to_mathint(oldDebt) + to_mathint(newDebt);
+}
+
+// Monotonic clock: the greatest block.timestamp observed so far. block.timestamp only increases,
+// so this lower-bounds every future timestamp. Persistent so callbacks cannot havoc it.
+persistent ghost uint256 lastTimestamp;
+
+hook TIMESTAMP() uint newTimestamp {
+    require newTimestamp >= lastTimestamp, "timestamps are guaranteed to be increasing";
+
+    require newTimestamp < 2 ^ 63, "safe as it corresponds to some time very far into the future";
+    lastTimestamp = newTimestamp;
 }
 
 function summaryMulDiv(uint256 x, uint256 y, uint256 d) returns uint256 {
@@ -109,13 +127,13 @@ rule lastLossFactorMonotonicallyIncreases(bytes32 id, address user, method f, en
 
 rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, method f, env e, calldataarg args) {
     require currentContract.marketState[id].lossFactor == max_uint128, "assume loss factor is maxed out";
-    uint256 creditBefore = creditOf(id, user);
-    uint256 debtBefore = debtOf(id, user);
+    uint256 creditBefore = credit(id, user);
+    uint256 debtBefore = debt(id, user);
 
     f(e, args);
 
-    assert creditOf(id, user) <= creditBefore;
-    assert debtOf(id, user) <= debtBefore;
+    assert credit(id, user) <= creditBefore;
+    assert debt(id, user) <= debtBefore;
 }
 
 /// INVARIANTS ///
@@ -134,8 +152,12 @@ strong invariant continuousFeeBounded(bytes32 id)
         }
     }
 
+// A created market's maturity, recorded in maturityOfId at creation, is at most MAX_TTM in the future.
+strong invariant maturityBoundedById(bytes32 id)
+    tickSpacing(id) > 0 => maturityOfId[id] <= lastTimestamp + MAX_TTM();
+
 strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
-    pendingFee(id, user) <= creditOf(id, user)
+    pendingFee(id, user) <= credit(id, user)
     {
         preserved with (env e) {
             requireInvariant continuousFeeBounded(id);
@@ -144,13 +166,13 @@ strong invariant pendingContinuousFeeBoundedByCredit(bytes32 id, address user)
         preserved take(Midnight.Offer offer, bytes ratifierData, uint256 unitsInput, address taker, address receiverIfTakerIsSeller, address takerCallbackAddress, bytes takerCallbackData) with (env e) {
             requireInvariant continuousFeeBounded(id);
             requireInvariant defaultContinuousFeeBoundedAll();
-            require to_mathint(offer.market.maturity) <= to_mathint(e.block.timestamp) + MAX_TTM(); // TODO verify this cleanly
+            requireInvariant maturityBoundedById(summaryToId(offer.market));
         }
     }
 
 rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
     requireInvariant pendingContinuousFeeBoundedByCredit(id, user);
-    assert creditOf(id, user) == 0 => pendingFee(id, user) == 0;
+    assert credit(id, user) == 0 => pendingFee(id, user) == 0;
 }
 
 strong invariant lastLossFactorLeqMarketLossFactor(bytes32 id, address user)
@@ -158,4 +180,10 @@ strong invariant lastLossFactorLeqMarketLossFactor(bytes32 id, address user)
 
 /// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)
-    creditOf(id, user) == 0 || debtOf(id, user) == 0;
+    credit(id, user) == 0 || debt(id, user) == 0;
+
+strong invariant enabledLltvIsLessThanOrEqualToOne(uint256 lltv)
+    currentContract.isLltvEnabled[lltv] => lltv <= WAD();
+
+strong invariant enabledLiquidationCursorsIsLessThanOne(uint256 liquidationCursor)
+    currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor < WAD();

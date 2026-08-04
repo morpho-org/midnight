@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 using Utils as Utils;
 using TakeAmountsLibHarness as TakeAmountsLibHarness;
@@ -13,8 +14,8 @@ methods {
     function TakeAmountsLibHarness.buyerAssetsToUnits(address, bytes32, Midnight.Offer, uint256) external returns (uint256);
     function TakeAmountsLibHarness.sellerAssetsToUnits(address, bytes32, Midnight.Offer, uint256) external returns (uint256);
 
-    // Deterministic id: same Market => same id. Matches what take() and TakeAmountsLib observe (both reach IdLib.toId via Midnight.toId / Midnight.touchMarket).
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
+    // Deterministic toId function.
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
     // Deterministic price: the same tick yields the same price for both the library and take().
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => summaryTickToPrice(tick);

@@ -13,16 +13,17 @@ Global invariants on positions, markets and accounting.
   Total units always equal the sum of debt plus withdrawable, a user never holds both credit and debt, and a position's pending continuous fee never exceeds its credit.
   Continuous fees stay below `MAX_CONTINUOUS_FEE` at both the default and the market level, and loss factors only ever increase, with each user's bounded by its market's.
   Rules also pin down `take`/`liquidate` input-output consistency: zero inputs give zero outputs, and `take` raises the claimable settlement fee by exactly the buyer/seller spread.
-  It also shows that neither credit nor debt can grow once a market's loss factor is maxed out.
+  It also shows that neither credit nor debt can grow once a market's loss factor is maxed out, and that every enabled `LLTV` tier is at most `WAD` while every enabled liquidation cursor is strictly below `WAD`.
 - [`BalanceEffects.spec`](specs/BalanceEffects.spec) pins down the exact credit, debt and collateral effect of every entry point.
 - [`WithdrawableMonotonicity.spec`](specs/WithdrawableMonotonicity.spec) checks how withdrawable assets move: up on `repay` and `liquidate`, down by exactly the amount on `withdraw` and `claimContinuousFee`, and unchanged otherwise.
   It checks the claimable settlement fee the same way: up on `take`, down on `claimSettlementFee`, and unchanged otherwise.
-- [`CreatedMarkets.spec`](specs/CreatedMarkets.spec) checks the well-formedness invariants of a created market: a non-empty collateral list, strictly sorted by token, with no zero token, and every entry with an `LLTV <= WAD` from an allowed tier and an allowed `maxLif`.
+- [`CreatedMarkets.spec`](specs/CreatedMarkets.spec) checks the well-formedness invariants of a created market: a non-empty collateral list, strictly sorted by token, with no zero token, and every entry with an enabled `LLTV` tier, an enabled liquidation cursor, and a `maxLif <= 2 * WAD`.
   Rules add that a market is created by the first interaction of each entry point, can only be created that way, and can never be deleted.
 - [`NotCreatedMarket.spec`](specs/NotCreatedMarket.spec) checks the converse: every state field of a market that was never created is empty.
 - [`LossFactor.spec`](specs/LossFactor.spec) checks that only `liquidate` changes a market's loss factor, and only when bad debt is realized (total units decrease), and that `updatePosition` syncs the user's `lastLossFactor` to the market's.
   It also checks that the loss-factor arithmetic in `updatePosition` and `liquidate` does not revert on a created market.
 - [`UpdateBeforeCredit.spec`](specs/UpdateBeforeCredit.spec) checks that credit is never loaded or stored before `_updatePosition` has run for that position.
+- [`MarketNotReadBeforeCreated.spec`](specs/MarketNotReadBeforeCreated.spec) checks that no code path reads a non-empty market or position field before the market is created (its `tickSpacing` is still zero).
 
 ## Positions health and liquidation
 
@@ -62,7 +63,7 @@ Who may change state, sign authorizations and hold roles, and how failures propa
   It also checks that `take` requires the caller to be the taker or authorized by them, and that `setIsAuthorized` changes only the targeted pair.
 - [`EcrecoverAuthorizer.spec`](specs/EcrecoverAuthorizer.spec) checks signature-based authorization: a successful call increments only the signer's nonce, and an expired deadline, wrong nonce or reused nonce reverts.
 - [`Role.spec`](specs/Role.spec) checks both liveness and access control for every role.
-  The role setter and only the role setter can reassign each role.
+  The configurator and only the configurator can reassign each role.
   The fee setter can set market and default settlement and continuous fees, and once a market is created only the fee setter can change the fees.
   The tick-spacing setter and only the tick-spacing setter can set a market's tick spacing.
   The fee claimer and only the fee claimer can claim settlement and continuous fees.
@@ -94,9 +95,6 @@ The collateral bitmap is an optimization: no functional changes compared to the 
 Round-trip properties ensuring that helper computations can reach any target amount.
 
 - [`TakeAmountsLibInvertibility.spec`](specs/TakeAmountsLibInvertibility.spec) checks that `TakeAmountsLib.buyerAssetsToUnits` and `sellerAssetsToUnits` are exact inverses of `take`: feeding the returned units back into `take` produces exactly the target buyer (resp. seller) assets.
-- [`BundlerRepayInvertibility.spec`](specs/BundlerRepayInvertibility.spec) checks the bundler's repay formula.
-  `repayUnitsFormula` proves the pure arithmetic identity: for `assets = floor(D * WAD / (WAD - pct))`, the net units `assets - floor(assets * pct / WAD)` equal `D`.
-  `repayAndWithdrawCollateralRepaysTargetUnits` proves the end-to-end property: calling `repayAndWithdrawCollateral` with those assets decreases the on-chain debt by exactly `U`.
 
 ## Fixed-point math
 

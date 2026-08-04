@@ -8,11 +8,11 @@ import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
-// Paste from frontend output.
-address constant ACCOUNT = 0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A;
-uint8 constant SIG_V = 28;
-bytes32 constant SIG_R = 0x3b634e6e609860ff1d80ec02a97d6d82bfe7ff35a8108120138ff561460d7040;
-bytes32 constant SIG_S = 0x3eb97018d5ccf0711062df8c70faea0971c4f8e9556d57673a03246728bd91c6;
+// Paste from frontend output (sign-root.ts).
+address constant ACCOUNT = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+uint8 constant SIG_V = 27;
+bytes32 constant SIG_R = 0xeb511490094f44ed91b79ebc436cc7c7e6d282e657bc39797a98ce2dd3826be0;
+bytes32 constant SIG_S = 0x58ec81dc273626bd4ea660bd5682a5860eed1e37927ee8cce469ef7261f9c183;
 
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 
@@ -25,6 +25,8 @@ contract FrontendSignatureTest is Test {
 
     function defaultOffer(uint8 number) internal pure returns (Offer memory offer) {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        offer.market.chainId = 1;
+        offer.market.midnight = address(0);
         offer.market.loanToken = address(uint160(0x1111111111111111111111111111111111111111) * uint160(number));
         offer.market.collateralParams = collateralParams;
         offer.expiry = 2 ** 32;
@@ -67,7 +69,7 @@ contract FrontendSignatureTest is Test {
         assertTrue(HashLib.isLeaf(_root, h3, 3, proof3));
 
         bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), _root, 0, proof0);
-        bytes32 result = EcrecoverRatifier(RATIFIER).isRatified(offers[0], ratifierData);
+        bytes32 result = EcrecoverRatifier(RATIFIER).isRatified(offers[0], ratifierData, address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 

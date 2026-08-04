@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
+
 methods {
     function mulDivDown(uint256 a, uint256 b, uint256 d) external returns (uint256) envfree;
     function mulDivUp(uint256 a, uint256 b, uint256 d) external returns (uint256) envfree;
@@ -27,6 +30,18 @@ rule mulDivMonotoneB(uint256 a, uint256 b1, uint256 b2, uint256 d) {
 rule mulDivMonotoneD(uint256 a, uint256 b, uint256 d1, uint256 d2) {
     assert d1 <= d2 => mulDivDown(a, b, d1) >= mulDivDown(a, b, d2);
     assert d1 <= d2 => mulDivUp(a, b, d1) >= mulDivUp(a, b, d2);
+}
+
+// 1-Lipschitz in the first argument when b <= d: the result cannot grow faster than the numerator a.
+rule mulDivLipschitzA(uint256 a1, uint256 a2, uint256 b, uint256 d) {
+    assert b <= d && a1 <= a2 => mulDivDown(a2, b, d) - mulDivDown(a1, b, d) <= a2 - a1;
+    assert b <= d && a1 <= a2 => mulDivUp(a2, b, d) - mulDivUp(a1, b, d) <= a2 - a1;
+}
+
+// 1-Lipschitz in the second argument when a <= d: the result cannot grow faster than the numerator b.
+rule mulDivLipschitzB(uint256 a, uint256 b1, uint256 b2, uint256 d) {
+    assert a <= d && b1 <= b2 => mulDivDown(a, b2, d) - mulDivDown(a, b1, d) <= b2 - b1;
+    assert a <= d && b1 <= b2 => mulDivUp(a, b2, d) - mulDivUp(a, b1, d) <= b2 - b1;
 }
 
 rule mulDivAddDownDown(uint256 a1, uint256 a2, uint256 b, uint256 d) {

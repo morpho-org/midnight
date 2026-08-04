@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 using MulDiv as MulDiv;
 
@@ -9,32 +10,26 @@ methods {
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-rule lifTimesLltvIsLessThanOrEqualToOne(uint256 lltv, uint256 cursor) {
-    require lltv <= WAD(), "see rule createdMarketsHaveLltvLessThanOrEqualToOne";
-    require cursor < WAD(), "see the definition of LIQUIDATION_CURSOR_LOW and LIQUIDATION_CURSOR_HIGH";
-    assert lltv * maxLif(lltv, cursor) <= WAD() * WAD();
+rule lifTimesLltvIsLessThanOrEqualToOne(uint256 lltv, uint256 liquidationCursor) {
+    require lltv <= WAD(), "see rule enabledLltvIsLessThanOrEqualToOne";
+    require liquidationCursor < WAD(), "see invariant enabledLiquidationCursorsIsLessThanOne";
+    assert lltv * maxLif(lltv, liquidationCursor) <= WAD() * WAD();
 }
 
-/// Check that maxLif >= WAD
-rule maxLifIsAtLeastWad(uint256 lltv, uint256 cursor) {
-    assert maxLif(lltv, cursor) >= WAD();
-}
-
-/// Check that maxLif <= 2*WAD for valid cursor values
-rule maxLifIsAtMostTwoWad(uint256 lltv, uint256 cursor) {
-    require lltv <= WAD(), "see rule createdMarketsHaveLltvLessThanOrEqualToOne";
-    require cursor <= WAD() / 2, "see LIQUIDATION_CURSOR_HIGH in ConstantsLib";
-    assert maxLif(lltv, cursor) <= 2 * WAD();
-}
-
-/// Check that maxLif * lltv <= WAD * (WAD - 1) for valid cursor values
-rule lifTimesLltvStrictBound(uint256 lltv, uint256 cursor) {
-    require cursor < WAD(), "see the definition of LIQUIDATION_CURSOR_LOW and LIQUIDATION_CURSOR_HIGH";
-    assert lltv < WAD() => lltv * maxLif(lltv, cursor) <= WAD() * (WAD() - 1);
+rule maxLifIsAtLeastWad(uint256 lltv, uint256 liquidationCursor) {
+    assert maxLif(lltv, liquidationCursor) >= WAD();
 }
 
 /// Check that mulDivUp(a, lltv, WAD()) <= mulDivUp(a, WAD(), lif)
 rule mulDivLifLLTV(uint256 a, uint256 lif, uint256 lltv) {
     // lif > 0, see rule maxLifIsAtLeastWad.
     assert lltv * lif <= WAD() * WAD() => MulDiv.mulDivUp(a, lltv, WAD()) <= MulDiv.mulDivUp(a, WAD(), lif);
+}
+
+/// Check that for created markets with LLTV < WAD, the imprecision of maxRepaid computation is bounded by a factor of 1000.
+/// The imprecision is the difference between maxRepaid and minimum needed to fit the requirement newDebt >= newMaxDebt.
+rule maxRepaidImprecisionFactorIsAtMostOneThousand(uint256 lltv, uint256 lif) {
+    require lltv < WAD(), "assume that lltv < WAD";
+    require lltv == WAD() || lltv * lif <= 999 * 10 ^ 15 * WAD(), "see createdMarketsRespectMaxLifBound in CreatedMarkets.spec";
+    assert WAD() * WAD() / (WAD() * WAD() - lif * lltv) <= 1000;
 }

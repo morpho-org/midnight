@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 import "BitmapSummaries.spec";
 
@@ -18,7 +19,7 @@ methods {
      */
     function _.price() external => PER_CALLEE_CONSTANT;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
-    function IdLib.toId(Midnight.Market memory market, uint256 chainId, address midnight) internal returns (bytes32) => NONDET;
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => NONDET;
 
     /* Simplify mulDiv reasoning for the solver.  We summarize these by ghost functions, i.e.,
      * arbitrary deterministic functions and axiomatize the axioms we need.

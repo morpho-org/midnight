@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 using Utils as Utils;
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
     function totalUnits(bytes32 id) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
@@ -14,12 +15,16 @@ methods {
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Deterministic toId needed to link market arguments to stored state.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     // SafeTransferLib summaries: bypass transfer logic (needed for liquidate @withrevert rules).
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+
+    // Revert-preserving deterministic ghost summaries for mulDivDown/mulDivUp (axioms proved in MulDiv.spec).
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
     // External calls are assumed non-reentrant: this is justified as we verify properties about the function's bodies.
     // External calls are assumed non-reverting: we verify that reverts do not happen in the function's bodies.
@@ -33,6 +38,41 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 
 function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
+}
+
+persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
+
+persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
+
+function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
+    if (d == 0) {
+        revert();
+    }
+    if (x * y > max_uint256) {
+        revert();
+    }
+    uint256 result = ghostMulDivDown(x, y, d);
+    require result * d <= x * y, "see mulDivDownRoundsDown in MulDiv.spec";
+    require (result + 1) * d > x * y, "see mulDivDownTightBound in MulDiv.spec";
+    require y <= d => result <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
+    require x <= d => result <= y, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
+    require y == d => result == x, "see mulDivIdentity in MulDiv.spec";
+    return result;
+}
+
+function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
+    if (d == 0) {
+        revert();
+    }
+    if (x * y + d - 1 > max_uint256) {
+        revert();
+    }
+    uint256 result = ghostMulDivUp(x, y, d);
+    require result * d >= x * y, "see mulDivUpRoundsUp in MulDiv.spec";
+    require result * d <= x * y + d - 1, "see mulDivUpUpperBound in MulDiv.spec";
+    require y <= d => result <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
+    require x <= d => result <= y, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
+    return result;
 }
 
 /// The market's lossFactor is only modified by liquidate.
@@ -75,28 +115,44 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
 
     require marketIsCreated(market), "market must be created";
     require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
-    require pendingFee(id, user) <= creditOf(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
+    require pendingFee(id, user) <= credit(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
     require currentContract.marketState[id].continuousFeeCredit + pendingFee(id, user) <= max_uint128, "Total credit should be bounded by 2^128 and an increase of continuous fee credit should corresponds to a similar decrease of credit";
 
-    require e.msg.value == 0, "setup the call";
+    require e.msg.value == 0, "Midnight is not payable";
     updatePosition@withrevert(e, market, user);
 
     assert !lastReverted, "updatePosition should not revert under valid state";
+}
+
+/// The loss factor computation in updatePositionView does not revert.
+rule updatePositionViewDoesNotRevert(env e, Midnight.Market market, address user) {
+    bytes32 id = summaryToId(market);
+
+    require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
+    require pendingFee(id, user) <= credit(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
+    require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+    require currentContract.marketState[id].continuousFeeCredit + pendingFee(id, user) <= max_uint128, "Total credit should be bounded by 2^128 and an increase of continuous fee credit should corresponds to a similar decrease of credit";
+
+    require e.msg.value == 0, "Midnight is not payable";
+    updatePositionView@withrevert(e, market, id, user);
+
+    assert !lastReverted, "updatePositionView should not revert under valid state";
 }
 
 /// updatePosition is idempotent: a second call in the same env leaves the relevant position state unchanged and accrues no new fee.
 rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
-    require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
+    require pendingFee(id, user) <= credit(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
     require currentContract.marketState[id].continuousFeeCredit + pendingFee(id, user) <= max_uint128, "see updatePositionDoesNotRevert";
 
     // Snapshot the relevant position state after a first updatePosition.
     updatePosition(e, market, user);
-    mathint creditAfterFirst = creditOf(id, user);
+    mathint creditAfterFirst = credit(id, user);
     mathint pendingFeeAfterFirst = pendingFee(id, user);
     uint128 lastLossFactorAfterFirst = lastLossFactor(id, user);
     uint128 lastAccrualAfterFirst = currentContract.position[id][user].lastAccrual;
@@ -113,7 +169,7 @@ rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
     assert accruedFee == 0;
 
     // Stored position state is unchanged by the second call.
-    assert creditOf(id, user) == creditAfterFirst;
+    assert credit(id, user) == creditAfterFirst;
     assert pendingFee(id, user) == pendingFeeAfterFirst;
     assert lastLossFactor(id, user) == lastLossFactorAfterFirst;
     assert currentContract.position[id][user].lastAccrual == lastAccrualAfterFirst;
@@ -127,10 +183,10 @@ rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market ma
 
     require lastLossFactor(id, user) == currentContract.marketState[id].lossFactor, "lastLossFactor synced with market";
     require lastLossFactor(id, user) < max_uint128, "lossFactor not saturated";
-    require pendingFee(id, user) <= creditOf(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
+    require pendingFee(id, user) <= credit(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
 
-    mathint creditBefore = creditOf(id, user);
+    mathint creditBefore = credit(id, user);
     mathint pendingFeeBefore = pendingFee(id, user);
 
     uint128 newCredit;
@@ -141,7 +197,7 @@ rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market ma
     // Credit and pendingFee only decrease by the accrued fee (no slashing).
     assert newCredit + accruedFee == creditBefore;
     assert newPendingFee + accruedFee == pendingFeeBefore;
-    assert creditOf(id, user) + accruedFee == creditBefore;
+    assert credit(id, user) + accruedFee == creditBefore;
     assert pendingFee(id, user) + accruedFee == pendingFeeBefore;
 }
 

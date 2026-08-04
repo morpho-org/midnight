@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
-import {BaseTest} from "./BaseTest.sol";
-import {TakeAmountsLib} from "../src/periphery/TakeAmountsLib.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
+import {TakeAmountsLib} from "../src/periphery/libraries/TakeAmountsLib.sol";
 
 contract TakeAmountsTest is BaseTest {
     using UtilsLib for uint256;
+
+    uint256 internal constant BORROWER_POSITION_UNITS = 1e37;
 
     Market internal market;
     bytes32 internal id;
@@ -20,13 +22,15 @@ contract TakeAmountsTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -34,8 +38,8 @@ contract TakeAmountsTest is BaseTest {
             .push(
                 CollateralParams({
                     token: address(collateralToken2),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle2)
                 })
             );
@@ -45,7 +49,7 @@ contract TakeAmountsTest is BaseTest {
         id = toId(market);
 
         offer.buy = false;
-        offer.maxUnits = type(uint256).max;
+        offer.maxUnits = type(uint128).max;
         offer.market = market;
         offer.ratifier = address(dummyRatifier);
         offer.expiry = vm.getBlockTimestamp() + 200;
@@ -144,7 +148,7 @@ contract TakeAmountsTest is BaseTest {
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
         tick = bound(tick, 4, _maxTick(settlementFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
-        _createPosition(1e36);
+        _createPosition(BORROWER_POSITION_UNITS);
 
         offer.maker = lender;
         offer.receiverIfMakerIsSeller = lender;
@@ -167,7 +171,7 @@ contract TakeAmountsTest is BaseTest {
         targetSellerAssets = bound(targetSellerAssets, 1, 1e30);
         tick = bound(tick, 4, _maxTick(settlementFee) / DEFAULT_TICK_SPACING) * DEFAULT_TICK_SPACING;
 
-        _createPosition(1e36);
+        _createPosition(BORROWER_POSITION_UNITS);
 
         offer.maker = lender;
         offer.receiverIfMakerIsSeller = lender;
@@ -212,7 +216,7 @@ contract TakeAmountsTest is BaseTest {
         uint256 settlementFee = _setSettlementFees(settlementFee0, settlementFee1);
         targetBuyerAssets = bound(targetBuyerAssets, 1, 1e30);
 
-        _createPosition(1e36);
+        _createPosition(BORROWER_POSITION_UNITS);
 
         uint256 buyerPrice = TickLib.tickToPrice(MAX_TICK) + settlementFee;
         uint256 targetUnits = targetBuyerAssets.mulDivUp(WAD, buyerPrice);

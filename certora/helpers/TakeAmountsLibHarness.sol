@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {Offer} from "../../src/interfaces/IMidnight.sol";
-import {TakeAmountsLib} from "../../src/periphery/TakeAmountsLib.sol";
+import {TakeAmountsLib} from "../../src/periphery/libraries/TakeAmountsLib.sol";
 
 contract TakeAmountsLibHarness {
     function buyerAssetsToUnits(address midnight, bytes32 id, Offer memory offer, uint256 targetBuyerAssets)

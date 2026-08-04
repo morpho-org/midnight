@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => CVL_toId(market);
+    // Summarize to return a non-deterministic value, but remember the last id returned.
+    // The stored id is assumed to be the one in the interactions, which is sound since toId is called only once per rule.
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
 
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
     function continuousFeeCredit(bytes32 id) external returns (uint128) envfree;
 
     // Summarize internals irrelevant to continuous fee tracking.
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
 
@@ -25,12 +28,9 @@ methods {
 
 /// HELPERS ///
 
-// IdLib summary: remember the last id returned by toId.
-
 persistent ghost bytes32 lastId;
 
-function CVL_toId(Midnight.Market market) returns bytes32 {
-    // non-deterministic id
+function summaryToId(Midnight.Market market) returns bytes32 {
     bytes32 id;
     lastId = id;
     return id;
@@ -48,7 +48,7 @@ rule continuousFeeNotOverchargedForBuyer(env e, Midnight.Offer offer, bytes rati
 
     postUpdateCredit, postUpdatePendingFee, _ = updatePositionView(e, offer.market, id, buyer);
 
-    require pendingFee(id, buyer) <= creditOf(id, buyer), "See pendingContinuousFeeBoundedByCredit in Midnight.spec";
+    require pendingFee(id, buyer) <= credit(id, buyer), "See pendingContinuousFeeBoundedByCredit in Midnight.spec";
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
@@ -57,7 +57,7 @@ rule continuousFeeNotOverchargedForBuyer(env e, Midnight.Offer offer, bytes rati
     uint256 contFee = continuousFee(id);
     uint256 timeToMaturity = e.block.timestamp <= offer.market.maturity ? assert_uint256(offer.market.maturity - e.block.timestamp) : 0;
 
-    mathint creditDelta = creditOf(id, buyer) - postUpdateCredit;
+    mathint creditDelta = credit(id, buyer) - postUpdateCredit;
 
     assert pendingFee(id, buyer) == postUpdatePendingFee + (creditDelta * contFee * timeToMaturity) / WAD();
 }
@@ -78,7 +78,7 @@ rule pendingFeeDecreasesProportionallyForSeller(env e, Midnight.Offer offer, byt
 
     require id == lastId, "id should be derived from market";
 
-    uint256 creditAfter = creditOf(id, seller);
+    uint256 creditAfter = credit(id, seller);
     uint256 pendingFeeAfter = pendingFee(id, seller);
 
     require creditAfter > 0 || pendingFeeAfter == 0, "See noRemainingContinuousFeeWithoutCredit in Midnight.spec";

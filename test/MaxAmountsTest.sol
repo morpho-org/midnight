@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
-import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 uint256 constant MAX_AMOUNT = type(uint128).max;
 
@@ -20,13 +20,15 @@ contract MaxAmountsTest is BaseTest {
         super.setUp();
 
         market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
         market.maturity = vm.getBlockTimestamp() + 100;
         market.collateralParams
             .push(
                 CollateralParams({
                     token: address(collateralToken1),
-                    lltv: 0.77e18,
-                    maxLif: maxLif(0.77e18, 0.25e18),
+                    lltv: LLTV,
+                    liquidationCursor: LIQUIDATION_CURSOR,
                     oracle: address(oracle1)
                 })
             );
@@ -66,7 +68,7 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint128).max;
         borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.tick = MAX_TICK;
@@ -74,7 +76,7 @@ contract MaxAmountsTest is BaseTest {
         take(amount, lender, borrowerOffer);
 
         assertEq(midnight.totalUnits(id), amount, "total units at max");
-        assertEq(midnight.debtOf(id, borrower), amount, "debt at max");
+        assertEq(midnight.debt(id, borrower), amount, "debt at max");
     }
 
     function testTakeAboveMaxAmountReverts() public {
@@ -93,12 +95,12 @@ contract MaxAmountsTest is BaseTest {
         borrowerOffer.buy = false;
         borrowerOffer.maker = borrower;
         borrowerOffer.receiverIfMakerIsSeller = borrower;
-        borrowerOffer.maxUnits = type(uint256).max;
+        borrowerOffer.maxUnits = type(uint128).max;
         borrowerOffer.expiry = vm.getBlockTimestamp() + 200;
         borrowerOffer.ratifier = address(dummyRatifier);
         borrowerOffer.tick = MAX_TICK;
 
-        vm.expectRevert(UtilsLib.CastOverflow.selector);
+        vm.expectRevert(IMidnight.ConsumedUnits.selector);
         take(amount, lender, borrowerOffer);
     }
 

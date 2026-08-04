@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Morpho Association
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -7,16 +8,13 @@ methods {
     function withdrawable(bytes32) external returns (uint128) envfree;
     function settlementFeeCbps(bytes32) external returns (uint16[7]) envfree;
     function continuousFee(bytes32) external returns (uint32) envfree;
-    function creditOf(bytes32, address) external returns (uint128) envfree;
-    function debtOf(bytes32, address) external returns (uint128) envfree;
+    function credit(bytes32, address) external returns (uint128) envfree;
+    function debt(bytes32, address) external returns (uint128) envfree;
     function pendingFee(bytes32, address) external returns (uint128) envfree;
     function lastAccrual(bytes32, address) external returns (uint128) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
 
     // Over-approximate view functions.
-    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-    function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
-    function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -63,10 +61,10 @@ strong invariant marketLossFactorIsEmptyIfNotCreated(bytes32 id)
     !marketIsCreated(id) => currentContract.marketState[id].lossFactor == 0;
 
 strong invariant marketCreditIsEmptyIfNotCreated(bytes32 id, address user)
-    !marketIsCreated(id) => creditOf(id, user) == 0;
+    !marketIsCreated(id) => credit(id, user) == 0;
 
 strong invariant marketDebtIsEmptyIfNotCreated(bytes32 id, address user)
-    !marketIsCreated(id) => debtOf(id, user) == 0;
+    !marketIsCreated(id) => debt(id, user) == 0;
 
 strong invariant marketCollateralBitmapAreEmptyIfNotCreated(bytes32 id, address user)
     !marketIsCreated(id) => userHasEmptyCollateralBitmap(id, user);
@@ -82,3 +80,32 @@ strong invariant marketCollateralIsEmptyIfNotCreated(bytes32 id, address user, u
 
 strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
     !marketIsCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
+
+/// NOT CREATED MARKET BEHAVIOR RULES ///
+
+rule updatePositionViewIsZeroIfMarketNotCreated(env e, Midnight.Market market, bytes32 id, address user) {
+    require currentContract.marketState[id].tickSpacing == 0, "assume that the market is not created";
+
+    requireInvariant marketCreditIsEmptyIfNotCreated(id, user);
+    requireInvariant positionLastLossFactorIsEmptyIfNotCreated(id, user);
+    requireInvariant marketLossFactorIsEmptyIfNotCreated(id);
+    requireInvariant marketPendingFeeIsEmptyIfNotCreated(id, user);
+    requireInvariant marketLastContinuousFeeAccrualIsEmptyIfNotCreated(id, user);
+
+    uint128 newCredit;
+    uint128 newPendingFee;
+    uint128 accruedFee;
+    newCredit, newPendingFee, accruedFee = updatePositionView(e, market, id, user);
+
+    assert newCredit == 0;
+    assert newPendingFee == 0;
+    assert accruedFee == 0;
+}
+
+rule marketIsHealthyIfNotCreated(env e, Midnight.Market market, bytes32 id, address borrower) {
+    require currentContract.marketState[id].tickSpacing == 0, "assume that the market is not created";
+
+    requireInvariant marketDebtIsEmptyIfNotCreated(id, borrower);
+
+    assert isHealthy(e, market, id, borrower);
+}

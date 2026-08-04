@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2025 Morpho Association
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 int256 constant LN_ONE_PLUS_DELTA = 0.004987541511039073e18; // floor(ln(1.005) * 1e18)
-uint256 constant MAX_TICK = 5820;
-// Minimum representable price increment in WAD (1e-6 WAD). Tick prices are rounded to multiples of this value.
-uint256 constant PRICE_ROUNDING_STEP = 1e12;
+uint256 constant MAX_TICK = 6744;
+// Minimum representable price increment in WAD (1e-7 WAD). Tick prices are rounded to multiples of this value.
+uint256 constant PRICE_ROUNDING_STEP = 1e11;
 
 library TickLib {
     using TickLib for uint256;
@@ -51,7 +51,7 @@ library TickLib {
         }
     }
 
-    /// @dev Among the ticks than are multiples of spacing, returns the lowest one with a price higher or equal.
+    /// @dev Among the ticks that are multiples of spacing, returns the lowest one with a price higher or equal.
     /// @dev spacing should divide MAX_TICK.
     function priceToTick(uint256 price, uint256 spacing) internal pure returns (uint256) {
         require(price <= 1e18, PriceGreaterThanOne());
