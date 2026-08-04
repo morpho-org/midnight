@@ -55,7 +55,7 @@ methods {
     // behavior of untrusted callbacks, and this spec (like ContinuousFee.spec) assumes no reentrancy.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => deterministicSuccess() expect(bytes32);
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => deterministicSuccess() expect(bytes32);
-    function _.isRatified(Midnight.Offer, bytes) external => deterministicSuccess() expect(bytes32);
+    function _.isRatified(Midnight.Offer, bytes, address) external => deterministicSuccess() expect(bytes32);
 
     // Token transfers: deterministic no-op (void => no havoc); identical across both runs.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
