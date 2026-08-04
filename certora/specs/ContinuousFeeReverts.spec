@@ -26,16 +26,14 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    function creditOf(bytes32 id, address user) external returns (uint128) envfree;
-    function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function continuousFee(bytes32 id) external returns (uint32) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
     function Utils.callbackSuccess() external returns (bytes32) envfree;
 
     // Deterministic id: links the market argument to stored state, identical across both runs.
-    function IdLib.toId(Midnight.Market memory market, uint256, address) internal returns (bytes32) => summaryToId(market);
-    function IdLib.storeInCode(Midnight.Market memory, uint256) internal returns (address) => NONDET;
+    function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
+    function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     // Deterministic ghost summaries of the rate-independent helpers (see header).
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDownWithRevert(x, y, d);
