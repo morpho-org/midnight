@@ -7,10 +7,12 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function collateral(bytes32 id, address user, uint256) external returns (uint128) envfree;
+    function collateralBitmap(bytes32 id, address user) external returns (uint128) envfree;
     function debt(bytes32 id, address user) external returns (uint128) envfree;
     function isHealthyNoBitmap(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function maxRepaidFor(Midnight.Market, bytes32, uint256, address) external returns (uint256) envfree;
     function badDebtFor(Midnight.Market, bytes32, address) external returns (uint256) envfree;
+    function liquidationLocked(bytes32, address) external returns (bool) envfree;
 
     // Assumption: price does not change during the rule (same value in maxRepaidFor, in liquidate and in the
     // post-state isHealthyNoBitmap). Deterministic per oracle address, as in Healthiness.spec.
@@ -27,7 +29,13 @@ methods {
     // maxLif is deterministic for each (lltv, liquidationCursor) pair.
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 
-    // Unresolved callbacks and token calls use AUTO/HAVOC_ECF, which models non-reentrant callees.
+    // Token transfers move external ERC20 balances only, never the borrower's position storage, so summarizing
+    // them as non-reverting no-ops is sound for this direction. The liquidator gate and callback are ruled out by
+    // the liquidatorGate == 0 and callback == 0 preconditions, so canLiquidate / onLiquidate are never called.
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function _.transferFrom(address from, address to, uint256 amount) external => NONDET;
+    function _.transfer(address to, uint256 amount) external => NONDET;
 }
 
 /// SUMMARY ///
@@ -148,6 +156,34 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     uint256 otherLltv = globalMarketCollateralLLTV[otherIndex];
     uint256 otherPrice = summaryPrice(globalMarket.collateralParams[otherIndex].oracle);
 
+    uint256 lltv = globalMarketCollateralLLTV[collateralIndex];
+    uint256 lif = maxLifGhost(lltv, globalMarketCollateralLiquidationCursor[collateralIndex]);
+    uint256 price = summaryPrice(globalMarket.collateralParams[collateralIndex].oracle);
+
+    // Regime and guards under which liquidate at the RCF cap does not revert: the Rocq theorem's hypotheses plus
+    // liquidate's own require guards. These are preconditions of the theorem, not a weakening of the conclusion.
+    require currentContract.marketState[globalId].tickSpacing != 0, "market already created (touchMarket is a no-op)";
+    require globalMarketLiquidatorGate == 0, "no liquidator gate (Midnight.sol:635)";
+    require callback == 0, "no liquidate callback";
+    require !liquidationLocked(globalId, borrower), "borrower not liquidation-locked (Midnight.sol:660)";
+    require !isHealthyNoBitmap(globalMarket, globalId, borrower), "strictly unhealthy: debt > maxDebt (Midnight.sol:661)";
+    require lltv < WAD(), "RCF is active only for lltv < WAD (Midnight.sol:695)";
+    require lif * lltv <= 999 * 10 ^ 15 * WAD(), "maxLif * lltv <= 0.999 * WAD^2: RCF denominator positive (Midnight.sol:698)";
+    require price > 0, "positive liquidated-collateral price";
+    require repaidUnits < debtBefore, "maxRepaid < debt case (no debt underflow at Midnight.sol:714)";
+
+    // Both collaterals are activated, so liquidate's bitmap maxDebt loop (Midnight.sol:645) sums the same two
+    // terms as the array-based maxRepaidFor / isHealthyNoBitmap; this keeps the two-collateral scope.
+    uint128 bitmap = collateralBitmap(globalId, borrower);
+    require summaryGetBit(bitmap, 0) && summaryGetBit(bitmap, 1), "both collaterals activated";
+    require forall uint256 otherBit. otherBit != 0 && otherBit != 1 => !summaryGetBit(bitmap, otherBit), "only the two collaterals activated";
+
+    // Seized collateral (Midnight.sol:692) does not exceed the position collateral (Midnight.sol:708 subtraction).
+    require collatBefore >= ghostMulDivDown(ghostMulDivDown(repaidUnits, lif, WAD()), ORACLE_PRICE_SCALE(), price), "seized <= collateral";
+
+    // No overflow of the market's withdrawable when repaid units are credited (Midnight.sol:713).
+    require currentContract.marketState[globalId].withdrawable + repaidUnits <= max_uint128, "withdrawable credit does not overflow";
+
     uint256 seizedOut;
     uint256 repaidOut;
     seizedOut, repaidOut = liquidate@withrevert(e, globalMarket, collateralIndex, 0, repaidUnits, borrower, false, receiver, callback, data);
@@ -162,10 +198,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // seizedOut = floor(floor(repaidUnits * lif / WAD) * ORACLE_PRICE_SCALE / price), matching the ghost terms
     // below. Each require is one ground instance of a rule proved in MulDiv.spec.
 
-    uint256 lltv = globalMarketCollateralLLTV[collateralIndex];
-    uint256 lif = maxLifGhost(lltv, globalMarketCollateralLiquidationCursor[collateralIndex]);
     uint256 maxSeizedValue = ghostMulDivDown(repaidUnits, lif, WAD());
-    uint256 price = summaryPrice(globalMarket.collateralParams[collateralIndex].oracle);
 
     // By Midnight.sol:692, seizedOut == ghostMulDivDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price).
     uint256 curCollatValue = ghostMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE());
