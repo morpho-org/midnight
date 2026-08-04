@@ -1,25 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// EQUIVALENCE OF REVERTS: activating the continuous fee never makes `take` revert in new ways.
-//
-// The continuous-fee *rate* (marketState[id].continuousFee) is read in exactly one function, take, and its
-// value propagates to only three places:
-//   - Midnight.sol:393-394  buyerPendingFeeIncrease = toUint128(buyerCreditIncrease.mulDivDown(continuousFee * ttm, WAD))
-//   - Midnight.sol:416       buyerPos.pendingFee += buyerPendingFeeIncrease
-//   - Midnight.sol:458       buyerPendingFeeIncrease is passed to the onBuy callback
-// Everything else in take (prices, settlementFee, buyer/seller assets, consumed checks, gates, the seller
-// side, _updatePosition, transfers, the final isHealthy check) is byte-identical between a run with the rate
-// at its configured value and a run with the rate forced to 0. Hence the only NEW revert opportunities the
-// enabled run has are the toUint128 cast (394) and the += (416); the callback is assumed to succeed.
-//
-// We prove this relationally: run take twice from the same pre-state, differing only in the market's fee rate.
-//
-// Determinism requirement (why this is a separate spec): in a two-run rule every rate-independent helper must
-// return identical results across both runs, otherwise the prover could manufacture a spurious revert
-// difference. So all helpers are summarized by *deterministic* persistent ghosts (same args => same result),
-// not NONDET. None of these summaries needs non-linear reasoning; they only need to cancel between the runs.
-// The single piece of non-linear reasoning is the mulDivDown argument bound (axiomMulDivDownArgLeDenom,
-// proved in MulDiv.spec) together with the assumption fee*ttm <= WAD (from the fee-rate and TTM caps).
+// EQUIVALENCE OF REVERTS: activating the continuous fee never makes `take` revert in new ways, provided 
+// the fee doesn't exceed the offer's continuousFeeCap.
 
 using Utils as Utils;
 
@@ -101,14 +83,14 @@ persistent ghost mulOverflow(mathint, mathint) returns bool {
 }
 
 function summaryMulDivDownWithRevert(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (d == 0 || mulOverflow(x, y)) {
+    if (d == 0 || x * y >= 2^256) {
         revert();
     }
     return require_uint256(summaryMulDivDownGhost(x, y, d));
 }
 
 function summaryMulDivUpWithRevert(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (d == 0 || mulOverflow(x, y)) {
+    if (d == 0 || x * y + d - 1 >= 2^256) {
         revert();
     }
     return require_uint256(summaryMulDivUpGhost(x, y, d));
@@ -136,6 +118,10 @@ function deterministicSuccess() returns bytes32 {
 
 /// RULE ///
 
+// Activating the continuous fee never makes `take` revert in new ways, provided the fee doesn't
+// exceed the offer's continuousFeeCap.
+//
+// We prove this relationally: run take twice from the same pre-state, differing only in the market's fee rate.
 rule continuousFeeActivationAddsNoReverts(env e, env eSetter, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     bytes32 id = summaryToId(offer.market);
     address buyer = offer.buy ? offer.maker : taker;
@@ -143,11 +129,6 @@ rule continuousFeeActivationAddsNoReverts(env e, env eSetter, Midnight.Offer off
 
     // timeToMaturity exactly as take computes it: zeroFloorSub(maturity, block.timestamp).
     mathint ttm = offer.market.maturity > e.block.timestamp ? offer.market.maturity - e.block.timestamp : 0;
-
-    // fee*ttm <= WAD follows from continuousFee <= MAX_CONTINUOUS_FEE, ttm <= MAX_TTM, and
-    // MAX_CONTINUOUS_FEE * MAX_TTM < WAD. With the mulDivDown argument axiom this bounds the buyer fee
-    // increase by the credit increase.
-    require to_mathint(continuousFee(id)) * ttm <= WAD(), "fee*ttm <= WAD: fee-rate cap + TTM cap, see Midnight.spec";
 
     // updatePosition preserves pendingFee <= credit (pendingContinuousFeeBoundedByCredit). Because the
     // mulDiv ghosts are deterministic, this view call computes exactly the post-slash/post-accrual buyer
@@ -166,6 +147,11 @@ rule continuousFeeActivationAddsNoReverts(env e, env eSetter, Midnight.Offer off
     require eSetter.msg.value == 0 && eSetter.msg.sender == currentContract.feeSetter, "valid fee setter call";
     require tickSpacing(id) > 0, "market is created";
 
+    require continuousFee(id) * ttm <= WAD(), "fee*ttm <= WAD: fee-rate cap + TTM cap, see Midnight.spec";
+
+    // The offer can intentionally reject the continuous fee if it exceeds the cap.
+    require continuousFee(id) <= offer.continuousFeeCap, "assume offer is compatible with market's fee";
+
     storage initState = lastStorage;
 
     // Enabled run: take with the arbitrary configured rate.
@@ -175,6 +161,7 @@ rule continuousFeeActivationAddsNoReverts(env e, env eSetter, Midnight.Offer off
     // Disabled pre-state: restore initState and force the rate to 0 via the real setter (writes only
     // continuousFee), so the only delta versus initState is the rate. Then run the same take.
     setMarketContinuousFee(eSetter, id, 0) at initState;
+
     take@withrevert(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
     bool revertedDisabled = lastReverted;
 
