@@ -162,6 +162,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
 
     // Regime and guards under which liquidate at the RCF cap does not revert: the Rocq theorem's hypotheses plus
     // liquidate's own require guards. These are preconditions of the theorem, not a weakening of the conclusion.
+    require e.msg.value == 0, "Midnight is not payable (liquidate is non-payable)";
     require currentContract.marketState[globalId].tickSpacing != 0, "market already created (touchMarket is a no-op)";
     require globalMarketLiquidatorGate == 0, "no liquidator gate (Midnight.sol:635)";
     require callback == 0, "no liquidate callback";
