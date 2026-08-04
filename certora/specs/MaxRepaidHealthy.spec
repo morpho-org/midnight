@@ -150,7 +150,10 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
 
     uint256 seizedOut;
     uint256 repaidOut;
-    seizedOut, repaidOut = liquidate(e, globalMarket, collateralIndex, 0, repaidUnits, borrower, false, receiver, callback, data);
+    seizedOut, repaidOut = liquidate@withrevert(e, globalMarket, collateralIndex, 0, repaidUnits, borrower, false, receiver, callback, data);
+
+    // Liquidating at the RCF cap succeeds: repaidUnits == maxRepaid satisfies the RCF require (Midnight.sol:700-705).
+    assert !lastReverted;
 
     uint256 collatAfter = assert_uint256(collatBefore - seizedOut);
 
