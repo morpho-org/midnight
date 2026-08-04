@@ -48,6 +48,8 @@ methods {
 
 definition WAD() returns uint256 = 10 ^ 18;
 
+definition MAX_TTM() returns mathint = 100 * 365 * 86400;
+
 /// DETERMINISTIC GHOST SUMMARIES ///
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
@@ -122,48 +124,36 @@ function deterministicSuccess() returns bytes32 {
 // exceed the offer's continuousFeeCap.
 //
 // We prove this relationally: run take twice from the same pre-state, differing only in the market's fee rate.
-rule continuousFeeActivationAddsNoReverts(env e, env eSetter, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
+rule continuousFeeActivationAddsNoReverts(env e, env eSetter, uint256 newContinuousFee, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     bytes32 id = summaryToId(offer.market);
-    address buyer = offer.buy ? offer.maker : taker;
-    address seller = offer.buy ? taker : offer.maker;
+
+    // The offer can intentionally reject the continuous fee if it exceeds the cap.
+    require newContinuousFee <= offer.continuousFeeCap, "assume offer is compatible with new continuous fee";
 
     // timeToMaturity exactly as take computes it: zeroFloorSub(maturity, block.timestamp).
     mathint ttm = offer.market.maturity > e.block.timestamp ? offer.market.maturity - e.block.timestamp : 0;
+    require ttm <= MAX_TTM(), "maturity less than MAX_TTM() in the future, see Midnight.spec";
 
-    // updatePosition preserves pendingFee <= credit (pendingContinuousFeeBoundedByCredit). Because the
-    // mulDiv ghosts are deterministic, this view call computes exactly the post-slash/post-accrual buyer
-    // credit and pendingFee that take's _updatePosition writes before the fee addition at Midnight.sol:416.
-    // Requiring the bound here excludes states where the slash result has pendingFee > credit, which saves
-    // reproving that known invariant via extra mulDiv axioms. This is what makes the += at 416 provably
-    // non-overflowing in the enabled run whenever the disabled run's credit += creditIncrease at 417 succeeds.
-    // If updatePositionView reverts, that path is pruned, but on it take's identical
-    // _updatePosition reverts too, so both takes revert and the assert holds trivially.
+    // updatePosition preserves pendingFee <= credit
+    // proved as pendingContinuousFeeBoundedByCredit in Midnight.spec.
+    address buyer = offer.buy ? offer.maker : taker;
     uint128 postCreditBuyer;
     uint128 postPendingBuyer;
     postCreditBuyer, postPendingBuyer, _ = updatePositionView(e, offer.market, id, buyer);
     require postPendingBuyer <= postCreditBuyer, "pendingContinuousFeeBoundedByCredit, preserved by updatePosition";
 
-    // Setter preconditions so the disabled pre-state differs from the enabled one only in the fee rate.
-    require eSetter.msg.value == 0 && eSetter.msg.sender == currentContract.feeSetter, "valid fee setter call";
-    require tickSpacing(id) > 0, "market is created";
-
-    require continuousFee(id) * ttm <= WAD(), "fee*ttm <= WAD: fee-rate cap + TTM cap, see Midnight.spec";
-
-    // The offer can intentionally reject the continuous fee if it exceeds the cap.
-    require continuousFee(id) <= offer.continuousFeeCap, "assume offer is compatible with market's fee";
-
     storage initState = lastStorage;
+
+    // arbitrary pre-state before continuous fee is set.  Record its revert status.
+    take@withrevert(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
+    bool revertedDisabled = lastReverted;
+
+    // now set the new continuous fee and check again.
+    setMarketContinuousFee(eSetter, id, newContinuousFee) at initState;
 
     // Enabled run: take with the arbitrary configured rate.
     take@withrevert(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
     bool revertedEnabled = lastReverted;
-
-    // Disabled pre-state: restore initState and force the rate to 0 via the real setter (writes only
-    // continuousFee), so the only delta versus initState is the rate. Then run the same take.
-    setMarketContinuousFee(eSetter, id, 0) at initState;
-
-    take@withrevert(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
-    bool revertedDisabled = lastReverted;
 
     assert !revertedDisabled => !revertedEnabled, "activating the continuous fee must not add reverts to take";
 }
