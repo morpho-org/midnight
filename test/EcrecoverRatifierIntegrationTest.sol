@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Midnight} from "../src/Midnight.sol";
 import {IEcrecoverRatifier, Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -387,5 +388,41 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
             address(0),
             hex""
         );
+    }
+
+    function testTakeSameRatifierOnOtherInstance() public {
+        Midnight otherMidnight = new Midnight();
+        otherMidnight.enableLiquidationCursor(LIQUIDATION_CURSOR);
+        otherMidnight.enableLltv(LLTV);
+
+        (address signer, uint256 pk) = makeAddrAndKey("signer");
+        privateKey[signer] = pk;
+
+        // The maker (lender in this case) authorizes the same ratifier on both instances.
+        vm.prank(lender);
+        otherMidnight.setIsAuthorized(address(ecrecoverRatifier), true, lender);
+
+        // The signer is authorized on midnight.
+        vm.prank(lender);
+        midnight.setIsAuthorized(signer, true, lender);
+
+        bytes memory ratifierData = merkleRatifierData([lenderOffer], signer);
+
+        // The signer can ratify offers on midnight.
+        vm.prank(borrower);
+        midnight.take(lenderOffer, ratifierData, 0, borrower, borrower, address(0), hex"");
+
+        // Cannot use the same ratifier data on otherMidnight.
+        vm.prank(borrower);
+        vm.expectRevert(IMidnight.InvalidMidnight.selector);
+        otherMidnight.take(lenderOffer, ratifierData, 0, borrower, borrower, address(0), hex"");
+
+        // The signer can ratify offers on otherMidnight though, but this is explicit (offers have to have the
+        // otherMidnight address), and this is documented.
+        Offer memory newOffer = lenderOffer;
+        newOffer.market.midnight = address(otherMidnight);
+        bytes memory newRatifierData = merkleRatifierData([newOffer], signer);
+        vm.prank(borrower);
+        otherMidnight.take(newOffer, newRatifierData, 0, borrower, borrower, address(0), hex"");
     }
 }

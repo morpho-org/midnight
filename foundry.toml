@@ -4,7 +4,10 @@ optimizer = true
 optimizer_runs = 466
 bytecode_hash = "none"
 evm_version = "osaka"
-fs_permissions = [{ access = "read", path = "test/ticks_exact.json" }]
+fs_permissions = [
+    { access = "read", path = "test/ticks_exact.json" },
+    { access = "read", path = "out/Morpho.sol/Morpho.json" },
+]
 
 [profile.default.fmt]
 wrap_comments = true
@@ -16,3 +19,13 @@ exclude_lints = [
     "incorrect-shift",
     "block-timestamp",
 ]
+
+[[profile.default.compilation_restrictions]]
+paths = "test/imports/MorphoImport.sol"
+optimizer_runs = 999999
+evm_version = "paris"
+
+[[profile.default.additional_compiler_profiles]]
+name = "999999-paris"
+optimizer_runs = 999999
+evm_version = "paris"
