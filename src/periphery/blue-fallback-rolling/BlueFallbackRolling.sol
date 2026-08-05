@@ -9,7 +9,7 @@ import {WAD} from "../../libraries/ConstantsLib.sol";
 import {IdLib} from "../../libraries/IdLib.sol";
 import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";
-import {IBlueFallbackRolling} from "./IBlueFallbackRolling.sol";
+import {CollateralRoll, IBlueFallbackRolling} from "./IBlueFallbackRolling.sol";
 import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
@@ -39,38 +39,56 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         emit SetConfig(msg.sender, midnightId, blueId, start, incentive, enabled);
     }
 
-    function roll(
-        Market memory midnightMarket,
-        MarketParams memory blueMarketParams,
-        address user,
-        uint64 start,
-        uint64 incentive,
-        uint256 assets
-    ) external override {
-        bytes32 midnightId = IdLib.toId(midnightMarket);
-        bytes32 blueId = Id.unwrap(blueMarketParams.id());
-        require(isConfig[user][keccak256(abi.encode(midnightId, blueId, start, incentive))], NotConfigured());
-        require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
+    /// @dev Each leg targets one of the user's activated Midnight collaterals and rolls it into its own Blue market.
+    /// @dev Rolling more than one collateral in the same debt-repayment ratio requires reading the Midnight debt
+    /// afresh for every leg, since earlier legs already repaid part of it: to fully drain a multi-collateral
+    /// position in one call, order legs so the last leg's assets equal whatever debt remains at that point.
+    function roll(Market memory midnightMarket, address user, uint64 start, uint64 incentive, CollateralRoll[] memory legs)
+        external
+        override
+    {
+        require(legs.length > 0, NoCollateralLegs());
         require(block.timestamp >= start, NotStarted());
+
+        bytes32 midnightId = IdLib.toId(midnightMarket);
         uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
-        require(UtilsLib.countBits(collateralBitmap) == 1, IncorrectActivatedCollateral());
-        uint256 collateralIndex = UtilsLib.msb(collateralBitmap);
-        require(
-            blueMarketParams.collateralToken == midnightMarket.collateralParams[collateralIndex].token,
-            InconsistentCollateralToken()
-        );
+        uint128 seenBitmap;
+        uint256 totalIncentiveAssets;
 
-        // Round in favor of the Midnight position.
-        uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
-            .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
-        // Round in favor of the borrower.
-        uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentive, WAD);
+        for (uint256 i; i < legs.length; ++i) {
+            CollateralRoll memory leg = legs[i];
+            uint256 collateralIndex = leg.collateralIndex;
+            uint128 collateralBit = uint128(1) << collateralIndex;
 
-        emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
+            require(collateralBitmap & collateralBit != 0, IncorrectActivatedCollateral());
+            require(seenBitmap & collateralBit == 0, DuplicateCollateralIndex());
+            seenBitmap |= collateralBit;
 
-        bytes memory data = abi.encode(midnightMarket, blueMarketParams, collateralIndex, assets, incentiveAssets, user);
-        IMorpho(BLUE).supplyCollateral(blueMarketParams, collateralAssets, user, data);
-        if (incentiveAssets > 0) SafeTransferLib.safeTransfer(midnightMarket.loanToken, msg.sender, incentiveAssets);
+            bytes32 blueId = Id.unwrap(leg.blueMarketParams.id());
+            require(isConfig[user][keccak256(abi.encode(midnightId, blueId, start, incentive))], NotConfigured());
+            require(leg.blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
+            require(
+                leg.blueMarketParams.collateralToken == midnightMarket.collateralParams[collateralIndex].token,
+                InconsistentCollateralToken()
+            );
+
+            // Round in favor of the Midnight position.
+            uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
+                .mulDivDown(leg.assets, IMidnight(MIDNIGHT).debt(midnightId, user));
+            // Round in favor of the borrower.
+            uint256 incentiveAssets = UtilsLib.mulDivDown(leg.assets, incentive, WAD);
+            totalIncentiveAssets += incentiveAssets;
+
+            emit Roll(msg.sender, user, midnightId, blueId, leg.assets, collateralAssets, incentiveAssets);
+
+            bytes memory data =
+                abi.encode(midnightMarket, leg.blueMarketParams, collateralIndex, leg.assets, incentiveAssets, user);
+            IMorpho(BLUE).supplyCollateral(leg.blueMarketParams, collateralAssets, user, data);
+        }
+
+        if (totalIncentiveAssets > 0) {
+            SafeTransferLib.safeTransfer(midnightMarket.loanToken, msg.sender, totalIncentiveAssets);
+        }
     }
 
     function onMorphoSupplyCollateral(uint256 collateralAssets, bytes calldata data) external {

@@ -6,12 +6,14 @@ import {IMorpho, Id, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorp
 import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
 import {Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {BlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/BlueFallbackRolling.sol";
-import {IBlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/IBlueFallbackRolling.sol";
+import {CollateralRoll, IBlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/IBlueFallbackRolling.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 contract BlueFallbackRollingTest is BaseTest {
     using MarketParamsLib for MarketParams;
+    using UtilsLib for uint256;
 
     uint256 internal constant BLUE_LLTV = 0.86e18;
     uint64 internal constant INCENTIVE = 0.001e18;
@@ -89,7 +91,7 @@ contract BlueFallbackRollingTest is BaseTest {
         uint256 midnightCollateral = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
 
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
+        fallbackContract.roll(midnightMarket, borrower, start, INCENTIVE, _legs(blueMarketParams, blueCollateralIndex, DEBT));
 
         uint256 incentiveAssets = DEBT * INCENTIVE / WAD;
         assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
@@ -106,7 +108,9 @@ contract BlueFallbackRollingTest is BaseTest {
         uint256 collateralAssets = totalCollateralAssets * debtAssets / DEBT;
 
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, debtAssets);
+        fallbackContract.roll(
+            midnightMarket, borrower, start, INCENTIVE, _legs(blueMarketParams, blueCollateralIndex, debtAssets)
+        );
 
         uint256 incentiveAssets = debtAssets * INCENTIVE / WAD;
         assertEq(midnight.debt(toId(midnightMarket), borrower), DEBT - debtAssets);
@@ -127,7 +131,9 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.expectRevert(IBlueFallbackRolling.NotStarted.selector);
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, futureStart, INCENTIVE, DEBT);
+        fallbackContract.roll(
+            midnightMarket, borrower, futureStart, INCENTIVE, _legs(blueMarketParams, blueCollateralIndex, DEBT)
+        );
     }
 
     function testRollRevertsForUnconfiguredBlueMarket() public {
@@ -135,7 +141,7 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
+        fallbackContract.roll(midnightMarket, borrower, start, INCENTIVE, _legs(blueMarketParams, blueCollateralIndex, DEBT));
     }
 
     function testRollRevertsForInconsistentLoanToken() public {
@@ -145,27 +151,132 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.expectRevert(IBlueFallbackRolling.InconsistentLoanToken.selector);
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
+        fallbackContract.roll(midnightMarket, borrower, start, INCENTIVE, _legs(blueMarketParams, blueCollateralIndex, DEBT));
     }
 
-    function testRollRevertsForMultipleActivatedCollaterals() public {
-        collateralize(midnightMarket, borrower, DEBT, 1 - blueCollateralIndex);
+    function testRollRevertsForNonActivatedCollateralLeg() public {
+        uint256 otherCollateralIndex = 1 - blueCollateralIndex;
 
         vm.expectRevert(IBlueFallbackRolling.IncorrectActivatedCollateral.selector);
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
+        fallbackContract.roll(midnightMarket, borrower, start, INCENTIVE, _legs(blueMarketParams, otherCollateralIndex, DEBT));
+    }
+
+    function testRollRevertsForDuplicateCollateralIndex() public {
+        CollateralRoll[] memory legs = new CollateralRoll[](2);
+        legs[0] = CollateralRoll({collateralIndex: blueCollateralIndex, blueMarketParams: blueMarketParams, assets: DEBT / 2});
+        legs[1] = CollateralRoll({collateralIndex: blueCollateralIndex, blueMarketParams: blueMarketParams, assets: DEBT / 2});
+
+        vm.expectRevert(IBlueFallbackRolling.DuplicateCollateralIndex.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(midnightMarket, borrower, start, INCENTIVE, legs);
+    }
+
+    function testRollRevertsForEmptyLegsArray() public {
+        vm.expectRevert(IBlueFallbackRolling.NoCollateralLegs.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(midnightMarket, borrower, start, INCENTIVE, new CollateralRoll[](0));
+    }
+
+    function testRollRevertsForMixedValidAndInvalidLegs() public {
+        uint256 otherCollateralIndex = 1 - blueCollateralIndex;
+        uint256 debtBefore = midnight.debt(toId(midnightMarket), borrower);
+        uint256 collateralBefore = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
+
+        CollateralRoll[] memory legs = new CollateralRoll[](2);
+        legs[0] = CollateralRoll({collateralIndex: blueCollateralIndex, blueMarketParams: blueMarketParams, assets: DEBT / 2});
+        legs[1] = CollateralRoll({collateralIndex: otherCollateralIndex, blueMarketParams: blueMarketParams, assets: DEBT / 2});
+
+        vm.expectRevert(IBlueFallbackRolling.IncorrectActivatedCollateral.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(midnightMarket, borrower, start, INCENTIVE, legs);
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), debtBefore, "debt unchanged");
+        assertEq(
+            midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex),
+            collateralBefore,
+            "collateral unchanged"
+        );
     }
 
     function testRollRevertsWhenActivatedCollateralDoesNotMatchBlue() public {
         uint256 otherCollateralIndex = 1 - blueCollateralIndex;
         collateralize(midnightMarket, borrower, DEBT, otherCollateralIndex);
-        uint256 blueCollateralAssets = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
-        vm.prank(borrower);
-        midnight.withdrawCollateral(midnightMarket, blueCollateralIndex, blueCollateralAssets, borrower, borrower);
 
         vm.expectRevert(IBlueFallbackRolling.InconsistentCollateralToken.selector);
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
+        fallbackContract.roll(midnightMarket, borrower, start, INCENTIVE, _legs(blueMarketParams, otherCollateralIndex, DEBT));
+    }
+
+    function testAnyoneCanRollMultipleCollateralsToBlue() public {
+        (uint256 otherCollateralIndex, MarketParams memory blueMarketParams2) = _setUpSecondCollateralMarket();
+
+        uint256 collateral0Before = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
+        uint256 collateral1Before = midnight.collateral(toId(midnightMarket), borrower, otherCollateralIndex);
+        uint256 debtLeg0 = DEBT / 2;
+        uint256 debtLeg1 = DEBT - debtLeg0;
+        uint256 collateralAssets0 = collateral0Before.mulDivDown(debtLeg0, DEBT);
+        // debtLeg1 equals the debt remaining after leg0, so leg1 fully drains collateral1.
+        uint256 collateralAssets1 = collateral1Before;
+
+        CollateralRoll[] memory legs = new CollateralRoll[](2);
+        legs[0] = CollateralRoll({collateralIndex: blueCollateralIndex, blueMarketParams: blueMarketParams, assets: debtLeg0});
+        legs[1] =
+            CollateralRoll({collateralIndex: otherCollateralIndex, blueMarketParams: blueMarketParams2, assets: debtLeg1});
+
+        vm.prank(keeper);
+        fallbackContract.roll(midnightMarket, borrower, start, INCENTIVE, legs);
+
+        uint256 incentiveAssets = DEBT * INCENTIVE / WAD;
+        assertEq(midnight.debt(toId(midnightMarket), borrower), 0, "debt");
+        assertEq(
+            midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex),
+            collateral0Before - collateralAssets0,
+            "collateral0"
+        );
+        assertEq(midnight.collateral(toId(midnightMarket), borrower, otherCollateralIndex), 0, "collateral1");
+        assertEq(blue.position(blueMarketParams.id(), borrower).collateral, collateralAssets0, "blue collateral0");
+        assertEq(blue.position(blueMarketParams2.id(), borrower).collateral, collateralAssets1, "blue collateral1");
+        assertGt(blue.position(blueMarketParams.id(), borrower).borrowShares, 0, "blue borrow0");
+        assertGt(blue.position(blueMarketParams2.id(), borrower).borrowShares, 0, "blue borrow1");
+        assertEq(loanToken.balanceOf(keeper), incentiveAssets, "incentive");
+        assertEq(loanToken.balanceOf(address(fallbackContract)), 0, "leftover");
+    }
+
+    function testAnyoneCanPartiallyRollMultipleCollateralsToBlue() public {
+        (uint256 otherCollateralIndex, MarketParams memory blueMarketParams2) = _setUpSecondCollateralMarket();
+
+        uint256 collateral0Before = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
+        uint256 collateral1Before = midnight.collateral(toId(midnightMarket), borrower, otherCollateralIndex);
+        uint256 debtLeg0 = DEBT / 4;
+        uint256 debtLeg1 = DEBT / 4;
+        uint256 collateralAssets0 = collateral0Before.mulDivDown(debtLeg0, DEBT);
+        uint256 collateralAssets1 = collateral1Before.mulDivDown(debtLeg1, DEBT - debtLeg0);
+
+        CollateralRoll[] memory legs = new CollateralRoll[](2);
+        legs[0] = CollateralRoll({collateralIndex: blueCollateralIndex, blueMarketParams: blueMarketParams, assets: debtLeg0});
+        legs[1] =
+            CollateralRoll({collateralIndex: otherCollateralIndex, blueMarketParams: blueMarketParams2, assets: debtLeg1});
+
+        vm.prank(keeper);
+        fallbackContract.roll(midnightMarket, borrower, start, INCENTIVE, legs);
+
+        uint256 incentiveAssets = (debtLeg0 + debtLeg1) * INCENTIVE / WAD;
+        assertEq(midnight.debt(toId(midnightMarket), borrower), DEBT - debtLeg0 - debtLeg1, "debt");
+        assertEq(
+            midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex),
+            collateral0Before - collateralAssets0,
+            "collateral0"
+        );
+        assertEq(
+            midnight.collateral(toId(midnightMarket), borrower, otherCollateralIndex),
+            collateral1Before - collateralAssets1,
+            "collateral1"
+        );
+        assertEq(blue.position(blueMarketParams.id(), borrower).collateral, collateralAssets0, "blue collateral0");
+        assertEq(blue.position(blueMarketParams2.id(), borrower).collateral, collateralAssets1, "blue collateral1");
+        assertEq(loanToken.balanceOf(keeper), incentiveAssets, "incentive");
+        assertEq(loanToken.balanceOf(address(fallbackContract)), 0, "leftover");
     }
 
     function testSupplyCollateralCallbackRevertsIfCallerIsNotBlue() public {
@@ -202,7 +313,7 @@ contract BlueFallbackRollingTest is BaseTest {
         assertFalse(fallbackContract.isConfig(borrower, configId(start, INCENTIVE)));
 
         vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
+        fallbackContract.roll(midnightMarket, borrower, start, INCENTIVE, _legs(blueMarketParams, blueCollateralIndex, DEBT));
     }
 
     function testSetConfigDoesNotReplaceOtherConfig() public {
@@ -218,5 +329,35 @@ contract BlueFallbackRollingTest is BaseTest {
 
     function configId(uint64 _start, uint64 incentive) internal view returns (bytes32) {
         return keccak256(abi.encode(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), _start, incentive));
+    }
+
+    function _legs(MarketParams memory params, uint256 collateralIndex, uint256 assets)
+        internal
+        pure
+        returns (CollateralRoll[] memory legs)
+    {
+        legs = new CollateralRoll[](1);
+        legs[0] = CollateralRoll({collateralIndex: collateralIndex, blueMarketParams: params, assets: assets});
+    }
+
+    /// @dev Activates a second Midnight collateral for the borrower and configures a second Blue market for it.
+    function _setUpSecondCollateralMarket() internal returns (uint256 otherCollateralIndex, MarketParams memory params) {
+        otherCollateralIndex = 1 - blueCollateralIndex;
+        collateralize(midnightMarket, borrower, DEBT, otherCollateralIndex);
+
+        params = MarketParams({
+            loanToken: address(loanToken),
+            collateralToken: midnightMarket.collateralParams[otherCollateralIndex].token,
+            oracle: midnightMarket.collateralParams[otherCollateralIndex].oracle,
+            irm: address(0),
+            lltv: BLUE_LLTV
+        });
+        blue.createMarket(params);
+
+        deal(address(loanToken), address(this), 2 * DEBT);
+        blue.supply(params, 2 * DEBT, 0, lender, hex"");
+
+        vm.prank(borrower);
+        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(params.id()), start, INCENTIVE, true);
     }
 }

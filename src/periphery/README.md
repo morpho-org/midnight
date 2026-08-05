@@ -23,15 +23,17 @@ The factory records callbacks in `callbackOf` and `isBlueCallback`.
 
 ### `BlueFallbackRolling`
 
-Permissionlessly refinances a borrower's Midnight debt into a user-selected Morpho Blue market once the Midnight market
-reaches the configured start timestamp. It supplies the selected collateral to Blue through a callback, borrows against
-it to repay Midnight, and rewards the caller from the additional Blue borrow. Rolls may migrate all debt and collateral
-or a proportional partial amount.
+Permissionlessly refinances a borrower's Midnight debt into one or more user-selected Morpho Blue markets once the
+Midnight market reaches the configured start timestamp. A roll processes one leg per activated Midnight collateral to
+migrate, each leg supplying that collateral to its own Blue market through a callback, borrowing against it to repay
+Midnight, and rewarding the caller from the additional Blue borrow. Legs may migrate all debt and collateral or a
+proportional partial amount, and a single roll can target any subset of the borrower's activated collaterals.
 
 Users may enable multiple fallback configurations per Midnight market and must authorize the contract on both Midnight
 and Blue. Each configuration selects a Blue market, start timestamp, and caller incentive, and can later be disabled.
-The caller incentive is a percentage of the debt and is capped at 100%. A roll requires the borrower to have exactly
-one activated Midnight collateral, matching the collateral token of the configured Blue market.
+The caller incentive is a percentage of the debt and is capped at 100%; the start timestamp and incentive are shared
+across every leg of a given roll. Each leg's target collateral must be activated on the Midnight position, must not
+repeat another leg's collateral, and must match the collateral token of its configured Blue market.
 
 ### `EcrecoverAuthorizer`
 
