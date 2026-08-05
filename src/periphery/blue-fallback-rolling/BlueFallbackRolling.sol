@@ -28,17 +28,41 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
     }
 
     /// @param start The start time of the rolling period.
-    /// @param incentive The caller incentive as a WAD-scaled percentage of the debt rolled.
+    /// @param incentiveAtStart The caller incentive at `start`, as a WAD-scaled percentage of the debt rolled.
+    /// @param incentiveAtMaturity The caller incentive at the Midnight market's maturity, as a WAD-scaled percentage of
+    /// the debt rolled. The incentive is auctioned off between the two: see `incentive`.
     /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
-    function setConfig(bytes32 midnightId, bytes32 blueId, uint64 start, uint64 incentive, bool enabled)
-        external
+    function setConfig(
+        bytes32 midnightId,
+        bytes32 blueId,
+        uint64 start,
+        uint64 incentiveAtStart,
+        uint64 incentiveAtMaturity,
+        bool enabled
+    ) external override {
+        require(incentiveAtStart <= incentiveAtMaturity, IncentiveNotIncreasing());
+        require(incentiveAtMaturity <= WAD, IncentiveTooHigh());
+
+        isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, incentiveAtStart, incentiveAtMaturity))] =
+            enabled;
+
+        emit SetConfig(msg.sender, midnightId, blueId, start, incentiveAtStart, incentiveAtMaturity, enabled);
+    }
+
+    /// @notice The caller incentive at the current timestamp, as a WAD-scaled percentage of the debt rolled.
+    /// @dev The incentive is auctioned off: it grows linearly from `incentiveAtStart` at `start` to
+    /// `incentiveAtMaturity` at `maturity`, and stays at `incentiveAtMaturity` afterwards.
+    function incentive(uint64 start, uint256 maturity, uint64 incentiveAtStart, uint64 incentiveAtMaturity)
+        public
+        view
         override
+        returns (uint256)
     {
-        require(incentive <= WAD, IncentiveTooHigh());
-
-        isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, incentive))] = enabled;
-
-        emit SetConfig(msg.sender, midnightId, blueId, start, incentive, enabled);
+        if (block.timestamp >= maturity) return incentiveAtMaturity;
+        if (block.timestamp <= start) return incentiveAtStart;
+        // Round in favor of the borrower.
+        return incentiveAtStart
+            + UtilsLib.mulDivDown(incentiveAtMaturity - incentiveAtStart, block.timestamp - start, maturity - start);
     }
 
     function roll(
@@ -46,12 +70,16 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         MarketParams memory blueMarketParams,
         address user,
         uint64 start,
-        uint64 incentive,
+        uint64 incentiveAtStart,
+        uint64 incentiveAtMaturity,
         uint256 assets
     ) external override {
         bytes32 midnightId = IdLib.toId(midnightMarket);
         bytes32 blueId = Id.unwrap(blueMarketParams.id());
-        require(isConfig[user][keccak256(abi.encode(midnightId, blueId, start, incentive))], NotConfigured());
+        require(
+            isConfig[user][keccak256(abi.encode(midnightId, blueId, start, incentiveAtStart, incentiveAtMaturity))],
+            NotConfigured()
+        );
         require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
         require(block.timestamp >= start, NotStarted());
         uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
@@ -66,7 +94,9 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
             .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
         // Round in favor of the borrower.
-        uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentive, WAD);
+        uint256 incentiveAssets = UtilsLib.mulDivDown(
+            assets, incentive(start, midnightMarket.maturity, incentiveAtStart, incentiveAtMaturity), WAD
+        );
 
         emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
 
