@@ -27,7 +27,9 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
+    /// @param start The start time of the rolling period.
     /// @param incentive The caller incentive as a WAD-scaled percentage of the debt rolled.
+    /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
     function setConfig(bytes32 midnightId, bytes32 blueId, uint64 start, uint64 incentive, bool enabled)
         external
         override
