@@ -195,11 +195,18 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
         otherContrib = ghostMulDivDown(ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()), otherLltv, WAD());
     }
 
-    // Exactly the market's collaterals [0, globalMarketCollateralLength) are activated, so liquidate's bitmap
-    // maxDebt loop (Midnight.sol:645) ranges over the same indices as the array-based maxRepaidFor /
-    // isHealthyNoBitmap. Covers both the single- and two-collateral markets.
+    // The activated collaterals are exactly [0, globalMarketCollateralLength), so liquidate's bitmap maxDebt /
+    // badDebt loop (Midnight.sol:645) ranges over the same indices as the array-based maxRepaidFor /
+    // isHealthyNoBitmap. Pinned with ground facts per index (no ghost-bounded quantifier, which the solver would
+    // not instantiate at the loop's concrete bits) for each supported market size.
     uint128 bitmap = collateralBitmap(globalId, borrower);
-    require forall uint256 bit. summaryGetBit(bitmap, bit) <=> bit < globalMarketCollateralLength, "exactly the market's collaterals are activated";
+    require summaryGetBit(bitmap, 0), "collateral 0 is activated";
+    if (globalMarketCollateralLength == 2) {
+        require summaryGetBit(bitmap, 1), "collateral 1 is activated (two-collateral market)";
+        require forall uint256 otherBit. otherBit != 0 && otherBit != 1 => !summaryGetBit(bitmap, otherBit), "only the two collaterals are activated";
+    } else {
+        require forall uint256 otherBit. otherBit != 0 => !summaryGetBit(bitmap, otherBit), "single-collateral: only collateral 0 is activated";
+    }
 
     // Seized collateral (Midnight.sol:692) does not exceed the position collateral (Midnight.sol:708 subtraction).
     require collatBefore >= ghostMulDivDown(ghostMulDivDown(repaidUnits, lif, WAD()), ORACLE_PRICE_SCALE(), price), "seized <= collateral";
