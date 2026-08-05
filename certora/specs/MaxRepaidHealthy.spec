@@ -171,7 +171,6 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     require lltv < WAD(), "RCF is active only for lltv < WAD (Midnight.sol:695)";
     require lif * lltv <= 999 * 10 ^ 15 * WAD(), "maxLif * lltv <= 0.999 * WAD^2: RCF denominator positive (Midnight.sol:698)";
     require price > 0, "positive liquidated-collateral price";
-    require repaidUnits < debtBefore, "maxRepaid < debt case (no debt underflow at Midnight.sol:714)";
 
     // No-overflow regime (Midnight LIVENESS: liquidate can revert on overflow). Every checked product in
     // liquidate's maxDebt / badDebt / seize / RCF computations stays within 256 bits, and every maxLif

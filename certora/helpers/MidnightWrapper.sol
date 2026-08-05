@@ -33,7 +33,9 @@ contract MidnightWrapper is Midnight {
 
     /* maxRepaidFor recomputes the RCF cap of Midnight.liquidate (see src/Midnight.sol:699) through a
      * bitmap-free, array-based code path. maxDebt is summed exactly as in isHealthyNoBitmap and the
-     * liquidate bad-debt loop, then the L699 mulDivUp is applied with lif = maxLif (normal mode).
+     * liquidate bad-debt loop, then the L699 mulDivUp is applied with lif = maxLif (normal mode). The result
+     * is clamped to the debt: a liquidator can never repay more than the outstanding debt, so the returned
+     * cap is always <= debt by construction (which is why the rule needs no separate repaid <= debt bound).
      * Expects the position to be unhealthy (debt > maxDebt) so that debt - maxDebt does not underflow. */
     function maxRepaidFor(Market memory market, bytes32 id, uint256 collateralIndex, address borrower)
         public
@@ -54,7 +56,8 @@ contract MidnightWrapper is Midnight {
         CollateralParams memory liquidatedParam = market.collateralParams[collateralIndex];
         uint256 lltv = liquidatedParam.lltv;
         uint256 lif = maxLif(lltv, liquidatedParam.liquidationCursor);
-        return (debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv);
+        uint256 maxRepaid = (debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv);
+        return UtilsLib.min(maxRepaid, debt);
     }
 
     /* badDebtFor recomputes the badDebt of Midnight.liquidate (see src/Midnight.sol:643-655) through a
