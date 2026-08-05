@@ -26,8 +26,11 @@ The factory records callbacks in `callbackOf` and `isBlueCallback`.
 Permissionlessly refinances a borrower's Midnight debt into one or more user-selected Morpho Blue markets once the
 Midnight market reaches the configured start timestamp. A roll processes one leg per activated Midnight collateral to
 migrate, each leg supplying that collateral to its own Blue market through a callback, borrowing against it to repay
-Midnight, and rewarding the caller from the additional Blue borrow. Legs may migrate all debt and collateral or a
-proportional partial amount, and a single roll can target any subset of the borrower's activated collaterals.
+Midnight, and rewarding the caller from the additional Blue borrow. A roll must include every one of the borrower's
+activated collaterals, and the caller cannot skew the mix moved between them: every leg withdraws the same WAD-scaled
+`fraction` of its own Midnight collateral, so a roll can only choose how much of the position to close (from a
+proportional partial amount up to a full drain), never which collaterals move or the relative amounts moved across
+them. The debt being closed is split evenly across legs by count.
 
 Users may enable multiple fallback configurations per Midnight market and must authorize the contract on both Midnight
 and Blue. Each configuration selects a Blue market, start timestamp, and caller incentive, and can later be disabled.

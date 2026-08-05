@@ -9,16 +9,17 @@ import {Market} from "../../interfaces/IMidnight.sol";
 struct CollateralRoll {
     uint256 collateralIndex;
     MarketParams blueMarketParams;
-    uint256 assets;
 }
 
 interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     /// ERRORS ///
     error DuplicateCollateralIndex();
+    error FractionTooHigh();
     error IncentiveTooHigh();
     error IncorrectActivatedCollateral();
     error InconsistentCollateralToken();
     error InconsistentLoanToken();
+    error MissingCollateralLeg();
     error NoCollateralLegs();
     error NotBlue();
     error NotConfigured();
@@ -55,6 +56,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         address user,
         uint64 start,
         uint64 incentive,
+        uint256 fraction,
         CollateralRoll[] memory legs
     ) external;
 }

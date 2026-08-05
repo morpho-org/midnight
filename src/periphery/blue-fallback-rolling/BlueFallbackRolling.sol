@@ -40,20 +40,29 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
     }
 
     /// @dev Each leg targets one of the user's activated Midnight collaterals and rolls it into its own Blue market.
-    /// @dev Rolling more than one collateral in the same debt-repayment ratio requires reading the Midnight debt
-    /// afresh for every leg, since earlier legs already repaid part of it: to fully drain a multi-collateral
-    /// position in one call, order legs so the last leg's assets equal whatever debt remains at that point.
-    function roll(Market memory midnightMarket, address user, uint64 start, uint64 incentive, CollateralRoll[] memory legs)
-        external
-        override
-    {
+    /// @dev `fraction` is a single WAD-scaled fraction of the position applied identically to every leg: each leg
+    /// withdraws that same fraction of its own Midnight collateral, so the caller can only choose how much of the
+    /// position to close, never the relative amounts moved between collaterals. Legs must cover every activated
+    /// collateral, so the caller cannot choose a subset either. The debt being closed is split evenly by leg count
+    /// so that no single leg's borrow depends on another leg's execution.
+    function roll(
+        Market memory midnightMarket,
+        address user,
+        uint64 start,
+        uint64 incentive,
+        uint256 fraction,
+        CollateralRoll[] memory legs
+    ) external override {
         require(legs.length > 0, NoCollateralLegs());
         require(block.timestamp >= start, NotStarted());
+        require(fraction <= WAD, FractionTooHigh());
 
         bytes32 midnightId = IdLib.toId(midnightMarket);
         uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
         uint128 seenBitmap;
         uint256 totalIncentiveAssets;
+        // Round in favor of the Midnight position.
+        uint256 assetsPerLeg = IMidnight(MIDNIGHT).debt(midnightId, user).mulDivDown(fraction, WAD) / legs.length;
 
         for (uint256 i; i < legs.length; ++i) {
             CollateralRoll memory leg = legs[i];
@@ -73,18 +82,21 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             );
 
             // Round in favor of the Midnight position.
-            uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
-                .mulDivDown(leg.assets, IMidnight(MIDNIGHT).debt(midnightId, user));
+            uint256 collateralAssets =
+                IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex).mulDivDown(fraction, WAD);
             // Round in favor of the borrower.
-            uint256 incentiveAssets = UtilsLib.mulDivDown(leg.assets, incentive, WAD);
+            uint256 incentiveAssets = UtilsLib.mulDivDown(assetsPerLeg, incentive, WAD);
             totalIncentiveAssets += incentiveAssets;
 
-            emit Roll(msg.sender, user, midnightId, blueId, leg.assets, collateralAssets, incentiveAssets);
+            emit Roll(msg.sender, user, midnightId, blueId, assetsPerLeg, collateralAssets, incentiveAssets);
 
-            bytes memory data =
-                abi.encode(midnightMarket, leg.blueMarketParams, collateralIndex, leg.assets, incentiveAssets, user);
+            bytes memory data = abi.encode(
+                midnightMarket, leg.blueMarketParams, collateralIndex, assetsPerLeg, incentiveAssets, user
+            );
             IMorpho(BLUE).supplyCollateral(leg.blueMarketParams, collateralAssets, user, data);
         }
+
+        require(seenBitmap == collateralBitmap, MissingCollateralLeg());
 
         if (totalIncentiveAssets > 0) {
             SafeTransferLib.safeTransfer(midnightMarket.loanToken, msg.sender, totalIncentiveAssets);
