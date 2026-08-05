@@ -137,7 +137,7 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrower, address receiver, address callback, bytes data) {
     Midnight.Market globalMarket = getGlobalMarket();
 
-    require globalMarketCollateralLength == 2, "two-collateral market";
+    require globalMarketCollateralLength == 1 || globalMarketCollateralLength == 2, "single- or two-collateral market";
 
     // No bad debt is realized, so liquidate does not reduce _position.debt before the RCF cap at
     // Midnight.sol:699 and maxRepaidFor reproduces that cap from the same debt (Rocq assumes no bad debt).
@@ -150,12 +150,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // first disjunct of the RCF check at Midnight.sol:700-705, independently of the dust waiver.
     uint256 repaidUnits = maxRepaidFor(globalMarket, globalId, collateralIndex, borrower);
 
-    // maxRepaidFor's non-reverting collateral lookup establishes collateralIndex < 2.
-    uint256 otherIndex = assert_uint256(1 - collateralIndex);
-    uint256 otherCollatBefore = collateral(globalId, borrower, otherIndex);
-    uint256 otherLltv = globalMarketCollateralLLTV[otherIndex];
-    uint256 otherPrice = summaryPrice(globalMarket.collateralParams[otherIndex].oracle);
-
+    // maxRepaidFor's non-reverting collateral lookup establishes collateralIndex < globalMarketCollateralLength.
     uint256 lltv = globalMarketCollateralLLTV[collateralIndex];
     uint256 lif = maxLifGhost(lltv, globalMarketCollateralLiquidationCursor[collateralIndex]);
     uint256 price = summaryPrice(globalMarket.collateralParams[collateralIndex].oracle);
@@ -175,23 +170,36 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // No-overflow regime (Midnight LIVENESS: liquidate can revert on overflow). Every checked product in
     // liquidate's maxDebt / badDebt / seize / RCF computations stays within 256 bits, and every maxLif
     // denominator is positive, so no summarized mulDiv takes its overflow / d == 0 revert branch.
-    uint256 maxLifOther = maxLifGhost(otherLltv, globalMarketCollateralLiquidationCursor[otherIndex]);
-    require lif > 0 && maxLifOther > 0, "positive maxLif per collateral (created-market invariant)";
+    require lif > 0, "positive maxLif for the liquidated collateral (created-market invariant)";
     require lif <= 2 * WAD(), "maxLif <= 2 * WAD (Midnight.sol:810)";
     require collatBefore * price + ORACLE_PRICE_SCALE() <= max_uint256, "collateral value (index) fits 256 bits";
-    require otherCollatBefore * otherPrice + ORACLE_PRICE_SCALE() <= max_uint256, "collateral value (other) fits 256 bits";
     require ghostMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE()) * lltv <= max_uint256, "maxDebt term (index) fits 256 bits";
-    require ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()) * otherLltv <= max_uint256, "maxDebt term (other) fits 256 bits";
     require ghostMulDivUp(collatBefore, price, ORACLE_PRICE_SCALE()) * WAD() + lif <= max_uint256, "badDebt term (index) fits 256 bits";
-    require ghostMulDivUp(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()) * WAD() + maxLifOther <= max_uint256, "badDebt term (other) fits 256 bits";
     require repaidUnits * lif <= max_uint256, "maxSeizedValue product fits 256 bits";
     require ghostMulDivDown(repaidUnits, lif, WAD()) * ORACLE_PRICE_SCALE() <= max_uint256, "seized value fits 256 bits";
 
-    // Both collaterals are activated, so liquidate's bitmap maxDebt loop (Midnight.sol:645) sums the same two
-    // terms as the array-based maxRepaidFor / isHealthyNoBitmap; this keeps the two-collateral scope.
+    // The other collateral's contribution to maxDebt exists only in a two-collateral market (the Rocq
+    // otherCollatContribution); in a single-collateral market it is 0. Its no-overflow bounds are needed only
+    // when liquidate's loop actually visits that collateral.
+    uint256 otherContrib = 0;
+    if (globalMarketCollateralLength == 2) {
+        uint256 otherIndex = assert_uint256(1 - collateralIndex);
+        uint256 otherCollatBefore = collateral(globalId, borrower, otherIndex);
+        uint256 otherLltv = globalMarketCollateralLLTV[otherIndex];
+        uint256 otherPrice = summaryPrice(globalMarket.collateralParams[otherIndex].oracle);
+        uint256 maxLifOther = maxLifGhost(otherLltv, globalMarketCollateralLiquidationCursor[otherIndex]);
+        require maxLifOther > 0, "positive maxLif for the other collateral (created-market invariant)";
+        require otherCollatBefore * otherPrice + ORACLE_PRICE_SCALE() <= max_uint256, "collateral value (other) fits 256 bits";
+        require ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()) * otherLltv <= max_uint256, "maxDebt term (other) fits 256 bits";
+        require ghostMulDivUp(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()) * WAD() + maxLifOther <= max_uint256, "badDebt term (other) fits 256 bits";
+        otherContrib = ghostMulDivDown(ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()), otherLltv, WAD());
+    }
+
+    // Exactly the market's collaterals [0, globalMarketCollateralLength) are activated, so liquidate's bitmap
+    // maxDebt loop (Midnight.sol:645) ranges over the same indices as the array-based maxRepaidFor /
+    // isHealthyNoBitmap. Covers both the single- and two-collateral markets.
     uint128 bitmap = collateralBitmap(globalId, borrower);
-    require summaryGetBit(bitmap, 0) && summaryGetBit(bitmap, 1), "both collaterals activated";
-    require forall uint256 otherBit. otherBit != 0 && otherBit != 1 => !summaryGetBit(bitmap, otherBit), "only the two collaterals activated";
+    require forall uint256 bit. summaryGetBit(bitmap, bit) <=> bit < globalMarketCollateralLength, "exactly the market's collaterals are activated";
 
     // Seized collateral (Midnight.sol:692) does not exceed the position collateral (Midnight.sol:708 subtraction).
     require collatBefore >= ghostMulDivDown(ghostMulDivDown(repaidUnits, lif, WAD()), ORACLE_PRICE_SCALE(), price), "seized <= collateral";
@@ -237,8 +245,6 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // repaidUnits is ceil(gap * WAD^2 / (WAD^2 - lif * lltv)). The two rounding facts below imply
     // maxDebtDropBound <= repaidUnits - gap. Therefore the new max debt falls by no more than the amount
     // repaid in excess of the old health gap.
-    uint256 otherCollatValue = ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE());
-    uint256 otherContrib = ghostMulDivDown(otherCollatValue, otherLltv, WAD());
     uint256 maxDebtBefore = require_uint256(curContrib + otherContrib);
 
     // Safe: maxRepaidFor's non-reverting subtraction establishes debtBefore >= maxDebtBefore.
