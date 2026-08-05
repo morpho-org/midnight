@@ -58,7 +58,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint256 maxLtv,
         uint256 assets
     ) external override {
-        require(maxLtv < blueMarketParams.lltv, InvalidMaxLtv());
+        require(maxLtv <= blueMarketParams.lltv, InvalidMaxLtv());
         bytes32 midnightId = IdLib.toId(midnightMarket);
         bytes32 blueId = Id.unwrap(blueMarketParams.id());
         require(isConfig[user][keccak256(abi.encode(midnightId, blueId, start, incentive, maxLtv))], NotConfigured());
