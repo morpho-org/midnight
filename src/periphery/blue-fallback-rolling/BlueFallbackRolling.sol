@@ -37,7 +37,9 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
+    /// @param start The start time of the rolling window.
     /// @param incentive The caller incentive as a WAD-scaled percentage of the debt rolled.
+    /// @param maxLtv The maximum LTV allowed for the Blue position after the roll.
     function setConfig(bytes32 midnightId, bytes32 blueId, uint64 start, uint64 incentive, uint256 maxLtv, bool enabled)
         external
         override
