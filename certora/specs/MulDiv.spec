@@ -160,6 +160,11 @@ rule mathMulDivMonotoneD(mathint a, mathint b, mathint d1, mathint d2) {
     assert a >= 0 && b >= 0 && 0 < d1 && d1 <= d2 => mathMulDivUp(a, b, d1) >= mathMulDivUp(a, b, d2);
 }
 
+rule mathMulDivMonotoneBD(mathint a, mathint b1, mathint b2, mathint d1, mathint d2) {
+    assert a >= 0 && b1 >= 0 && b2 >= 0 && d1 > 0 && d2 > 0 && b1 * d2 <= d1 * b2 => mathMulDivDown(a, b1, d1) <= mathMulDivDown(a, b2, d2);
+    assert a >= 0 && b1 >= 0 && b2 >= 0 && d1 > 0 && d2 > 0 && b1 * d2 <= d1 * b2 => mathMulDivUp(a, b1, d1) <= mathMulDivUp(a, b2, d2);
+}
+
 // 1-Lipschitz in the first argument when b <= d: the result cannot grow faster than the numerator a.
 rule mathMulDivLipschitzA(mathint a1, mathint a2, mathint b, mathint d) {
     assert a1 >= 0 && b >= 0 && b <= d && a1 <= a2 => mathMulDivDown(a2, b, d) - mathMulDivDown(a1, b, d) <= a2 - a1;
