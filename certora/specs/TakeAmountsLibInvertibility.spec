@@ -62,14 +62,14 @@ function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (d == 0 || a * b >= 2 ^ 256) {
         revert();
     }
-    return assert_uint256(ghostMulDivDown(a, b, d));
+    return require_uint256(ghostMulDivDown(a, b, d));
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (d == 0 || a * b + d - 1 >= 2 ^ 256) {
         revert();
     }
-    return assert_uint256(ghostMulDivUp(a, b, d));
+    return require_uint256(ghostMulDivUp(a, b, d));
 }
 
 /// TAKE AMOUNTS LIB INVERTIBILITY ///
