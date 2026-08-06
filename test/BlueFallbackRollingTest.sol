@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {IMorpho, Id, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
-import {Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {BlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/BlueFallbackRolling.sol";
 import {IBlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/IBlueFallbackRolling.sol";
@@ -43,8 +43,6 @@ contract BlueFallbackRollingTest is BaseTest {
         });
         blue.createMarket(blueMarketParams);
 
-        fallbackContract = new BlueFallbackRolling(address(midnight), address(blue));
-
         midnightMarket.loanToken = address(loanToken);
         midnightMarket.chainId = block.chainid;
         midnightMarket.midnight = address(midnight);
@@ -70,26 +68,44 @@ contract BlueFallbackRollingTest is BaseTest {
         midnightMarket.collateralParams = sortCollateralParams(midnightMarket.collateralParams);
         blueCollateralIndex = midnightMarket.collateralParams[0].token == address(collateralToken1) ? 0 : 1;
 
+        // The Midnight market must be final before the rolling contract is deployed, since its id is immutable.
+        fallbackContract = newFallbackContract(blueMarketParams, start, INCENTIVE);
+
         collateralize(midnightMarket, borrower, DEBT, blueCollateralIndex);
         setupMarket(midnightMarket, DEBT);
 
         deal(address(loanToken), address(this), 2 * DEBT);
         loanToken.approve(address(blue), type(uint256).max);
         blue.supply(blueMarketParams, 2 * DEBT, 0, lender, hex"");
+    }
+
+    /// @dev Deploys a rolling contract for the current Midnight market and authorizes it for the borrower.
+    function newFallbackContract(MarketParams memory _blueMarketParams, uint64 _start, uint64 _incentive)
+        internal
+        returns (BlueFallbackRolling)
+    {
+        BlueFallbackRolling newContract = new BlueFallbackRolling(
+            address(midnight),
+            address(blue),
+            toId(midnightMarket),
+            Id.unwrap(_blueMarketParams.id()),
+            _start,
+            _incentive
+        );
 
         vm.prank(borrower);
-        midnight.setIsAuthorized(address(fallbackContract), true, borrower);
+        midnight.setIsAuthorized(address(newContract), true, borrower);
         vm.prank(borrower);
-        blue.setAuthorization(address(fallbackContract), true);
-        vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, true);
+        blue.setAuthorization(address(newContract), true);
+
+        return newContract;
     }
 
     function testAnyoneCanRollBorrowerToBlue() public {
         uint256 midnightCollateral = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
 
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
+        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, DEBT);
 
         uint256 incentiveAssets = DEBT * INCENTIVE / WAD;
         assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
@@ -106,7 +122,7 @@ contract BlueFallbackRollingTest is BaseTest {
         uint256 collateralAssets = totalCollateralAssets * debtAssets / DEBT;
 
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, debtAssets);
+        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, debtAssets);
 
         uint256 incentiveAssets = debtAssets * INCENTIVE / WAD;
         assertEq(midnight.debt(toId(midnightMarket), borrower), DEBT - debtAssets);
@@ -122,30 +138,38 @@ contract BlueFallbackRollingTest is BaseTest {
 
     function testCannotRollBeforeStart() public {
         uint64 futureStart = uint64(vm.getBlockTimestamp() + 1);
-        vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), futureStart, INCENTIVE, true);
+        BlueFallbackRolling futureContract = newFallbackContract(blueMarketParams, futureStart, INCENTIVE);
 
         vm.expectRevert(IBlueFallbackRolling.NotStarted.selector);
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, futureStart, INCENTIVE, DEBT);
+        futureContract.roll(midnightMarket, blueMarketParams, borrower, DEBT);
     }
 
-    function testRollRevertsForUnconfiguredBlueMarket() public {
+    function testRollRevertsForOtherBlueMarket() public {
         blueMarketParams.oracle = makeAddr("otherOracle");
 
-        vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
+        vm.expectRevert(IBlueFallbackRolling.InconsistentBlueMarket.selector);
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
+        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, DEBT);
+    }
+
+    function testRollRevertsForOtherMidnightMarket() public {
+        midnightMarket.maturity += 1;
+
+        vm.expectRevert(IBlueFallbackRolling.InconsistentMidnightMarket.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, DEBT);
     }
 
     function testRollRevertsForInconsistentLoanToken() public {
-        blueMarketParams.loanToken = makeAddr("otherLoanToken");
-        vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, true);
+        // The Blue market of the config has a loan token that differs from the Midnight one.
+        MarketParams memory otherBlueMarketParams = blueMarketParams;
+        otherBlueMarketParams.loanToken = makeAddr("otherLoanToken");
+        BlueFallbackRolling otherContract = newFallbackContract(otherBlueMarketParams, start, INCENTIVE);
 
         vm.expectRevert(IBlueFallbackRolling.InconsistentLoanToken.selector);
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
+        otherContract.roll(midnightMarket, otherBlueMarketParams, borrower, DEBT);
     }
 
     function testRollRevertsForMultipleActivatedCollaterals() public {
@@ -153,7 +177,7 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.expectRevert(IBlueFallbackRolling.IncorrectActivatedCollateral.selector);
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
+        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, DEBT);
     }
 
     function testRollRevertsWhenActivatedCollateralDoesNotMatchBlue() public {
@@ -165,7 +189,7 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.expectRevert(IBlueFallbackRolling.InconsistentCollateralToken.selector);
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
+        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, DEBT);
     }
 
     function testSupplyCollateralCallbackRevertsIfCallerIsNotBlue() public {
@@ -177,46 +201,48 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
-    function testSetConfig() public view {
-        assertTrue(fallbackContract.isConfig(borrower, configId(start, INCENTIVE)));
+    function testConstructor() public view {
+        assertEq(fallbackContract.MIDNIGHT(), address(midnight));
+        assertEq(fallbackContract.BLUE(), address(blue));
+        assertEq(fallbackContract.MIDNIGHT_ID(), toId(midnightMarket));
+        assertEq(fallbackContract.BLUE_ID(), Id.unwrap(blueMarketParams.id()));
+        assertEq(fallbackContract.START(), start);
+        assertEq(fallbackContract.INCENTIVE(), INCENTIVE);
     }
 
-    function testSetConfigRevertsForTooLargeIncentive() public {
-        uint64 incentive = MAX_INCENTIVE + 1;
-
+    function testConstructorRevertsForTooLargeIncentive() public {
         vm.expectRevert(IBlueFallbackRolling.IncentiveTooHigh.selector);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, incentive, true);
-    }
-
-    function testSetConfigAllowsOneIncentive() public {
-        vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, MAX_INCENTIVE, true);
-
-        assertTrue(fallbackContract.isConfig(borrower, configId(start, MAX_INCENTIVE)));
-    }
-
-    function testSetConfigCanDisable() public {
-        vm.prank(borrower);
-        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, INCENTIVE, false);
-
-        assertFalse(fallbackContract.isConfig(borrower, configId(start, INCENTIVE)));
-
-        vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, INCENTIVE, DEBT);
-    }
-
-    function testSetConfigDoesNotReplaceOtherConfig() public {
-        uint64 otherStart = start + 1;
-        vm.prank(borrower);
-        fallbackContract.setConfig(
-            toId(midnightMarket), Id.unwrap(blueMarketParams.id()), otherStart, MAX_INCENTIVE, true
+        new BlueFallbackRolling(
+            address(midnight),
+            address(blue),
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            MAX_INCENTIVE + 1
         );
-
-        assertTrue(fallbackContract.isConfig(borrower, configId(start, INCENTIVE)));
-        assertTrue(fallbackContract.isConfig(borrower, configId(otherStart, MAX_INCENTIVE)));
     }
 
-    function configId(uint64 _start, uint64 incentive) internal view returns (bytes32) {
-        return keccak256(abi.encode(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), _start, incentive));
+    function testConstructorAllowsOneIncentive() public {
+        BlueFallbackRolling maxIncentiveContract = newFallbackContract(blueMarketParams, start, MAX_INCENTIVE);
+
+        assertEq(maxIncentiveContract.INCENTIVE(), MAX_INCENTIVE);
+    }
+
+    function testRollRevertsWithoutBlueAuthorization() public {
+        vm.prank(borrower);
+        blue.setAuthorization(address(fallbackContract), false);
+
+        vm.expectRevert(bytes("unauthorized"));
+        vm.prank(keeper);
+        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, DEBT);
+    }
+
+    function testRollRevertsWithoutMidnightAuthorization() public {
+        vm.prank(borrower);
+        midnight.setIsAuthorized(address(fallbackContract), false, borrower);
+
+        vm.expectRevert(IMidnight.Unauthorized.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, DEBT);
     }
 }

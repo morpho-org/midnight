@@ -10,21 +10,14 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     /// ERRORS ///
     error IncentiveTooHigh();
     error IncorrectActivatedCollateral();
+    error InconsistentBlueMarket();
     error InconsistentCollateralToken();
     error InconsistentLoanToken();
+    error InconsistentMidnightMarket();
     error NotBlue();
-    error NotConfigured();
     error NotStarted();
 
     /// EVENTS ///
-    event SetConfig(
-        address indexed user,
-        bytes32 indexed midnightId,
-        bytes32 indexed blueId,
-        uint256 start,
-        uint256 incentive,
-        bool enabled
-    );
     event Roll(
         address indexed caller,
         address indexed user,
@@ -35,19 +28,15 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         uint256 incentiveAssets
     );
 
-    /// STORAGE GETTERS ///
+    /// IMMUTABLE GETTERS ///
     function MIDNIGHT() external view returns (address);
     function BLUE() external view returns (address);
-    function isConfig(address user, bytes32 configId) external view returns (bool);
+    function MIDNIGHT_ID() external view returns (bytes32);
+    function BLUE_ID() external view returns (bytes32);
+    function START() external view returns (uint64);
+    function INCENTIVE() external view returns (uint64);
 
     /// FUNCTIONS ///
-    function setConfig(bytes32 midnightId, bytes32 blueId, uint64 start, uint64 incentive, bool enabled) external;
-    function roll(
-        Market memory midnightMarket,
-        MarketParams memory blueMarketParams,
-        address user,
-        uint64 start,
-        uint64 incentive,
-        uint256 assets
-    ) external;
+    function roll(Market memory midnightMarket, MarketParams memory blueMarketParams, address user, uint256 assets)
+        external;
 }

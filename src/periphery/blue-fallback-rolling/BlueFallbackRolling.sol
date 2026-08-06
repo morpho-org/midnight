@@ -12,48 +12,52 @@ import {UtilsLib} from "../../libraries/UtilsLib.sol";
 import {IBlueFallbackRolling} from "./IBlueFallbackRolling.sol";
 import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 
-/// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
+/// @dev This contract rolls debt from a single Midnight market to a single Blue market, under fixed terms.
+/// @dev Users opt in by authorizing this contract on both Midnight and Blue, and opt out by revoking either
+/// authorization. There is no other configuration: because the terms are immutable, the authorization can only ever
+/// result in the roll defined by this contract.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
     using UtilsLib for uint128;
 
     address public immutable override MIDNIGHT;
     address public immutable override BLUE;
+    bytes32 public immutable override MIDNIGHT_ID;
+    bytes32 public immutable override BLUE_ID;
+    /// @dev The start time of the rolling period.
+    uint64 public immutable override START;
+    /// @dev The caller incentive as a WAD-scaled percentage of the debt rolled.
+    uint64 public immutable override INCENTIVE;
 
-    mapping(address user => mapping(bytes32 configId => bool)) public override isConfig;
+    /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
+    constructor(
+        address _midnight,
+        address _blue,
+        bytes32 _midnightId,
+        bytes32 _blueId,
+        uint64 _start,
+        uint64 _incentive
+    ) {
+        require(_incentive <= WAD, IncentiveTooHigh());
 
-    constructor(address _midnight, address _blue) {
         MIDNIGHT = _midnight;
         BLUE = _blue;
+        MIDNIGHT_ID = _midnightId;
+        BLUE_ID = _blueId;
+        START = _start;
+        INCENTIVE = _incentive;
     }
 
-    /// @param start The start time of the rolling period.
-    /// @param incentive The caller incentive as a WAD-scaled percentage of the debt rolled.
-    /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
-    function setConfig(bytes32 midnightId, bytes32 blueId, uint64 start, uint64 incentive, bool enabled)
+    function roll(Market memory midnightMarket, MarketParams memory blueMarketParams, address user, uint256 assets)
         external
         override
     {
-        require(incentive <= WAD, IncentiveTooHigh());
-
-        isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, incentive))] = enabled;
-
-        emit SetConfig(msg.sender, midnightId, blueId, start, incentive, enabled);
-    }
-
-    function roll(
-        Market memory midnightMarket,
-        MarketParams memory blueMarketParams,
-        address user,
-        uint64 start,
-        uint64 incentive,
-        uint256 assets
-    ) external override {
         bytes32 midnightId = IdLib.toId(midnightMarket);
         bytes32 blueId = Id.unwrap(blueMarketParams.id());
-        require(isConfig[user][keccak256(abi.encode(midnightId, blueId, start, incentive))], NotConfigured());
+        require(midnightId == MIDNIGHT_ID, InconsistentMidnightMarket());
+        require(blueId == BLUE_ID, InconsistentBlueMarket());
         require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
-        require(block.timestamp >= start, NotStarted());
+        require(block.timestamp >= START, NotStarted());
         uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
         require(UtilsLib.countBits(collateralBitmap) == 1, IncorrectActivatedCollateral());
         uint256 collateralIndex = UtilsLib.msb(collateralBitmap);
@@ -66,7 +70,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
             .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
         // Round in favor of the borrower.
-        uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentive, WAD);
+        uint256 incentiveAssets = UtilsLib.mulDivDown(assets, INCENTIVE, WAD);
 
         emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
 
