@@ -27,12 +27,12 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    function setConfig(Config memory config, bool enabled) external override {
+    function setConfig(bytes32 midnightId, bytes32 blueId, Config memory config, bool enabled) external override {
         require(config.incentive <= WAD, IncentiveTooHigh());
 
-        isConfig[msg.sender][keccak256(abi.encode(config))] = enabled;
+        isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, config))] = enabled;
 
-        emit SetConfig(msg.sender, config.midnightId, config.blueId, config.start, config.incentive, enabled);
+        emit SetConfig(msg.sender, midnightId, blueId, config.rollWindow, config.incentive, enabled);
     }
 
     function roll(
@@ -42,14 +42,16 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         Config memory config,
         uint256 assets
     ) external override {
-        // The ids must be derived from the markets given here, not merely trusted from `config`, so that a config
-        // cannot be reused to roll into a market it was not set up for.
-        require(IdLib.toId(midnightMarket) == config.midnightId, InconsistentMidnightId());
-        require(Id.unwrap(blueMarketParams.id()) == config.blueId, InconsistentBlueId());
-        require(isConfig[user][keccak256(abi.encode(config))], NotConfigured());
+        // The ids are derived from the markets given here, so a config cannot be reused to roll into a market it was
+        // not set up for.
+        bytes32 midnightId = IdLib.toId(midnightMarket);
+        bytes32 blueId = Id.unwrap(blueMarketParams.id());
+        require(isConfig[user][keccak256(abi.encode(midnightId, blueId, config))], NotConfigured());
         require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
-        require(block.timestamp >= config.start, NotStarted());
-        uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(config.midnightId, user);
+        require(
+            block.timestamp >= UtilsLib.zeroFloorSub(midnightMarket.maturity, config.rollWindow), RollWindowNotOpen()
+        );
+        uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
         require(UtilsLib.countBits(collateralBitmap) == 1, IncorrectActivatedCollateral());
         uint256 collateralIndex = UtilsLib.msb(collateralBitmap);
         require(
@@ -58,12 +60,12 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         );
 
         // Round in favor of the Midnight position.
-        uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(config.midnightId, user, collateralIndex)
-            .mulDivDown(assets, IMidnight(MIDNIGHT).debt(config.midnightId, user));
+        uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
+            .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
         // Round in favor of the borrower.
         uint256 incentiveAssets = UtilsLib.mulDivDown(assets, config.incentive, WAD);
 
-        emit Roll(msg.sender, user, config.midnightId, config.blueId, assets, collateralAssets, incentiveAssets);
+        emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
 
         bytes memory data = abi.encode(midnightMarket, blueMarketParams, collateralIndex, assets, incentiveAssets, user);
         IMorpho(BLUE).supplyCollateral(blueMarketParams, collateralAssets, user, data);
