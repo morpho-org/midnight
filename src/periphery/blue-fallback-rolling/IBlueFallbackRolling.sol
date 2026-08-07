@@ -4,9 +4,10 @@ pragma solidity >=0.5.0;
 
 import {IMorphoSupplyCollateralCallback} from "../../../lib/morpho-blue/src/interfaces/IMorphoCallbacks.sol";
 import {MarketParams} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {IRepayCallback} from "../../interfaces/ICallbacks.sol";
 import {Market} from "../../interfaces/IMidnight.sol";
 
-interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
+interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback, IRepayCallback {
     /// ERRORS ///
     error EndBeforeStart();
     error IncentiveNotIncreasing();
@@ -17,7 +18,9 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     error InconsistentLoanToken();
     error NotBlue();
     error NotConfigured();
+    error NotMidnight();
     error NotStarted();
+    error WrongRollerCallbackReturnValue();
 
     /// EVENTS ///
     event SetConfig(
@@ -63,7 +66,8 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         uint64 end,
         int256 incentiveAtStart,
         int256 incentiveAtEnd,
-        uint256 assets
+        uint256 assets,
+        bytes calldata data
     ) external;
     function incentive(uint64 start, uint64 end, int256 incentiveAtStart, int256 incentiveAtEnd)
         external

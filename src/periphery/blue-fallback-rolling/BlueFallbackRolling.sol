@@ -4,8 +4,9 @@ pragma solidity 0.8.34;
 
 import {IMorpho, Id, MarketParams} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {MarketParamsLib} from "../../../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
+import {IRepayCallback} from "../../interfaces/ICallbacks.sol";
 import {IMidnight, Market} from "../../interfaces/IMidnight.sol";
-import {WAD} from "../../libraries/ConstantsLib.sol";
+import {CALLBACK_SUCCESS, WAD} from "../../libraries/ConstantsLib.sol";
 import {IdLib} from "../../libraries/IdLib.sol";
 import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";
@@ -73,6 +74,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         return incentiveAtStart + (incentiveAtEnd - incentiveAtStart) * int256(elapsed) / int256(duration);
     }
 
+    /// @param data Arbitrary data passed back to the caller during the Midnight repayment, through its `onRepay`. It
+    /// must be empty for a caller that does not implement `IRepayCallback`, such as an EOA: no callback is then made.
     function roll(
         Market memory midnightMarket,
         MarketParams memory blueMarketParams,
@@ -81,7 +84,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint64 end,
         int256 incentiveAtStart,
         int256 incentiveAtEnd,
-        uint256 assets
+        uint256 assets,
+        bytes calldata data
     ) external override {
         bytes32 midnightId = IdLib.toId(midnightMarket);
         bytes32 blueId = Id.unwrap(blueMarketParams.id());
@@ -111,8 +115,9 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
 
         uint256 borrowAssets = incentiveAssets >= 0 ? assets + uint256(incentiveAssets) : assets;
-        bytes memory data = abi.encode(midnightMarket, blueMarketParams, collateralIndex, assets, borrowAssets, user);
-        IMorpho(BLUE).supplyCollateral(blueMarketParams, collateralAssets, user, data);
+        bytes memory blueData =
+            abi.encode(midnightMarket, blueMarketParams, collateralIndex, assets, borrowAssets, user, msg.sender, data);
+        IMorpho(BLUE).supplyCollateral(blueMarketParams, collateralAssets, user, blueData);
 
         if (incentiveAssets > 0) {
             SafeTransferLib.safeTransfer(midnightMarket.loanToken, msg.sender, uint256(incentiveAssets));
@@ -133,13 +138,39 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             uint256 collateralIndex,
             uint256 assets,
             uint256 borrowAssets,
-            address user
-        ) = abi.decode(data, (Market, MarketParams, uint256, uint256, uint256, address));
+            address user,
+            address caller,
+            bytes memory callerData
+        ) = abi.decode(data, (Market, MarketParams, uint256, uint256, uint256, address, address, bytes));
 
         IMorpho(BLUE).borrow(blueMarketParams, borrowAssets, 0, user, address(this));
         SafeApproveLib.forceApproveMax(midnightMarket.loanToken, MIDNIGHT);
-        IMidnight(MIDNIGHT).repay(midnightMarket, assets, user, address(0), hex"");
+        // Passing this contract as the repayment callback keeps it the payer, and lets it call the caller back. Without
+        // caller data, no callback is needed, so the repayment is made without one.
+        if (callerData.length > 0) {
+            IMidnight(MIDNIGHT).repay(midnightMarket, assets, user, address(this), abi.encode(caller, callerData));
+        } else {
+            IMidnight(MIDNIGHT).repay(midnightMarket, assets, user, address(0), hex"");
+        }
         IMidnight(MIDNIGHT).withdrawCollateral(midnightMarket, collateralIndex, collateralAssets, user, address(this));
         SafeApproveLib.forceApproveMax(blueMarketParams.collateralToken, BLUE);
+    }
+
+    /// @dev Forwards the Midnight repayment callback to the caller of `roll`, so that it can run its own logic within
+    /// the roll. This contract remains the payer of the repayment, so the caller is not expected to fund it.
+    function onRepay(bytes32 id, Market memory market, uint256 units, address onBehalf, bytes memory data)
+        external
+        override
+        returns (bytes32)
+    {
+        require(msg.sender == MIDNIGHT, NotMidnight());
+
+        (address caller, bytes memory callerData) = abi.decode(data, (address, bytes));
+        require(
+            IRepayCallback(caller).onRepay(id, market, units, onBehalf, callerData) == CALLBACK_SUCCESS,
+            WrongRollerCallbackReturnValue()
+        );
+
+        return CALLBACK_SUCCESS;
     }
 }
