@@ -28,41 +28,44 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
     }
 
     /// @param start The start time of the rolling period.
+    /// @param end The end time of the rolling period.
     /// @param incentiveAtStart The caller incentive at `start`, as a WAD-scaled percentage of the debt rolled.
-    /// @param incentiveAtMaturity The caller incentive at the Midnight market's maturity, as a WAD-scaled percentage of
-    /// the debt rolled. The incentive is auctioned off between the two: see `incentive`.
+    /// @param incentiveAtEnd The caller incentive at `end`, as a WAD-scaled percentage of the debt rolled. The
     /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
     function setConfig(
         bytes32 midnightId,
         bytes32 blueId,
         uint64 start,
+        uint64 end,
         uint64 incentiveAtStart,
-        uint64 incentiveAtMaturity,
+        uint64 incentiveAtEnd,
         bool enabled
     ) external override {
-        require(incentiveAtStart <= incentiveAtMaturity, IncentiveNotIncreasing());
-        require(incentiveAtMaturity <= WAD, IncentiveTooHigh());
+        require(start <= end, EndBeforeStart());
+        require(incentiveAtStart <= incentiveAtEnd, IncentiveNotIncreasing());
+        require(incentiveAtEnd <= WAD, IncentiveTooHigh());
 
-        isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, incentiveAtStart, incentiveAtMaturity))] =
+        isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd))] =
             enabled;
 
-        emit SetConfig(msg.sender, midnightId, blueId, start, incentiveAtStart, incentiveAtMaturity, enabled);
+        emit SetConfig(msg.sender, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, enabled);
     }
 
     /// @notice The caller incentive at the current timestamp, as a WAD-scaled percentage of the debt rolled.
-    /// @dev The incentive is auctioned off: it grows linearly from `incentiveAtStart` at `start` to
-    /// `incentiveAtMaturity` at `maturity`, and stays at `incentiveAtMaturity` afterwards.
-    function incentive(uint64 start, uint256 maturity, uint64 incentiveAtStart, uint64 incentiveAtMaturity)
+    /// @dev The incentive is auctioned off: it grows linearly from `incentiveAtStart` at `start` to `incentiveAtEnd` at
+    /// `end`, and stays at `incentiveAtEnd` afterwards.
+    function incentive(uint64 start, uint64 end, uint64 incentiveAtStart, uint64 incentiveAtEnd)
         public
         view
         override
         returns (uint256)
     {
-        if (block.timestamp >= maturity) return incentiveAtMaturity;
+        if (block.timestamp >= end) return incentiveAtEnd;
         if (block.timestamp <= start) return incentiveAtStart;
         // Round in favor of the borrower.
-        return incentiveAtStart
-            + UtilsLib.mulDivDown(incentiveAtMaturity - incentiveAtStart, block.timestamp - start, maturity - start);
+        return
+            incentiveAtStart
+                + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, end - start);
     }
 
     function roll(
@@ -70,14 +73,15 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         MarketParams memory blueMarketParams,
         address user,
         uint64 start,
+        uint64 end,
         uint64 incentiveAtStart,
-        uint64 incentiveAtMaturity,
+        uint64 incentiveAtEnd,
         uint256 assets
     ) external override {
         bytes32 midnightId = IdLib.toId(midnightMarket);
         bytes32 blueId = Id.unwrap(blueMarketParams.id());
         require(
-            isConfig[user][keccak256(abi.encode(midnightId, blueId, start, incentiveAtStart, incentiveAtMaturity))],
+            isConfig[user][keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd))],
             NotConfigured()
         );
         require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
@@ -94,9 +98,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
             .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
         // Round in favor of the borrower.
-        uint256 incentiveAssets = UtilsLib.mulDivDown(
-            assets, incentive(start, midnightMarket.maturity, incentiveAtStart, incentiveAtMaturity), WAD
-        );
+        uint256 incentiveAssets =
+            UtilsLib.mulDivDown(assets, incentive(start, end, incentiveAtStart, incentiveAtEnd), WAD);
 
         emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
 
