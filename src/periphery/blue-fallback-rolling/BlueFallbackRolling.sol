@@ -93,6 +93,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             blueMarketParams.collateralToken == midnightMarket.collateralParams[collateralIndex].token,
             InconsistentCollateralToken()
         );
+        require(midnightMarket.collateralParams[collateralIndex].lltv <= blueMarketParams.lltv, BlueLltvTooLow());
 
         // Round in favor of the Midnight position.
         uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)

@@ -8,6 +8,7 @@ import {Market} from "../../interfaces/IMidnight.sol";
 
 interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     /// ERRORS ///
+    error BlueLltvTooLow();
     error EndBeforeStart();
     error IncentiveNotIncreasing();
     error IncentiveTooHigh();
