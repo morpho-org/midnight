@@ -262,6 +262,17 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
+    function testCannotRollAfterEnd(uint256 elapsed) public {
+        elapsed = bound(elapsed, 1, 365 days);
+        vm.warp(end + elapsed);
+
+        vm.expectRevert(IBlueFallbackRolling.Ended.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+        );
+    }
+
     function testRollRevertsForUnconfiguredBlueMarket() public {
         blueMarketParams.oracle = makeAddr("otherOracle");
 

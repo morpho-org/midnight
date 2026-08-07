@@ -86,6 +86,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         );
         require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
         require(block.timestamp >= start, NotStarted());
+        require(block.timestamp <= end, Ended());
         uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
         require(UtilsLib.countBits(collateralBitmap) == 1, IncorrectActivatedCollateral());
         uint256 collateralIndex = UtilsLib.msb(collateralBitmap);
