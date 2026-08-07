@@ -7,7 +7,7 @@ import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
-import {TakeAmountsLib} from "../src/periphery/TakeAmountsLib.sol";
+import {TakeAmountsLib} from "../src/periphery/libraries/TakeAmountsLib.sol";
 
 contract TakeAmountsTest is BaseTest {
     using UtilsLib for uint256;

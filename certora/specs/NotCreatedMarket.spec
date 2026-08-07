@@ -15,9 +15,6 @@ methods {
     function tickSpacing(bytes32) external returns (uint8) envfree;
 
     // Over-approximate view functions.
-    function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
-    function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
-    function UtilsLib.mulDivUp(uint256, uint256, uint256) internal returns (uint256) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
@@ -83,3 +80,32 @@ strong invariant marketCollateralIsEmptyIfNotCreated(bytes32 id, address user, u
 
 strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
     !marketIsCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
+
+/// NOT CREATED MARKET BEHAVIOR RULES ///
+
+rule updatePositionViewIsZeroIfMarketNotCreated(env e, Midnight.Market market, bytes32 id, address user) {
+    require currentContract.marketState[id].tickSpacing == 0, "assume that the market is not created";
+
+    requireInvariant marketCreditIsEmptyIfNotCreated(id, user);
+    requireInvariant positionLastLossFactorIsEmptyIfNotCreated(id, user);
+    requireInvariant marketLossFactorIsEmptyIfNotCreated(id);
+    requireInvariant marketPendingFeeIsEmptyIfNotCreated(id, user);
+    requireInvariant marketLastContinuousFeeAccrualIsEmptyIfNotCreated(id, user);
+
+    uint128 newCredit;
+    uint128 newPendingFee;
+    uint128 accruedFee;
+    newCredit, newPendingFee, accruedFee = updatePositionView(e, market, id, user);
+
+    assert newCredit == 0;
+    assert newPendingFee == 0;
+    assert accruedFee == 0;
+}
+
+rule marketIsHealthyIfNotCreated(env e, Midnight.Market market, bytes32 id, address borrower) {
+    require currentContract.marketState[id].tickSpacing == 0, "assume that the market is not created";
+
+    requireInvariant marketDebtIsEmptyIfNotCreated(id, borrower);
+
+    assert isHealthy(e, market, id, borrower);
+}

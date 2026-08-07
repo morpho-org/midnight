@@ -23,6 +23,7 @@ Global invariants on positions, markets and accounting.
 - [`LossFactor.spec`](specs/LossFactor.spec) checks that only `liquidate` changes a market's loss factor, and only when bad debt is realized (total units decrease), and that `updatePosition` syncs the user's `lastLossFactor` to the market's.
   It also checks that the loss-factor arithmetic in `updatePosition` and `liquidate` does not revert on a created market.
 - [`UpdateBeforeCredit.spec`](specs/UpdateBeforeCredit.spec) checks that credit is never loaded or stored before `_updatePosition` has run for that position.
+- [`MarketNotReadBeforeCreated.spec`](specs/MarketNotReadBeforeCreated.spec) checks that no code path reads a non-empty market or position field before the market is created (its `tickSpacing` is still zero).
 
 ## Positions health and liquidation
 
