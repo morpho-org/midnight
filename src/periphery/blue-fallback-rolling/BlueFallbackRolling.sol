@@ -29,21 +29,25 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
 
     /// @param start The start time of the rolling period.
     /// @param end The end time of the rolling period.
-    /// @param incentiveAtStart The caller incentive at `start`, as a WAD-scaled percentage of the debt rolled.
+    /// @param incentiveAtStart The caller incentive at `start`, as a WAD-scaled percentage of the debt rolled. It must
+    /// be greater than or equal to `-WAD`: a negative incentive is a premium that the caller pays instead, which is
+    /// repaid on Blue on behalf of the user.
     /// @param incentiveAtEnd The caller incentive at `end`, as a WAD-scaled percentage of the debt rolled. The
+    /// incentive is auctioned off between the two: see `incentive`.
     /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
     function setConfig(
         bytes32 midnightId,
         bytes32 blueId,
         uint64 start,
         uint64 end,
-        uint64 incentiveAtStart,
-        uint64 incentiveAtEnd,
+        int256 incentiveAtStart,
+        int256 incentiveAtEnd,
         bool enabled
     ) external override {
         require(start <= end, EndBeforeStart());
+        require(incentiveAtStart >= -int256(WAD), IncentiveTooLow());
         require(incentiveAtStart <= incentiveAtEnd, IncentiveNotIncreasing());
-        require(incentiveAtEnd <= WAD, IncentiveTooHigh());
+        require(incentiveAtEnd <= int256(WAD), IncentiveTooHigh());
 
         isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd))] =
             enabled;
@@ -54,18 +58,19 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
     /// @notice The caller incentive at the current timestamp, as a WAD-scaled percentage of the debt rolled.
     /// @dev The incentive is auctioned off: it grows linearly from `incentiveAtStart` at `start` to `incentiveAtEnd` at
     /// `end`, and stays at `incentiveAtEnd` afterwards.
-    function incentive(uint64 start, uint64 end, uint64 incentiveAtStart, uint64 incentiveAtEnd)
+    function incentive(uint64 start, uint64 end, int256 incentiveAtStart, int256 incentiveAtEnd)
         public
         view
         override
-        returns (uint256)
+        returns (int256)
     {
         if (block.timestamp >= end) return incentiveAtEnd;
         if (block.timestamp <= start) return incentiveAtStart;
-        // Round in favor of the borrower.
-        return
-            incentiveAtStart
-                + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, end - start);
+        uint256 elapsed = block.timestamp - start;
+        uint256 duration = end - start;
+        // Round in favor of the borrower: the incentive increases over the auction, so the division truncates the
+        // interpolated growth downwards.
+        return incentiveAtStart + (incentiveAtEnd - incentiveAtStart) * int256(elapsed) / int256(duration);
     }
 
     function roll(
@@ -74,8 +79,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         address user,
         uint64 start,
         uint64 end,
-        uint64 incentiveAtStart,
-        uint64 incentiveAtEnd,
+        int256 incentiveAtStart,
+        int256 incentiveAtEnd,
         uint256 assets
     ) external override {
         bytes32 midnightId = IdLib.toId(midnightMarket);
@@ -97,15 +102,26 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         // Round in favor of the Midnight position.
         uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
             .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
-        // Round in favor of the borrower.
-        uint256 incentiveAssets =
-            UtilsLib.mulDivDown(assets, incentive(start, end, incentiveAtStart, incentiveAtEnd), WAD);
+        int256 incentiveWad = incentive(start, end, incentiveAtStart, incentiveAtEnd);
+        // Round in favor of the borrower: down when the caller is paid, up in magnitude when the caller pays.
+        int256 incentiveAssets = incentiveWad >= 0
+            ? int256(UtilsLib.mulDivDown(assets, uint256(incentiveWad), WAD))
+            : -int256(UtilsLib.mulDivUp(assets, uint256(-incentiveWad), WAD));
 
         emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
 
-        bytes memory data = abi.encode(midnightMarket, blueMarketParams, collateralIndex, assets, incentiveAssets, user);
+        uint256 borrowAssets = incentiveAssets >= 0 ? assets + uint256(incentiveAssets) : assets;
+        bytes memory data = abi.encode(midnightMarket, blueMarketParams, collateralIndex, assets, borrowAssets, user);
         IMorpho(BLUE).supplyCollateral(blueMarketParams, collateralAssets, user, data);
-        if (incentiveAssets > 0) SafeTransferLib.safeTransfer(midnightMarket.loanToken, msg.sender, incentiveAssets);
+
+        if (incentiveAssets > 0) {
+            SafeTransferLib.safeTransfer(midnightMarket.loanToken, msg.sender, uint256(incentiveAssets));
+        } else if (incentiveAssets < 0) {
+            uint256 premiumAssets = uint256(-incentiveAssets);
+            SafeTransferLib.safeTransferFrom(midnightMarket.loanToken, msg.sender, address(this), premiumAssets);
+            SafeApproveLib.forceApproveMax(blueMarketParams.loanToken, BLUE);
+            IMorpho(BLUE).repay(blueMarketParams, premiumAssets, 0, user, hex"");
+        }
     }
 
     function onMorphoSupplyCollateral(uint256 collateralAssets, bytes calldata data) external {
@@ -116,11 +132,11 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             MarketParams memory blueMarketParams,
             uint256 collateralIndex,
             uint256 assets,
-            uint256 incentiveAssets,
+            uint256 borrowAssets,
             address user
         ) = abi.decode(data, (Market, MarketParams, uint256, uint256, uint256, address));
 
-        IMorpho(BLUE).borrow(blueMarketParams, assets + incentiveAssets, 0, user, address(this));
+        IMorpho(BLUE).borrow(blueMarketParams, borrowAssets, 0, user, address(this));
         SafeApproveLib.forceApproveMax(midnightMarket.loanToken, MIDNIGHT);
         IMidnight(MIDNIGHT).repay(midnightMarket, assets, user, address(0), hex"");
         IMidnight(MIDNIGHT).withdrawCollateral(midnightMarket, collateralIndex, collateralAssets, user, address(this));

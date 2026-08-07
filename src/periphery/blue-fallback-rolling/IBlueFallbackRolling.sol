@@ -11,6 +11,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     error EndBeforeStart();
     error IncentiveNotIncreasing();
     error IncentiveTooHigh();
+    error IncentiveTooLow();
     error IncorrectActivatedCollateral();
     error InconsistentCollateralToken();
     error InconsistentLoanToken();
@@ -25,8 +26,8 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         bytes32 indexed blueId,
         uint256 start,
         uint256 end,
-        uint256 incentiveAtStart,
-        uint256 incentiveAtEnd,
+        int256 incentiveAtStart,
+        int256 incentiveAtEnd,
         bool enabled
     );
     event Roll(
@@ -36,7 +37,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         bytes32 blueId,
         uint256 debtAssets,
         uint256 collateralAssets,
-        uint256 incentiveAssets
+        int256 incentiveAssets
     );
 
     /// STORAGE GETTERS ///
@@ -50,8 +51,8 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         bytes32 blueId,
         uint64 start,
         uint64 end,
-        uint64 incentiveAtStart,
-        uint64 incentiveAtEnd,
+        int256 incentiveAtStart,
+        int256 incentiveAtEnd,
         bool enabled
     ) external;
     function roll(
@@ -60,12 +61,12 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         address user,
         uint64 start,
         uint64 end,
-        uint64 incentiveAtStart,
-        uint64 incentiveAtEnd,
+        int256 incentiveAtStart,
+        int256 incentiveAtEnd,
         uint256 assets
     ) external;
-    function incentive(uint64 start, uint64 end, uint64 incentiveAtStart, uint64 incentiveAtEnd)
+    function incentive(uint64 start, uint64 end, int256 incentiveAtStart, int256 incentiveAtEnd)
         external
         view
-        returns (uint256);
+        returns (int256);
 }
