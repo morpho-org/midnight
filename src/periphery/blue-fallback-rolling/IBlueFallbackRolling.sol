@@ -9,8 +9,8 @@ import {Market} from "../../interfaces/IMidnight.sol";
 interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     /// ERRORS ///
     error BlueLltvTooLow();
-    error EndBeforeStart();
     error Ended();
+    error EndNotAfterStart();
     error IncentiveNotIncreasing();
     error IncentiveTooHigh();
     error IncorrectActivatedCollateral();
@@ -66,8 +66,4 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         uint64 incentiveAtEnd,
         uint256 assets
     ) external;
-    function incentive(uint64 start, uint64 end, uint64 incentiveAtStart, uint64 incentiveAtEnd)
-        external
-        view
-        returns (uint256);
 }

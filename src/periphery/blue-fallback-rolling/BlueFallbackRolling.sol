@@ -41,7 +41,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint64 incentiveAtEnd,
         bool enabled
     ) external override {
-        require(start <= end, EndBeforeStart());
+        require(start < end, EndNotAfterStart());
         require(incentiveAtStart <= incentiveAtEnd, IncentiveNotIncreasing());
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
 
@@ -49,23 +49,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             enabled;
 
         emit SetConfig(msg.sender, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, enabled);
-    }
-
-    /// @notice The caller incentive at the current timestamp, as a WAD-scaled percentage of the debt rolled.
-    /// @dev The incentive is auctioned off: it grows linearly from `incentiveAtStart` at `start` to `incentiveAtEnd` at
-    /// `end`, and stays at `incentiveAtEnd` afterwards.
-    function incentive(uint64 start, uint64 end, uint64 incentiveAtStart, uint64 incentiveAtEnd)
-        public
-        view
-        override
-        returns (uint256)
-    {
-        if (block.timestamp >= end) return incentiveAtEnd;
-        if (block.timestamp <= start) return incentiveAtStart;
-        // Round in favor of the borrower.
-        return
-            incentiveAtStart
-                + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, end - start);
     }
 
     function roll(
@@ -99,9 +82,10 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         // Round in favor of the Midnight position.
         uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
             .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
-        // Round in favor of the borrower.
-        uint256 incentiveAssets =
-            UtilsLib.mulDivDown(assets, incentive(start, end, incentiveAtStart, incentiveAtEnd), WAD);
+        // The incentive grows linearly from `incentiveAtStart` at `start` to `incentiveAtEnd` at `end`.
+        uint256 incentiveFactor = incentiveAtStart
+            + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, end - start);
+        uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentiveFactor, WAD);
 
         emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
 
