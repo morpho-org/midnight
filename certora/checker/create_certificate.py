@@ -6,21 +6,27 @@ from web3 import Web3
 
 w3 = Web3()
 
+# Constants from src/ratifiers/libraries/HashLib.sol (checked against the type
+# strings in test/HashLibTest.sol by _check_typehashes below).
+COLLATERAL_PARAMS_TYPE = b"CollateralParams(address token,uint256 lltv,uint256 liquidationCursor,address oracle)"
+MARKET_TYPE = b"Market(uint256 chainId,address midnight,address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)"
+OFFER_TYPE = b"Offer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint128 maxUnits,uint128 maxAssets,uint256 continuousFeeCap)"
+
 COLLATERAL_PARAMS_TYPEHASH = bytes.fromhex(
-    "af44a88eb50ebdbbebd980e5a23045c44f61ece5f80ab708a1bbe8718102e6af"
+    "39ed3f928d24fd00574b1a02aba9c2483abcf5d9a3a366118c9a5aa29885b841"
 )
 MARKET_TYPEHASH = bytes.fromhex(
-    "358117e98511cc3df97175dca58053b06675b43ad090b0553f8a1eff008b6e2e"
+    "510b3862f3816a109c9340b76972e8a30984246be06e034ae12ed2934220391a"
 )
 OFFER_TYPEHASH = bytes.fromhex(
-    "980a4cfc9766df84667f316d76e10cefc8caf04fb4cd4a9fca00a8e7b34f619c"
+    "9905214264a9fb7b6cc1b0e33db7a04687c6e4185a84755d29914314aa9d8906"
 )
 
 # ABI signature for `Offer` matching src/interfaces/IMidnight.sol field order.
 OFFER_ABI_TYPE = (
     "("
-    "(address,(address,uint256,uint256,address)[],uint256,uint256,address,address),"
-    "bool,address,uint256,uint256,uint256,bytes32,address,bytes,address,address,bool,uint256,uint256"
+    "(uint256,address,address,(address,uint256,uint256,address)[],uint256,uint256,address,address),"
+    "bool,address,uint256,uint256,uint256,bytes32,address,bytes,address,address,bool,uint128,uint128,uint256"
     ")"
 )
 INTERNAL_NODE_ABI_TYPE = "(bytes32,bytes32,bytes32)"
@@ -46,16 +52,34 @@ def _keccak_abi(types, values):
     return w3.keccak(encode(types, values))
 
 
+# Pin the hardcoded typehashes to the EIP-712 type strings (mirrors test/HashLibTest.sol).
+def _check_typehashes():
+    _require(
+        w3.keccak(COLLATERAL_PARAMS_TYPE) == COLLATERAL_PARAMS_TYPEHASH,
+        "COLLATERAL_PARAMS_TYPEHASH does not match its type string",
+    )
+    _require(
+        w3.keccak(MARKET_TYPE + COLLATERAL_PARAMS_TYPE) == MARKET_TYPEHASH,
+        "MARKET_TYPEHASH does not match its type string",
+    )
+    _require(
+        w3.keccak(OFFER_TYPE + COLLATERAL_PARAMS_TYPE + MARKET_TYPE) == OFFER_TYPEHASH,
+        "OFFER_TYPEHASH does not match its type string",
+    )
+
+
 # Returns the abi-encoded form of an Offer, ready for `abi.decode(bytes, (Offer))`.
 def abi_encode_offer(o):
     m = o["market"]
     market = (
+        int(m["chainId"]),
+        w3.to_checksum_address(m["midnight"]),
         w3.to_checksum_address(m["loanToken"]),
         [
             (
                 w3.to_checksum_address(cp["token"]),
                 int(cp["lltv"]),
-                int(cp["maxLif"]),
+                int(cp["liquidationCursor"]),
                 w3.to_checksum_address(cp["oracle"]),
             )
             for cp in m["collateralParams"]
@@ -80,6 +104,7 @@ def abi_encode_offer(o):
         bool(o["reduceOnly"]),
         int(o["maxUnits"]),
         int(o["maxAssets"]),
+        int(o["continuousFeeCap"]),
     )
     return "0x" + encode([OFFER_ABI_TYPE], [offer]).hex()
 
@@ -96,7 +121,7 @@ def hash_collateral_params(cp):
             COLLATERAL_PARAMS_TYPEHASH,
             w3.to_checksum_address(cp["token"]),
             int(cp["lltv"]),
-            int(cp["maxLif"]),
+            int(cp["liquidationCursor"]),
             w3.to_checksum_address(cp["oracle"]),
         ],
     )
@@ -108,9 +133,21 @@ def hash_market(m):
     )
     collateral_params_hash = w3.keccak(collateral_params_hashes)
     return _keccak_abi(
-        ["bytes32", "address", "bytes32", "uint256", "uint256", "address", "address"],
+        [
+            "bytes32",
+            "uint256",
+            "address",
+            "address",
+            "bytes32",
+            "uint256",
+            "uint256",
+            "address",
+            "address",
+        ],
         [
             MARKET_TYPEHASH,
+            int(m["chainId"]),
+            w3.to_checksum_address(m["midnight"]),
             w3.to_checksum_address(m["loanToken"]),
             collateral_params_hash,
             int(m["maturity"]),
@@ -139,7 +176,8 @@ def hash_offer(o):
                 "address",
                 "address",
                 "bool",
-                "uint256",
+                "uint128",
+                "uint128",
                 "uint256",
             ],
             [
@@ -158,6 +196,7 @@ def hash_offer(o):
                 bool(o["reduceOnly"]),
                 int(o["maxUnits"]),
                 int(o["maxAssets"]),
+                int(o["continuousFeeCap"]),
             ],
         )
     )
@@ -214,6 +253,8 @@ def main():
     if len(sys.argv) != 2:
         print("usage: python create_certificate.py <proofs.json>", file=sys.stderr)
         sys.exit(2)
+
+    _check_typehashes()
 
     with open(sys.argv[1]) as f:
         proofs = json.load(f)

@@ -28,6 +28,7 @@ struct Leaf {
     bool reduceOnly;
     uint256 maxUnits;
     uint256 maxAssets;
+    uint256 continuousFeeCap;
 }
 
 contract OfferTree {
@@ -75,6 +76,7 @@ contract OfferTree {
         l.reduceOnly = offer.reduceOnly;
         l.maxUnits = offer.maxUnits;
         l.maxAssets = offer.maxAssets;
+        l.continuousFeeCap = offer.continuousFeeCap;
         n.hashNode = id;
     }
 
@@ -141,7 +143,8 @@ contract OfferTree {
                 l.ratifier,
                 l.reduceOnly,
                 l.maxUnits,
-                l.maxAssets
+                l.maxAssets,
+                l.continuousFeeCap
             )
         );
     }
