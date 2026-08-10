@@ -29,8 +29,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
 
     /// @param start The start time of the rolling period.
     /// @param end The end time of the rolling period.
-    /// @param incentiveAtStart The caller incentive at `start`, as a WAD-scaled percentage of the debt rolled.
-    /// @param incentiveAtEnd The caller incentive at `end`, as a WAD-scaled percentage of the debt rolled. The
     /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
     function setConfig(
         bytes32 midnightId,
