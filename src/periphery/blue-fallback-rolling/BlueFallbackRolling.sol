@@ -9,7 +9,13 @@ import {WAD} from "../../libraries/ConstantsLib.sol";
 import {IdLib} from "../../libraries/IdLib.sol";
 import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";
-import {IBlueFallbackRolling} from "./interfaces/IBlueFallbackRolling.sol";
+import {
+    IBlueFallbackRolling,
+    ConfigAuthorization,
+    Signature,
+    CONFIG_AUTHORIZATION_TYPEHASH,
+    EIP712_DOMAIN_TYPEHASH
+} from "./interfaces/IBlueFallbackRolling.sol";
 import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
@@ -21,6 +27,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
     address public immutable override BLUE;
 
     mapping(address user => mapping(bytes32 configId => bool)) public override isConfig;
+    mapping(address user => uint256) public override nonce;
 
     constructor(address _midnight, address _blue) {
         MIDNIGHT = _midnight;
@@ -40,16 +47,60 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint128 minRollableAssets,
         bool enabled
     ) external override {
+        _setConfig(
+            msg.sender, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets, enabled
+        );
+    }
+
+    function setConfigWithSig(ConfigAuthorization memory authorization, Signature memory signature) external override {
+        require(block.timestamp <= authorization.deadline, Expired());
+        require(authorization.nonce == nonce[authorization.user]++, InvalidNonce());
+
+        bytes32 hashStruct = keccak256(abi.encode(CONFIG_AUTHORIZATION_TYPEHASH, authorization));
+        bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+        address signer = ecrecover(digest, signature.v, signature.r, signature.s);
+        require(signer != address(0), InvalidSignature());
+        require(
+            signer == authorization.user || IMidnight(MIDNIGHT).isAuthorized(authorization.user, signer), Unauthorized()
+        );
+
+        emit SetConfigWithSig(msg.sender, authorization.user, authorization.nonce, signer);
+
+        _setConfig(
+            authorization.user,
+            authorization.midnightId,
+            authorization.blueId,
+            authorization.start,
+            authorization.end,
+            authorization.incentiveAtStart,
+            authorization.incentiveAtEnd,
+            authorization.minRollableAssets,
+            authorization.enabled
+        );
+    }
+
+    function _setConfig(
+        address user,
+        bytes32 midnightId,
+        bytes32 blueId,
+        uint64 start,
+        uint64 end,
+        uint64 incentiveAtStart,
+        uint64 incentiveAtEnd,
+        uint128 minRollableAssets,
+        bool enabled
+    ) internal {
         require(start < end, EndNotAfterStart());
         require(incentiveAtStart <= WAD, IncentiveTooHigh());
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
 
         bytes32 configId =
             keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets));
-        isConfig[msg.sender][configId] = enabled;
+        isConfig[user][configId] = enabled;
 
         emit SetConfig(
-            msg.sender, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets, enabled
+            user, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets, enabled
         );
     }
 
