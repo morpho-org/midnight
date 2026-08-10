@@ -7,8 +7,16 @@ import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.
 import {Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {BlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/BlueFallbackRolling.sol";
-import {IBlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/IBlueFallbackRolling.sol";
+import {
+    IBlueFallbackRolling,
+    ConfigAuthorization,
+    Signature,
+    CONFIG_AUTHORIZATION_TYPEHASH
+} from "../src/periphery/blue-fallback-rolling/IBlueFallbackRolling.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
+
+bytes constant CONFIG_AUTHORIZATION_TYPE =
+    "ConfigAuthorization(address user,bytes32 midnightId,bytes32 blueId,uint64 start,uint64 end,uint64 incentiveAtStart,uint64 incentiveAtEnd,bool enabled,uint256 nonce,uint256 deadline)";
 
 contract BlueFallbackRollingTest is BaseTest {
     using MarketParamsLib for MarketParams;
@@ -460,6 +468,214 @@ contract BlueFallbackRollingTest is BaseTest {
 
         assertTrue(fallbackContract.isConfig(borrower, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END)));
         assertTrue(fallbackContract.isConfig(borrower, configId(otherStart, end, MAX_INCENTIVE, MAX_INCENTIVE)));
+    }
+
+    function testConfigAuthorizationTypeHash() public pure {
+        assertEq(CONFIG_AUTHORIZATION_TYPEHASH, keccak256(CONFIG_AUTHORIZATION_TYPE));
+    }
+
+    function testSetConfigWithSig() public {
+        uint64 otherEnd = end + 1;
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        Signature memory sig = signConfigAuthorization(auth, borrower);
+        assertFalse(
+            fallbackContract.isConfig(borrower, configId(start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END))
+        );
+
+        vm.expectEmit();
+        emit IBlueFallbackRolling.SetConfigWithSig(keeper, borrower, 0, borrower);
+        vm.expectEmit();
+        emit IBlueFallbackRolling.SetConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            otherEnd,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            true
+        );
+
+        // Relayed by a third party: the borrower never sends a transaction.
+        vm.prank(keeper);
+        fallbackContract.setConfigWithSig(auth, sig);
+
+        assertTrue(fallbackContract.isConfig(borrower, configId(start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END)));
+        assertEq(fallbackContract.nonce(borrower), 1);
+    }
+
+    function testSetConfigWithSigEnablesRoll() public {
+        uint64 otherEnd = end + 1;
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        fallbackContract.setConfigWithSig(auth, signConfigAuthorization(auth, borrower));
+        vm.warp(otherEnd);
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket, blueMarketParams, borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+        );
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
+        assertEq(loanToken.balanceOf(keeper), DEBT * INCENTIVE_AT_END / WAD);
+    }
+
+    function testSetConfigWithSigSignedByMidnightAuthorizedAddress() public {
+        vm.prank(borrower);
+        midnight.setIsAuthorized(lender, true, borrower);
+        uint64 otherEnd = end + 1;
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+
+        vm.expectEmit();
+        emit IBlueFallbackRolling.SetConfigWithSig(address(this), borrower, 0, lender);
+
+        fallbackContract.setConfigWithSig(auth, signConfigAuthorization(auth, lender));
+
+        assertTrue(fallbackContract.isConfig(borrower, configId(start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END)));
+    }
+
+    function testSetConfigWithSigCanDisable() public {
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, false);
+
+        fallbackContract.setConfigWithSig(auth, signConfigAuthorization(auth, borrower));
+
+        assertFalse(fallbackContract.isConfig(borrower, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END)));
+
+        vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+        );
+    }
+
+    function testSetConfigWithSigRevertsWhenExpired() public {
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        auth.deadline = vm.getBlockTimestamp() - 1;
+
+        vm.expectRevert(IBlueFallbackRolling.Expired.selector);
+        fallbackContract.setConfigWithSig(auth, signConfigAuthorization(auth, borrower));
+    }
+
+    function testSetConfigWithSigRevertsOnReplay() public {
+        uint64 otherEnd = end + 1;
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        Signature memory sig = signConfigAuthorization(auth, borrower);
+        fallbackContract.setConfigWithSig(auth, sig);
+
+        vm.expectRevert(IBlueFallbackRolling.InvalidNonce.selector);
+        fallbackContract.setConfigWithSig(auth, sig);
+    }
+
+    function testSetConfigWithSigRevertsForFutureNonce() public {
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        auth.nonce = 1;
+
+        vm.expectRevert(IBlueFallbackRolling.InvalidNonce.selector);
+        fallbackContract.setConfigWithSig(auth, signConfigAuthorization(auth, borrower));
+    }
+
+    function testSetConfigWithSigRevertsForUnauthorizedSigner() public {
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+
+        vm.expectRevert(IBlueFallbackRolling.Unauthorized.selector);
+        fallbackContract.setConfigWithSig(auth, signConfigAuthorization(auth, otherLender));
+    }
+
+    function testSetConfigWithSigRevertsForInvalidSignature() public {
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        Signature memory sig = signConfigAuthorization(auth, borrower);
+        // An out-of-range `v` makes ecrecover return the zero address.
+        sig.v = 0;
+
+        vm.expectRevert(IBlueFallbackRolling.InvalidSignature.selector);
+        fallbackContract.setConfigWithSig(auth, sig);
+    }
+
+    function testSetConfigWithSigRevertsForEndNotAfterStart() public {
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, start, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+
+        vm.expectRevert(IBlueFallbackRolling.EndNotAfterStart.selector);
+        fallbackContract.setConfigWithSig(auth, signConfigAuthorization(auth, borrower));
+    }
+
+    function testSetConfigWithSigRevertsForTooLargeIncentive() public {
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, end, INCENTIVE_AT_START, MAX_INCENTIVE + 1, true);
+
+        vm.expectRevert(IBlueFallbackRolling.IncentiveTooHigh.selector);
+        fallbackContract.setConfigWithSig(auth, signConfigAuthorization(auth, borrower));
+    }
+
+    function testSetConfigWithSigRevertsOnAnotherChain(uint64 otherChainId) public {
+        vm.assume(otherChainId != block.chainid && otherChainId != 0);
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        Signature memory sig = signConfigAuthorization(auth, borrower);
+        vm.chainId(otherChainId);
+
+        vm.expectRevert(IBlueFallbackRolling.Unauthorized.selector);
+        fallbackContract.setConfigWithSig(auth, sig);
+    }
+
+    function testSetConfigWithSigRevertsForAnotherVerifyingContract() public {
+        BlueFallbackRolling otherFallbackContract = new BlueFallbackRolling(address(midnight), address(blue));
+        ConfigAuthorization memory auth =
+            makeConfigAuthorization(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        Signature memory sig = signConfigAuthorization(auth, borrower, address(otherFallbackContract));
+
+        vm.expectRevert(IBlueFallbackRolling.Unauthorized.selector);
+        fallbackContract.setConfigWithSig(auth, sig);
+    }
+
+    function makeConfigAuthorization(
+        address user,
+        uint64 _start,
+        uint64 _end,
+        uint64 incentiveAtStart,
+        uint64 incentiveAtEnd,
+        bool enabled
+    ) internal view returns (ConfigAuthorization memory) {
+        return ConfigAuthorization({
+            user: user,
+            midnightId: toId(midnightMarket),
+            blueId: Id.unwrap(blueMarketParams.id()),
+            start: _start,
+            end: _end,
+            incentiveAtStart: incentiveAtStart,
+            incentiveAtEnd: incentiveAtEnd,
+            enabled: enabled,
+            nonce: fallbackContract.nonce(user),
+            deadline: vm.getBlockTimestamp() + 1 days
+        });
+    }
+
+    function signConfigAuthorization(ConfigAuthorization memory authorization, address _signer)
+        internal
+        view
+        returns (Signature memory)
+    {
+        return signConfigAuthorization(authorization, _signer, address(fallbackContract));
+    }
+
+    function signConfigAuthorization(
+        ConfigAuthorization memory authorization,
+        address _signer,
+        address verifyingContract
+    ) internal view returns (Signature memory) {
+        bytes32 hashStruct = keccak256(abi.encode(CONFIG_AUTHORIZATION_TYPEHASH, authorization));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), hashStruct));
+        Signature memory sig;
+        (sig.v, sig.r, sig.s) = vm.sign(privateKey[_signer], digest);
+        return sig;
     }
 
     /// @dev The incentive `elapsed` seconds into the auction, interpolated between the two configured bounds.
