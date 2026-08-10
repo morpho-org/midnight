@@ -27,8 +27,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    /// @param start The start time of the rolling period.
-    /// @param end The end time of the rolling period.
     /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
     function setConfig(
         bytes32 midnightId,
