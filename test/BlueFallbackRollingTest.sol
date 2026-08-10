@@ -378,12 +378,21 @@ contract BlueFallbackRollingTest is BaseTest {
         assertTrue(fallbackContract.isConfig(borrower, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END)));
     }
 
-    function testSetConfigRevertsForTooLargeIncentive() public {
+    function testSetConfigRevertsForTooLargeIncentiveAtEnd() public {
         uint64 incentiveAtEnd = MAX_INCENTIVE + 1;
 
         vm.expectRevert(IBlueFallbackRolling.IncentiveTooHigh.selector);
         fallbackContract.setConfig(
             toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, end, INCENTIVE_AT_START, incentiveAtEnd, true
+        );
+    }
+
+    function testSetConfigRevertsForTooLargeIncentiveAtStart() public {
+        uint64 incentiveAtStart = MAX_INCENTIVE + 1;
+
+        vm.expectRevert(IBlueFallbackRolling.IncentiveTooHigh.selector);
+        fallbackContract.setConfig(
+            toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, end, incentiveAtStart, MAX_INCENTIVE, true
         );
     }
 

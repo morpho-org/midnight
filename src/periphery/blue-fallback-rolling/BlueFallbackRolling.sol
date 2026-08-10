@@ -40,6 +40,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         bool enabled
     ) external override {
         require(start < end, EndNotAfterStart());
+        require(incentiveAtStart <= WAD, IncentiveTooHigh());
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
 
         isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd))] =
