@@ -78,7 +78,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         // Round in favor of the Midnight position.
         uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
             .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
-        // Round against the keeper.
+        // Round against the roller.
         uint256 incentiveFactor = incentiveAtStart
             + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, end - start);
         uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentiveFactor, WAD);
