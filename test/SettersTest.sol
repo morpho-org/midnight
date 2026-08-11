@@ -342,10 +342,7 @@ contract SettersTest is BaseTest {
 
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(collateralToken1),
-            lltv: lltv,
-            liquidationCursor: liquidationCursor,
-            oracle: address(oracle1)
+            token: address(collateralToken1), lltv: lltv, liquidationCursor: liquidationCursor, oracle: address(oracle1)
         });
         Market memory market = Market({
             chainId: block.chainid,
