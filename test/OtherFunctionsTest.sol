@@ -168,6 +168,23 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(callback.recordedData(), data, "data");
     }
 
+    function testRepayCallbackWrongReturnValue(uint256 units, uint256 repaid, bytes memory data) public {
+        units = bound(units, 1, MAX_UNITS);
+        repaid = bound(repaid, 1, units);
+        collateralize(market, borrower, units);
+        setupMarket(market, units);
+        skip(99);
+
+        address callback = address(new InvalidRepayCallback());
+        deal(address(loanToken), callback, repaid);
+        vm.prank(callback);
+        loanToken.approve(address(midnight), repaid);
+
+        vm.expectRevert(IMidnight.WrongRepayCallbackReturnValue.selector);
+        vm.prank(borrower);
+        midnight.repay(market, repaid, borrower, callback, data);
+    }
+
     function testWithdraw(uint256 units, uint256 withdraw) public {
         units = bound(units, 1, MAX_UNITS);
         withdraw = bound(withdraw, 1, units);
@@ -830,5 +847,11 @@ contract RepayCallback {
 
     function recordedMarket() external view returns (Market memory) {
         return _recordedMarket;
+    }
+}
+
+contract InvalidRepayCallback is IRepayCallback {
+    function onRepay(bytes32, Market memory, uint256, address, bytes memory) external pure returns (bytes32) {
+        return bytes32(0);
     }
 }

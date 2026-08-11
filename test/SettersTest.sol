@@ -327,6 +327,41 @@ contract SettersTest is BaseTest {
         midnight.touchMarket(market);
     }
 
+    function testTouchMarketRejectsMaxLifTooHigh() public {
+        uint256 liquidationCursor = 0.999e18;
+        midnight.enableLiquidationCursor(liquidationCursor);
+
+        uint256 lltv = 0.5e18;
+        midnight.enableLltv(lltv);
+
+        // maxLif = 1998001998001998001, which is <= 2 WAD (so InvalidMaxLif passes) but
+        // lltv * maxLif = 999000999000999000.5e18 > 0.999e18 * WAD, so MaxLifTooHigh trips.
+        uint256 _maxLif = maxLif(lltv, liquidationCursor);
+        assertLe(_maxLif, 2 * WAD, "maxLif below two WAD");
+        assertGt(lltv * _maxLif, 0.999 ether * WAD, "lltv * maxLif above bound");
+
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        collateralParams[0] = CollateralParams({
+            token: address(collateralToken1),
+            lltv: lltv,
+            liquidationCursor: liquidationCursor,
+            oracle: address(oracle1)
+        });
+        Market memory market = Market({
+            chainId: block.chainid,
+            midnight: address(midnight),
+            loanToken: address(loanToken),
+            maturity: vm.getBlockTimestamp() + 1 days,
+            collateralParams: collateralParams,
+            rcfThreshold: 0,
+            enterGate: address(0),
+            liquidatorGate: address(0)
+        });
+
+        vm.expectRevert(IMidnight.MaxLifTooHigh.selector);
+        midnight.touchMarket(market);
+    }
+
     // Default settlement fee tests
 
     function testSettlementFeeRevertsWhenNotCreated() public {
