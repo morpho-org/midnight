@@ -23,15 +23,21 @@ The factory records callbacks in `callbackOf` and `isBlueBuyCallback`.
 
 ### `BlueFallbackRolling`
 
-Permissionlessly refinances a borrower's Midnight debt into a user-selected Morpho Blue market once the Midnight market
-reaches the configured start timestamp. It supplies the selected collateral to Blue through a callback, borrows against
-it to repay Midnight, and rewards the caller from the additional Blue borrow. Rolls may migrate all debt and collateral
-or a proportional partial amount.
+Permissionlessly refinances a borrower's Midnight debt into a user-selected Morpho Blue market during a configured
+rolling period while rewarding the caller.
 
 Users may enable multiple fallback configurations per Midnight market and must authorize the contract on both Midnight
-and Blue. Each configuration selects a Blue market, start timestamp, and caller incentive, and can later be disabled.
-The caller incentive is a percentage of the debt and is capped at 100%. A roll requires the borrower to have exactly
-one activated Midnight collateral, matching the collateral token of the configured Blue market.
+and Blue. Each configuration selects a Blue market, a start and end timestamp for the rolling period, and a caller
+incentive at each bound, and can later be disabled. The caller incentive is a percentage of the debt, capped at 100%,
+and interpolates linearly between its two bounds over the rolling period. A roll
+requires the borrower to have exactly one activated Midnight collateral, matching the collateral token of the
+configured Blue market, whose LLTV must be greater than or equal to the Midnight collateral's LLTV.
+
+A configuration can be set either directly with `setConfig`, or by relaying an EIP-712 signature to
+`setConfigWithSig`, which anyone can submit on the user's behalf. The signature is bounded by a deadline and
+replay-protected by one nonce per user, and may be produced by the user or by any address they have authorized on
+Midnight. Configurations set by signature are revoked like any other, with
+`setConfig(..., false)`.
 
 ### `EcrecoverAuthorizer`
 
