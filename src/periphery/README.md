@@ -29,9 +29,11 @@ it to repay Midnight, and rewards the caller from the additional Blue borrow. Ro
 or a proportional partial amount.
 
 Users may enable multiple fallback configurations per Midnight market and must authorize the contract on both Midnight
-and Blue. Each configuration selects a Blue market, start timestamp, and caller incentive, and can later be disabled.
-The caller incentive is a percentage of the debt and is capped at 100%. A roll requires the borrower to have exactly
-one activated Midnight collateral, matching the collateral token of the configured Blue market.
+and Blue. Each configuration selects a Blue market, start timestamp, caller incentive, and minimum rollable amount, and
+can later be disabled. The caller incentive is a percentage of the debt and is capped at 100%. The minimum rollable
+amount is the smallest debt a single roll can migrate, and is bypassed by a roll migrating the whole remaining Midnight
+debt, so a position can always be closed out. A roll requires the borrower to have exactly one activated Midnight
+collateral, matching the collateral token of the configured Blue market.
 
 ### `EcrecoverAuthorizer`
 
