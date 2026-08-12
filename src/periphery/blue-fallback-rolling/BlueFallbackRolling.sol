@@ -9,7 +9,7 @@ import {WAD} from "../../libraries/ConstantsLib.sol";
 import {IdLib} from "../../libraries/IdLib.sol";
 import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";
-import {IBlueFallbackRolling} from "./IBlueFallbackRolling.sol";
+import {IBlueFallbackRolling} from "./interfaces/IBlueFallbackRolling.sol";
 import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
@@ -79,8 +79,11 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
             .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
         // Round against the roller.
-        uint256 incentiveFactor = incentiveAtStart
-            + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, end - start);
+        uint256 incentiveFactor = incentiveAtEnd >= incentiveAtStart
+            ? incentiveAtStart
+                + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, end - start)
+            : incentiveAtStart
+                - UtilsLib.mulDivUp(incentiveAtStart - incentiveAtEnd, block.timestamp - start, end - start);
         uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentiveFactor, WAD);
 
         emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);

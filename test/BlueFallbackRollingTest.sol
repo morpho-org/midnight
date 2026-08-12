@@ -7,7 +7,7 @@ import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.
 import {Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {BlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/BlueFallbackRolling.sol";
-import {IBlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/IBlueFallbackRolling.sol";
+import {IBlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/interfaces/IBlueFallbackRolling.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 contract BlueFallbackRollingTest is BaseTest {
@@ -187,7 +187,34 @@ contract BlueFallbackRollingTest is BaseTest {
         assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
     }
 
-    /// @dev The auction can be configured to end after the Midnight maturity.
+    function testRollPaysTheAuctionedIncentiveWhenDecreasing(uint256 elapsed) public {
+        elapsed = bound(elapsed, 0, end - start);
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_END,
+            INCENTIVE_AT_START,
+            true
+        );
+        vm.warp(start + elapsed);
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_END, INCENTIVE_AT_START, DEBT
+        );
+
+        uint256 duration = end - start;
+        uint256 decrease = (INCENTIVE_AT_END - INCENTIVE_AT_START) * elapsed;
+
+        uint256 expected = INCENTIVE_AT_END - (decrease + duration - 1) / duration;
+        assertEq(loanToken.balanceOf(keeper), DEBT * expected / WAD);
+        assertEq(loanToken.balanceOf(address(fallbackContract)), 0);
+        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
+    }
+
     function testRollPaysTheAuctionedIncentiveWhenTheAuctionEndsAfterMaturity() public {
         uint64 lateEnd = uint64(midnightMarket.maturity) + 1 days;
         vm.prank(borrower);
