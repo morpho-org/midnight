@@ -345,14 +345,20 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
-    function testRollRevertsWhenBlueLltvIsLowerThanMidnightLltv() public {
+    function testCanRollWhenBlueLltvIsLowerThanMidnightLltv() public {
         uint256 lowLltv = LLTV - 1;
         blue.enableLltv(lowLltv);
         MarketParams memory lowBlueMarketParams = blueMarketParams;
         lowBlueMarketParams.lltv = lowLltv;
         blue.createMarket(lowBlueMarketParams);
+        deal(address(loanToken), address(this), 2 * DEBT);
+        blue.supply(lowBlueMarketParams, 2 * DEBT, 0, lender, hex"");
 
-        vm.prank(borrower);
+        uint256 extraCollateral = 10e18;
+        deal(lowBlueMarketParams.collateralToken, borrower, extraCollateral);
+        vm.startPrank(borrower);
+        collateralToken1.approve(address(midnight), extraCollateral);
+        midnight.supplyCollateral(midnightMarket, blueCollateralIndex, extraCollateral, borrower);
         fallbackContract.setConfig(
             toId(midnightMarket),
             Id.unwrap(lowBlueMarketParams.id()),
@@ -362,12 +368,15 @@ contract BlueFallbackRollingTest is BaseTest {
             INCENTIVE_AT_END,
             true
         );
+        vm.stopPrank();
 
-        vm.expectRevert(IBlueFallbackRolling.BlueLltvTooLow.selector);
         vm.prank(keeper);
         fallbackContract.roll(
             midnightMarket, lowBlueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
         );
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
+        assertGt(blue.position(lowBlueMarketParams.id(), borrower).borrowShares, 0);
     }
 
     function testSupplyCollateralCallbackRevertsIfCallerIsNotBlue() public {

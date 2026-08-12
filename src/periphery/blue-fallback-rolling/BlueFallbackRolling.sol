@@ -27,7 +27,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
+    /// @dev The user is responsible for checking the Blue market oracle and LLTV. Unsafe oracle or LLTV choices can
+    /// cause the resulting Morpho Blue position to be liquidated.
     function setConfig(
         bytes32 midnightId,
         bytes32 blueId,
@@ -73,7 +74,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             blueMarketParams.collateralToken == midnightMarket.collateralParams[collateralIndex].token,
             InconsistentCollateralToken()
         );
-        require(midnightMarket.collateralParams[collateralIndex].lltv <= blueMarketParams.lltv, BlueLltvTooLow());
 
         // Round in favor of the Midnight position.
         uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
