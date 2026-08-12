@@ -18,6 +18,8 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     error NotBlue();
     error NotConfigured();
     error NotStarted();
+    error RemainingDebtTooLow();
+    error RollAmountTooLow();
 
     /// EVENTS ///
     event SetConfig(
@@ -28,6 +30,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         uint256 end,
         uint256 incentiveAtStart,
         uint256 incentiveAtEnd,
+        uint256 minRollAmount,
         bool enabled
     );
     event Roll(
@@ -53,6 +56,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         uint64 end,
         uint64 incentiveAtStart,
         uint64 incentiveAtEnd,
+        uint256 minRollAmount,
         bool enabled
     ) external;
     function roll(
@@ -63,6 +67,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         uint64 end,
         uint64 incentiveAtStart,
         uint64 incentiveAtEnd,
+        uint256 minRollAmount,
         uint256 assets
     ) external;
 }

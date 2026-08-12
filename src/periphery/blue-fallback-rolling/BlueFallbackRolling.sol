@@ -35,16 +35,22 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint64 end,
         uint64 incentiveAtStart,
         uint64 incentiveAtEnd,
+        uint256 minRollAmount,
         bool enabled
     ) external override {
         require(start < end, EndNotAfterStart());
         require(incentiveAtStart <= WAD, IncentiveTooHigh());
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
 
-        isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd))] =
-            enabled;
+        isConfig[
+            msg.sender
+        ][
+            keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollAmount))
+        ] = enabled;
 
-        emit SetConfig(msg.sender, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, enabled);
+        emit SetConfig(
+            msg.sender, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollAmount, enabled
+        );
     }
 
     function roll(
@@ -55,17 +61,24 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint64 end,
         uint64 incentiveAtStart,
         uint64 incentiveAtEnd,
+        uint256 minRollAmount,
         uint256 assets
     ) external override {
         bytes32 midnightId = IdLib.toId(midnightMarket);
         bytes32 blueId = Id.unwrap(blueMarketParams.id());
         require(
-            isConfig[user][keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd))],
+            isConfig[user][keccak256(
+                    abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollAmount)
+                )],
             NotConfigured()
         );
         require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
         require(block.timestamp >= start, NotStarted());
         require(block.timestamp <= end, Ended());
+        require(assets >= minRollAmount, RollAmountTooLow());
+        uint256 debtAssets = IMidnight(MIDNIGHT).debt(midnightId, user);
+        uint256 remainingDebtAssets = debtAssets - assets;
+        require(remainingDebtAssets == 0 || remainingDebtAssets >= minRollAmount, RemainingDebtTooLow());
         uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
         require(UtilsLib.countBits(collateralBitmap) == 1, IncorrectActivatedCollateral());
         uint256 collateralIndex = UtilsLib.msb(collateralBitmap);
@@ -76,8 +89,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         require(midnightMarket.collateralParams[collateralIndex].lltv <= blueMarketParams.lltv, BlueLltvTooLow());
 
         // Round in favor of the Midnight position.
-        uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
-            .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
+        uint256 collateralAssets =
+            IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex).mulDivDown(assets, debtAssets);
         // Round against the roller.
         uint256 incentiveFactor = incentiveAtEnd >= incentiveAtStart
             ? incentiveAtStart
