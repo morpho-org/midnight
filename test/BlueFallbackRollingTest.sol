@@ -473,40 +473,6 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
-    function testRollRevertsWhenBlueLltvIsLowerThanMidnightLltv() public {
-        uint256 lowLltv = LLTV - 1;
-        blue.enableLltv(lowLltv);
-        MarketParams memory lowBlueMarketParams = blueMarketParams;
-        lowBlueMarketParams.lltv = lowLltv;
-        blue.createMarket(lowBlueMarketParams);
-
-        vm.prank(borrower);
-        fallbackContract.setConfig(
-            toId(midnightMarket),
-            Id.unwrap(lowBlueMarketParams.id()),
-            start,
-            end,
-            INCENTIVE_AT_START,
-            INCENTIVE_AT_END,
-            MIN_ROLLABLE_ASSETS,
-            true
-        );
-
-        vm.expectRevert(IBlueFallbackRolling.BlueLltvTooLow.selector);
-        vm.prank(keeper);
-        fallbackContract.roll(
-            midnightMarket,
-            lowBlueMarketParams,
-            borrower,
-            start,
-            end,
-            INCENTIVE_AT_START,
-            INCENTIVE_AT_END,
-            MIN_ROLLABLE_ASSETS,
-            DEBT
-        );
-    }
-
     function testSupplyCollateralCallbackRevertsIfCallerIsNotBlue() public {
         uint256 collateralAssets = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
         vm.expectRevert(IBlueFallbackRolling.NotBlue.selector);

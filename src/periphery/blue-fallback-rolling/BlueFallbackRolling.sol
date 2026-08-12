@@ -27,7 +27,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
+    /// @dev Users must make sure that the oracle and the LLTV of the Blue market are appropriate, otherwise their
+    /// position can be liquidated on Blue.
     /// @dev `minRollableAssets` is the minimum debt that a single roll can move to Blue, unless the roll moves the
     /// whole remaining Midnight debt.
     function setConfig(
@@ -79,7 +80,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             blueMarketParams.collateralToken == midnightMarket.collateralParams[collateralIndex].token,
             InconsistentCollateralToken()
         );
-        require(midnightMarket.collateralParams[collateralIndex].lltv <= blueMarketParams.lltv, BlueLltvTooLow());
 
         uint256 debtAssets = IMidnight(MIDNIGHT).debt(midnightId, user);
         require(assets >= minRollableAssets || assets == debtAssets, RollableAssetsTooLow());
