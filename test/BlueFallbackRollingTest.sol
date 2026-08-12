@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
+import {stdError} from "../lib/forge-std/src/Test.sol";
 import {IMorpho, Id, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
 import {Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
@@ -31,7 +32,7 @@ contract BlueFallbackRollingTest is BaseTest {
     function setUp() public override {
         super.setUp();
         start = uint64(vm.getBlockTimestamp());
-        // Deliberately different from the Midnight maturity: the auction period is independent of it.
+
         end = start + 12 hours;
 
         blue = IMorpho(deployCode("Morpho.sol", abi.encode(address(this))));
@@ -248,27 +249,6 @@ contract BlueFallbackRollingTest is BaseTest {
         );
 
         assertEq(loanToken.balanceOf(keeper), DEBT * INCENTIVE_AT_START / WAD);
-        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
-    }
-
-    /// @dev Measures the gas of a full roll: supplyCollateral on Blue, borrow on Blue, repay and
-    /// withdrawCollateral on Midnight, plus the incentive transfer. Rolls at `end` so the incentive is maximal.
-    function testGasFullRoll() public {
-        vm.warp(end);
-
-        // Copy the params to memory beforehand so the gasleft() window only covers the roll itself.
-        Market memory _midnightMarket = midnightMarket;
-        MarketParams memory _blueMarketParams = blueMarketParams;
-
-        vm.prank(keeper);
-        uint256 gasBefore = gasleft();
-        fallbackContract.roll(
-            _midnightMarket, _blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
-        );
-        uint256 gasUsed = gasBefore - gasleft();
-
-        emit log_named_uint("Gas: full roll", gasUsed);
-
         assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
     }
 
@@ -489,7 +469,83 @@ contract BlueFallbackRollingTest is BaseTest {
         assertTrue(fallbackContract.isConfig(borrower, configId(otherStart, end, MAX_INCENTIVE, MAX_INCENTIVE)));
     }
 
-    /// @dev The incentive `elapsed` seconds into the auction, interpolated between the two configured bounds.
+    function testSetConfigEmitsSetConfig() public {
+        vm.expectEmit(address(fallbackContract));
+        emit IBlueFallbackRolling.SetConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            false
+        );
+
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            false
+        );
+    }
+
+    function testRollEmitsRoll() public {
+        uint256 collateralAssets = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
+        vm.warp(end);
+
+        vm.expectEmit(address(fallbackContract));
+        emit IBlueFallbackRolling.Roll(
+            keeper,
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            DEBT,
+            collateralAssets,
+            DEBT * INCENTIVE_AT_END / WAD
+        );
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+        );
+    }
+
+    function testRollTransfersNoIncentiveWhenTheIncentiveIsZero(uint256 elapsed) public {
+        elapsed = bound(elapsed, 0, end - start);
+        vm.prank(borrower);
+        fallbackContract.setConfig(toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, end, 0, 0, true);
+        vm.warp(start + elapsed);
+
+        vm.prank(keeper);
+        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, end, 0, 0, DEBT);
+
+        assertEq(loanToken.balanceOf(keeper), 0);
+        assertEq(loanToken.balanceOf(address(fallbackContract)), 0);
+        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
+    }
+
+    /// @dev Rolling with zero assets reverts in Blue's supply collateral.
+    function testRollRevertsForZeroAssets() public {
+        vm.expectRevert(bytes("zero assets"));
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, 0
+        );
+    }
+
+    function testRollRevertsForAssetsGreaterThanDebt() public {
+        vm.expectRevert(stdError.arithmeticError);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT + 1
+        );
+    }
+
     function expectedIncentive(uint256 elapsed) internal view returns (uint256) {
         uint256 duration = end - start;
         return INCENTIVE_AT_START + (INCENTIVE_AT_END - INCENTIVE_AT_START) * elapsed / duration;
