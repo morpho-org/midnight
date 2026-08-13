@@ -27,8 +27,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    /// @dev Users must make sure that the oracle and the LLTV of the Blue market are appropriate, otherwise their
-    /// position can be liquidated on Blue.
+    /// @dev Users must make sure that the oracle and the LLTV of the Blue market are appropriate; otherwise, they
+    /// risk getting the position on Blue liquidated.
     /// @dev `minRollableAssets` is the minimum debt that a single roll can move to Blue, unless the roll moves the
     /// whole remaining Midnight debt.
     function setConfig(
