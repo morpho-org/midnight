@@ -33,8 +33,8 @@ methods {
 
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => transferCallback();
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => transferCallback();
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => genericCallback();
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => genericCallback();
     function _.transferFrom(address from, address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
     function _.transfer(address to, uint256 amount) external with(env e) => genericCallbackBool() expect(bool);
     function _.onBuy(bytes32 id, Midnight.Market market, uint256 buyerAssets, uint256 units, uint256 pendingFeeIncrease, address buyer, bytes data) external => genericCallbackBytes32() expect(bytes32);
@@ -49,6 +49,8 @@ methods {
 definition WAD() returns uint256 = 10 ^ 18;
 
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
+
+definition TIME_TO_MAX_LIF() returns mathint = 60 * 60;
 
 persistent ghost summaryPrice(address) returns uint256;
 
@@ -241,18 +243,43 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     mathint collateralAfter = collateralBefore - seizedAssetsOut;
     mathint price = summaryPrice(globalMarket.collateralParams[collateralIndex].oracle);
 
-    // require all the axioms that are needed to prove the healthiness after liquidation. These are the same axioms that are proved in the MulDiv.spec
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivDownMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivUpMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomMathMulDivDownMonotoneB(a, b1, b2, d), "axiom";
-    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomMathMulDivUpMonotoneD(a, b, d1, d2), "axiom";
+    // The liquidation incentive factor that liquidate() actually uses.  Post maturity it ramps from WAD up to
+    // maxLif over TIME_TO_MAX_LIF; expressing it as a CVL term lets us instantiate every mulDiv axiom at a
+    // ground term instead of quantifying over all arguments.
+    mathint maxLifValue = maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]);
+    mathint timeSinceMaturity = e.block.timestamp > globalMarket.maturity ? e.block.timestamp - globalMarket.maturity : 0;
+    mathint lifCandidate = WAD() + (maxLifValue - WAD()) * timeSinceMaturity / TIME_TO_MAX_LIF();
+    mathint lifValue = postMaturityMode ? (maxLifValue < lifCandidate ? maxLifValue : lifCandidate) : maxLifValue;
+
+    // seizedValue is the (rounded up) value of the seized collateral; repaidValue is the value the liquidator
+    // is entitled to seize for repaidUnits.  Both appear as the first argument of the axioms below.
+    mathint seizedValue = ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE());
+    mathint repaidValue = ghostMulDivDown(repaidUnitsOut, lifValue, WAD());
+
+    // The axioms needed to prove healthiness after liquidation, all instantiated at ground terms.
+    // They are the same axioms proved in MulDiv.spec.
+    // seizedValue / repaidValue are terms the code does not necessarily evaluate itself (each branch of
+    // liquidate computes only one of them), so the mulDiv summaries never pin them into uint256 and they
+    // would otherwise be free to go negative, falsifying the `a >= 0` guard of every axiom below.
+    require axiomMathMulDivUpZeroA(price, ORACLE_PRICE_SCALE()), "axiom";
+    require axiomMathMulDivUpMonotoneA(0, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
+
     require axiomMathMulDivDownZeroA(price, ORACLE_PRICE_SCALE()), "axiom";
     require axiomMathMulDivDownZeroA(globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
-    require axiomMathMulDivInverseUpDown(repaidUnitsOut, maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), WAD()), "axiom";
-    require axiomMathMulDivInverseUpDown(ghostMulDivDown(repaidUnitsOut, maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
-    require axiomMathMulDivUpMonotoneBD(ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), WAD(), WAD(), globalMarketCollateralLLTV[collateralIndex]), "axiom";
+
+    // maxDebt drops by at most mulDivUp(seizedValue, lltv, WAD) when the collateral drops by seizedAssetsOut.
     require axiomMathMulDivAddDownUp(collateralAfter, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
-    require axiomMathMulDivAddDownUp(ghostMulDivDown(collateralAfter, price, ORACLE_PRICE_SCALE()), ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
+    require axiomMathMulDivDownMonotoneA(ghostMulDivDown(collateralBefore, price, ORACLE_PRICE_SCALE()), ghostMulDivDown(collateralAfter, price, ORACLE_PRICE_SCALE()) + seizedValue, globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
+    require axiomMathMulDivAddDownUp(ghostMulDivDown(collateralAfter, price, ORACLE_PRICE_SCALE()), seizedValue, globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
+
+    // Case seizedAssets given: repaidUnits == mulDivUp(seizedValue, WAD, lif) >= mulDivUp(seizedValue, lltv, WAD).
+    require axiomMathMulDivUpMonotoneBD(seizedValue, globalMarketCollateralLLTV[collateralIndex], WAD(), WAD(), maxLifValue), "axiom";
+    require axiomMathMulDivUpMonotoneD(seizedValue, WAD(), lifValue, maxLifValue), "axiom";
+
+    // Case repaidUnits given: seizedValue <= repaidValue and mulDivUp(repaidValue, lltv, WAD) <= repaidUnits.
+    require axiomMathMulDivInverseUpDown(repaidValue, ORACLE_PRICE_SCALE(), price), "axiom";
+    require axiomMathMulDivUpMonotoneA(seizedValue, repaidValue, WAD(), lifValue), "axiom";
+    require axiomMathMulDivInverseUpDown(repaidUnitsOut, lifValue, WAD()), "axiom";
 
     // check that the user was healthy before all callbacks.  We can only assert this after we included all the needed axioms.
     assert healthyOrLockedBeforeCallbacks, "user is healthy or locked before callbacks";
