@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
+persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
 
-ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
+persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
 
 definition mathMulDivDown(mathint a, mathint b, mathint d) returns mathint = ghostMulDivDown(a, b, d);
 
