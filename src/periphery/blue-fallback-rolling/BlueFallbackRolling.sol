@@ -13,6 +13,8 @@ import {IBlueFallbackRolling} from "./interfaces/IBlueFallbackRolling.sol";
 import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
+/// @dev Users must make sure that the oracle and the LLTV of the Blue market are appropriate; otherwise, their
+/// position on Blue could be left close to liquidation.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
     using UtilsLib for uint128;
@@ -27,8 +29,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    /// @dev Users must make sure that the oracle and the LLTV of the Blue market are appropriate; otherwise, they
-    /// risk getting the position on Blue liquidated.
     /// @dev `minRollableAssets` is the minimum debt that a single roll can move to Blue, unless the roll moves the
     /// whole remaining Midnight debt.
     function setConfig(
