@@ -24,9 +24,8 @@ The factory records callbacks in `callbackOf` and `isBlueBuyCallback`.
 ### `BlueFallbackRolling`
 
 Permissionlessly refinances a borrower's Midnight debt into a user-selected Morpho Blue market once the Midnight market
-reaches the configured start timestamp. It supplies the selected collateral to Blue through a callback, borrows against
-it to repay Midnight, and rewards the caller from the additional Blue borrow. Rolls may migrate all debt and collateral
-or a proportional partial amount.
+reaches the configured start timestamp. It supplies the activated collateral to Blue through a callback, borrows against
+it to repay Midnight, and rewards the caller.
 
 Users may enable multiple fallback configurations per Midnight market and must authorize the contract on both Midnight
 and Blue. Each configuration selects a Blue market, start timestamp, caller incentive, and minimum rollable amount, and
