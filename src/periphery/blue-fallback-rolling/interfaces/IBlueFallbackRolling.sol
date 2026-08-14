@@ -44,6 +44,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
 
     /// EVENTS ///
     event SetConfig(
+        address caller,
         address indexed user,
         bytes32 indexed midnightId,
         bytes32 indexed blueId,
@@ -73,6 +74,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
 
     /// FUNCTIONS ///
     function setConfig(
+        address user,
         bytes32 midnightId,
         bytes32 blueId,
         uint64 start,

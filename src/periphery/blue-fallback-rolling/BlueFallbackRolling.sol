@@ -36,7 +36,9 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
+    /// @dev The caller must be `user` or an address authorized for `user` on Midnight.
     function setConfig(
+        address user,
         bytes32 midnightId,
         bytes32 blueId,
         uint64 start,
@@ -50,12 +52,23 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         require(incentiveAtStart <= WAD, IncentiveTooHigh());
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
 
+        require(msg.sender == user || IMidnight(MIDNIGHT).isAuthorized(user, msg.sender), Unauthorized());
+
         bytes32 configId =
             keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets));
-        isConfig[msg.sender][configId] = enabled;
+        isConfig[user][configId] = enabled;
 
         emit SetConfig(
-            msg.sender, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets, enabled
+            msg.sender,
+            user,
+            midnightId,
+            blueId,
+            start,
+            end,
+            incentiveAtStart,
+            incentiveAtEnd,
+            minRollableAssets,
+            enabled
         );
     }
 
@@ -92,6 +105,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         isConfig[signedStruct.user][configId] = signedStruct.enabled;
 
         emit SetConfig(
+            msg.sender,
             signedStruct.user,
             signedStruct.midnightId,
             signedStruct.blueId,
