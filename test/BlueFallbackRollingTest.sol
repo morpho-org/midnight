@@ -797,8 +797,7 @@ contract BlueFallbackRollingTest is BaseTest {
         assertEq(midnight.debt(toId(midnightMarket), borrower), DEBT - MIN_ROLLABLE_ASSETS);
     }
 
-    /// @dev A `minRollableAssets` above the Midnight debt leaves rolls unconstrained, including partial ones.
-    function testRollAllowsPartialRollWhenDebtIsBelowMinRollableAssets() public {
+    function testRollRevertsForPartialRollWhenDebtIsBelowMinRollableAssets() public {
         // forge-lint: disable-next-line(unsafe-typecast) as DEBT is far below type(uint128).max.
         uint128 minRollableAssets = uint128(DEBT + 1);
         uint256 assets = DEBT / 4;
@@ -814,6 +813,7 @@ contract BlueFallbackRollingTest is BaseTest {
             true
         );
 
+        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
         vm.prank(keeper);
         fallbackContract.roll(
             midnightMarket,
@@ -826,41 +826,6 @@ contract BlueFallbackRollingTest is BaseTest {
             minRollableAssets,
             assets
         );
-
-        assertEq(midnight.debt(toId(midnightMarket), borrower), DEBT - assets);
-    }
-
-    /// @dev The constraint stops applying as soon as the debt reaches `minRollableAssets`, bound included.
-    function testRollAllowsPartialRollWhenDebtEqualsMinRollableAssets() public {
-        // forge-lint: disable-next-line(unsafe-typecast) as DEBT is far below type(uint128).max.
-        uint128 minRollableAssets = uint128(DEBT);
-        uint256 assets = DEBT / 4;
-        vm.prank(borrower);
-        fallbackContract.setConfig(
-            toId(midnightMarket),
-            Id.unwrap(blueMarketParams.id()),
-            start,
-            end,
-            INCENTIVE_AT_START,
-            INCENTIVE_AT_END,
-            minRollableAssets,
-            true
-        );
-
-        vm.prank(keeper);
-        fallbackContract.roll(
-            midnightMarket,
-            blueMarketParams,
-            borrower,
-            start,
-            end,
-            INCENTIVE_AT_START,
-            INCENTIVE_AT_END,
-            minRollableAssets,
-            assets
-        );
-
-        assertEq(midnight.debt(toId(midnightMarket), borrower), DEBT - assets);
     }
 
     /// @dev One wei of debt above `minRollableAssets` is enough for the constraint to apply.
@@ -959,8 +924,7 @@ contract BlueFallbackRollingTest is BaseTest {
         assertEq(midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex), 0);
     }
 
-    /// @dev A remainder below `minRollableAssets` does not have to be rolled in one go, nor matched exactly.
-    function testRollAllowsPartialRollOfRemainderBelowMinRollableAssets() public {
+    function testRollRevertsForPartialRollOfRemainderBelowMinRollableAssets() public {
         uint256 remainder = MIN_ROLLABLE_ASSETS - 1;
 
         vm.prank(keeper);
@@ -976,6 +940,7 @@ contract BlueFallbackRollingTest is BaseTest {
             DEBT - remainder
         );
 
+        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
         vm.prank(keeper);
         fallbackContract.roll(
             midnightMarket,
@@ -988,8 +953,6 @@ contract BlueFallbackRollingTest is BaseTest {
             MIN_ROLLABLE_ASSETS,
             remainder / 2
         );
-
-        assertEq(midnight.debt(toId(midnightMarket), borrower), remainder - remainder / 2);
     }
 
     function testRollRevertsForUnconfiguredMinRollableAssets() public {
@@ -1035,8 +998,8 @@ contract BlueFallbackRollingTest is BaseTest {
     }
 
     function testRollRevertsWithFuzzedMinRollableAssets(uint128 minRollableAssets, uint256 assets) public {
-        minRollableAssets = uint128(bound(minRollableAssets, 1, DEBT - 1));
-        assets = bound(assets, 0, minRollableAssets - 1);
+        minRollableAssets = uint128(bound(minRollableAssets, 1, 2 * DEBT));
+        assets = bound(assets, 0, minRollableAssets < DEBT ? minRollableAssets - 1 : DEBT - 1);
         vm.prank(borrower);
         fallbackContract.setConfig(
             toId(midnightMarket),
@@ -1072,7 +1035,8 @@ contract BlueFallbackRollingTest is BaseTest {
     function testRollSucceedsWithFuzzedMinRollableAssets(uint128 minRollableAssets, uint256 assets) public {
         minRollableAssets = uint128(bound(minRollableAssets, 0, 2 * DEBT));
         uint256 minAssets = MIN_FUZZED_ASSETS;
-        if (DEBT > minRollableAssets && minRollableAssets > MIN_FUZZED_ASSETS) minAssets = minRollableAssets;
+        if (minRollableAssets > MIN_FUZZED_ASSETS) minAssets = minRollableAssets;
+        if (minAssets > DEBT) minAssets = DEBT;
         assets = bound(assets, minAssets, DEBT);
         vm.prank(borrower);
         fallbackContract.setConfig(
