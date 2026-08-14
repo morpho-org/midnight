@@ -27,7 +27,6 @@ bytes32 constant CONFIG_SIG_STRUCT_TYPEHASH = 0x04585cbb2a64a0940f0981dd6100fcf9
 
 interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     /// ERRORS ///
-    error BlueLltvTooLow();
     error Ended();
     error EndNotAfterStart();
     error Expired();

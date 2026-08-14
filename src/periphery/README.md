@@ -23,8 +23,9 @@ The factory records callbacks in `callbackOf` and `isBlueBuyCallback`.
 
 ### `BlueFallbackRolling`
 
-Permissionlessly refinances a borrower's Midnight debt into a user-selected Morpho Blue market during a configured
-rolling period while rewarding the caller.
+Permissionlessly refinances a borrower's Midnight debt into a user-selected Morpho Blue market during the configured
+rolling period. It supplies the activated collateral to Blue before, through a callback, borrowing against it on Blue
+to reward the caller, repay the debt and withdraw the collateral on Midnight.
 
 Users may enable multiple fallback configurations per Midnight market and must authorize the contract on both Midnight
 and Blue. Each configuration selects a Blue market, a start and end timestamp for the rolling period, a caller
@@ -32,8 +33,7 @@ incentive at each bound, and a minimum rollable amount, and can later be disable
 of the debt, capped at 100%, and interpolates linearly between its two bounds over the rolling period. The minimum
 rollable amount is the smallest debt a single roll can migrate, and is bypassed by a roll migrating the whole remaining
 Midnight debt, so a position can always be closed out. A roll requires the borrower to have exactly one activated
-Midnight collateral, matching the collateral token of the configured Blue market, whose LLTV must be greater than or
-equal to the Midnight collateral's LLTV.
+Midnight collateral, matching the collateral token of the configured Blue market.
 
 A configuration can be set either directly with `setConfig`, or by relaying an EIP-712 signature to
 `setConfigWithSig`, which anyone can submit on the user's behalf. The signature is bounded by a deadline and

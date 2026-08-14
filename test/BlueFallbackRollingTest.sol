@@ -481,40 +481,6 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
-    function testRollRevertsWhenBlueLltvIsLowerThanMidnightLltv() public {
-        uint256 lowLltv = LLTV - 1;
-        blue.enableLltv(lowLltv);
-        MarketParams memory lowBlueMarketParams = blueMarketParams;
-        lowBlueMarketParams.lltv = lowLltv;
-        blue.createMarket(lowBlueMarketParams);
-
-        vm.prank(borrower);
-        fallbackContract.setConfig(
-            toId(midnightMarket),
-            Id.unwrap(lowBlueMarketParams.id()),
-            start,
-            end,
-            INCENTIVE_AT_START,
-            INCENTIVE_AT_END,
-            MIN_ROLLABLE_ASSETS,
-            true
-        );
-
-        vm.expectRevert(IBlueFallbackRolling.BlueLltvTooLow.selector);
-        vm.prank(keeper);
-        fallbackContract.roll(
-            midnightMarket,
-            lowBlueMarketParams,
-            borrower,
-            start,
-            end,
-            INCENTIVE_AT_START,
-            INCENTIVE_AT_END,
-            MIN_ROLLABLE_ASSETS,
-            DEBT
-        );
-    }
-
     function testSupplyCollateralCallbackRevertsIfCallerIsNotBlue() public {
         uint256 collateralAssets = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
         vm.expectRevert(IBlueFallbackRolling.NotBlue.selector);
@@ -798,7 +764,7 @@ contract BlueFallbackRollingTest is BaseTest {
     }
 
     function testRollRevertsForPartialRollWhenDebtIsBelowMinRollableAssets() public {
-        // forge-lint: disable-next-line(unsafe-typecast) as DEBT is far below type(uint128).max.
+        // forge-lint: disable-next-line(unsafe-typecast) as DEBT + 1 < type(uint128).max
         uint128 minRollableAssets = uint128(DEBT + 1);
         uint256 assets = DEBT / 4;
         vm.prank(borrower);
@@ -830,7 +796,7 @@ contract BlueFallbackRollingTest is BaseTest {
 
     /// @dev One wei of debt above `minRollableAssets` is enough for the constraint to apply.
     function testRollRevertsWhenDebtIsJustAboveMinRollableAssets() public {
-        // forge-lint: disable-next-line(unsafe-typecast) as DEBT is far below type(uint128).max.
+        // forge-lint: disable-next-line(unsafe-typecast) as DEBT - 1 < type(uint128).max
         uint128 minRollableAssets = uint128(DEBT - 1);
         vm.prank(borrower);
         fallbackContract.setConfig(
