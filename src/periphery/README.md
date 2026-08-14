@@ -36,10 +36,10 @@ Midnight debt, so a position can always be closed out. A roll requires the borro
 Midnight collateral, matching the collateral token of the configured Blue market.
 
 A configuration can be set either directly with `setConfig`, or by relaying an EIP-712 signature to
-`setConfigWithSig`, which anyone can submit on the user's behalf. `setConfig` may be called by the user or by any
-address they have authorized on Midnight. The signature is bounded by a deadline and replay-protected by one nonce per
-user, and may be produced by the user or by any address they have authorized on Midnight. Configurations set by
-signature are revoked like any other, with `setConfig(..., false)`.
+`setConfigWithSig`, which anyone can submit on the user's behalf. Configurations can be set (directly or with a
+signature) by the user or by an address authorized for them on Midnight. The signature is bounded by a deadline and
+replay-protected by one nonce per user. Configurations set by signature are revoked like any other, with
+`setConfig(..., false)`.
 
 ### `EcrecoverAuthorizer`
 
