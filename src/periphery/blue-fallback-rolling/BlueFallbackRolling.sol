@@ -21,6 +21,8 @@ import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
 /// @dev Users must make sure that the oracle and the LLTV of the Blue market are appropriate; otherwise, their
 /// position on Blue could be left close to liquidation.
+/// @dev Configs can be set (directly or with a signature) by the user or by an address authorized for them on
+/// Midnight.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
     using UtilsLib for uint128;
@@ -36,7 +38,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    /// @dev The caller must be `user` or an address authorized for `user` on Midnight.
     function setConfig(
         address user,
         bytes32 midnightId,
