@@ -799,6 +799,7 @@ contract BlueFallbackRollingTest is BaseTest {
 
     /// @dev A `minRollableAssets` above the Midnight debt leaves rolls unconstrained, including partial ones.
     function testRollAllowsPartialRollWhenDebtIsBelowMinRollableAssets() public {
+        // forge-lint: disable-next-line(unsafe-typecast) as DEBT is far below type(uint128).max.
         uint128 minRollableAssets = uint128(DEBT + 1);
         uint256 assets = DEBT / 4;
         vm.prank(borrower);
@@ -831,6 +832,7 @@ contract BlueFallbackRollingTest is BaseTest {
 
     /// @dev The constraint stops applying as soon as the debt reaches `minRollableAssets`, bound included.
     function testRollAllowsPartialRollWhenDebtEqualsMinRollableAssets() public {
+        // forge-lint: disable-next-line(unsafe-typecast) as DEBT is far below type(uint128).max.
         uint128 minRollableAssets = uint128(DEBT);
         uint256 assets = DEBT / 4;
         vm.prank(borrower);
@@ -863,6 +865,7 @@ contract BlueFallbackRollingTest is BaseTest {
 
     /// @dev One wei of debt above `minRollableAssets` is enough for the constraint to apply.
     function testRollRevertsWhenDebtIsJustAboveMinRollableAssets() public {
+        // forge-lint: disable-next-line(unsafe-typecast) as DEBT is far below type(uint128).max.
         uint128 minRollableAssets = uint128(DEBT - 1);
         vm.prank(borrower);
         fallbackContract.setConfig(
