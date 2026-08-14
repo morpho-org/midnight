@@ -1159,7 +1159,6 @@ contract BlueFallbackRollingTest is BaseTest {
         return sig;
     }
 
-    /// @dev The incentive `elapsed` seconds into the auction, interpolated between the two configured bounds.
     function expectedIncentive(uint256 elapsed) internal view returns (uint256) {
         uint256 duration = end - start;
         return INCENTIVE_AT_START + (INCENTIVE_AT_END - INCENTIVE_AT_START) * elapsed / duration;
