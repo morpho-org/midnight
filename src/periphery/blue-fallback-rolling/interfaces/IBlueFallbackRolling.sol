@@ -7,7 +7,7 @@ import {MarketParams} from "../../../../lib/morpho-blue/src/interfaces/IMorpho.s
 import {Market} from "../../../interfaces/IMidnight.sol";
 import {Signature, EIP712_DOMAIN_TYPEHASH} from "../../ecrecover-authorizer/interfaces/IEcrecoverAuthorizer.sol";
 
-struct ConfigSigStruct {
+struct RollingSigConfig {
     address user;
     bytes32 midnightId;
     bytes32 blueId;
@@ -21,9 +21,9 @@ struct ConfigSigStruct {
     uint256 deadline;
 }
 
-/// @dev keccak256("ConfigSigStruct(address user,bytes32 midnightId,bytes32 blueId,uint64 start,uint64 end,uint64
+/// @dev keccak256("RollingSigConfig(address user,bytes32 midnightId,bytes32 blueId,uint64 start,uint64 end,uint64
 /// incentiveAtStart,uint64 incentiveAtEnd,uint128 minRollableAssets,bool enabled,uint256 nonce,uint256 deadline)").
-bytes32 constant CONFIG_SIG_STRUCT_TYPEHASH = 0x04585cbb2a64a0940f0981dd6100fcf913e7e4fc7350bdd94061b4ac00cfe57e;
+bytes32 constant ROLLING_SIG_CONFIG_TYPEHASH = 0xe9c26bf889fe81ae74818d999f646de824faee0e125e2c1d5da42d69eb83e5e3;
 
 interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     /// ERRORS ///
@@ -84,7 +84,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         uint128 minRollableAssets,
         bool enabled
     ) external;
-    function setConfigWithSig(ConfigSigStruct memory signedStruct, Signature memory signature) external;
+    function setConfigWithSig(RollingSigConfig memory signedStruct, Signature memory signature) external;
     function roll(
         Market memory midnightMarket,
         MarketParams memory blueMarketParams,

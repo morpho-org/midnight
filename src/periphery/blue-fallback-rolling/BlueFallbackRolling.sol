@@ -11,9 +11,9 @@ import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";
 import {
     IBlueFallbackRolling,
-    ConfigSigStruct,
+    RollingSigConfig,
     Signature,
-    CONFIG_SIG_STRUCT_TYPEHASH,
+    ROLLING_SIG_CONFIG_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IBlueFallbackRolling.sol";
 import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
@@ -73,7 +73,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         );
     }
 
-    function setConfigWithSig(ConfigSigStruct memory signedStruct, Signature memory signature) external override {
+    function setConfigWithSig(RollingSigConfig memory signedStruct, Signature memory signature) external override {
         require(signedStruct.start < signedStruct.end, EndNotAfterStart());
         require(signedStruct.incentiveAtStart <= WAD, IncentiveTooHigh());
         require(signedStruct.incentiveAtEnd <= WAD, IncentiveTooHigh());
@@ -81,7 +81,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         require(block.timestamp <= signedStruct.deadline, Expired());
         require(signedStruct.nonce == nonce[signedStruct.user]++, InvalidNonce());
 
-        bytes32 hashStruct = keccak256(abi.encode(CONFIG_SIG_STRUCT_TYPEHASH, signedStruct));
+        bytes32 hashStruct = keccak256(abi.encode(ROLLING_SIG_CONFIG_TYPEHASH, signedStruct));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
         address signer = ecrecover(digest, signature.v, signature.r, signature.s);

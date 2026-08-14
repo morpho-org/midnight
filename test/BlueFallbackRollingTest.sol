@@ -10,14 +10,14 @@ import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {BlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/BlueFallbackRolling.sol";
 import {
     IBlueFallbackRolling,
-    ConfigSigStruct,
+    RollingSigConfig,
     Signature,
-    CONFIG_SIG_STRUCT_TYPEHASH
+    ROLLING_SIG_CONFIG_TYPEHASH
 } from "../src/periphery/blue-fallback-rolling/interfaces/IBlueFallbackRolling.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
-bytes constant CONFIG_SIG_STRUCT_TYPE =
-    "ConfigSigStruct(address user,bytes32 midnightId,bytes32 blueId,uint64 start,uint64 end,uint64 incentiveAtStart,uint64 incentiveAtEnd,uint128 minRollableAssets,bool enabled,uint256 nonce,uint256 deadline)";
+bytes constant ROLLING_SIG_CONFIG_TYPE =
+    "RollingSigConfig(address user,bytes32 midnightId,bytes32 blueId,uint64 start,uint64 end,uint64 incentiveAtStart,uint64 incentiveAtEnd,uint128 minRollableAssets,bool enabled,uint256 nonce,uint256 deadline)";
 
 contract BlueFallbackRollingTest is BaseTest {
     using MarketParamsLib for MarketParams;
@@ -1199,15 +1199,15 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
-    function testConfigSigStructTypeHash() public pure {
-        assertEq(CONFIG_SIG_STRUCT_TYPEHASH, keccak256(CONFIG_SIG_STRUCT_TYPE));
+    function testRollingSigConfigTypeHash() public pure {
+        assertEq(ROLLING_SIG_CONFIG_TYPEHASH, keccak256(ROLLING_SIG_CONFIG_TYPE));
     }
 
     function testSetConfigWithSig() public {
         uint64 otherEnd = end + 1;
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
-        Signature memory sig = signConfigSigStruct(signedStruct, borrower);
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        Signature memory sig = signRollingSigConfig(signedStruct, borrower);
         assertFalse(
             fallbackContract.isConfig(
                 borrower, configId(start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS)
@@ -1244,9 +1244,9 @@ contract BlueFallbackRollingTest is BaseTest {
 
     function testSetConfigWithSigEnablesRoll() public {
         uint64 otherEnd = end + 1;
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
-        fallbackContract.setConfigWithSig(signedStruct, signConfigSigStruct(signedStruct, borrower));
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        fallbackContract.setConfigWithSig(signedStruct, signRollingSigConfig(signedStruct, borrower));
         vm.warp(otherEnd);
 
         vm.prank(keeper);
@@ -1270,13 +1270,13 @@ contract BlueFallbackRollingTest is BaseTest {
         vm.prank(borrower);
         midnight.setIsAuthorized(lender, true, borrower);
         uint64 otherEnd = end + 1;
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
 
         vm.expectEmit();
         emit IBlueFallbackRolling.SetConfigWithSig(address(this), borrower, 0, lender);
 
-        fallbackContract.setConfigWithSig(signedStruct, signConfigSigStruct(signedStruct, lender));
+        fallbackContract.setConfigWithSig(signedStruct, signRollingSigConfig(signedStruct, lender));
 
         assertTrue(
             fallbackContract.isConfig(
@@ -1286,10 +1286,10 @@ contract BlueFallbackRollingTest is BaseTest {
     }
 
     function testSetConfigWithSigCanDisable() public {
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, false);
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, false);
 
-        fallbackContract.setConfigWithSig(signedStruct, signConfigSigStruct(signedStruct, borrower));
+        fallbackContract.setConfigWithSig(signedStruct, signRollingSigConfig(signedStruct, borrower));
 
         assertFalse(
             fallbackContract.isConfig(
@@ -1313,19 +1313,19 @@ contract BlueFallbackRollingTest is BaseTest {
     }
 
     function testSetConfigWithSigRevertsWhenExpired() public {
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
         signedStruct.deadline = vm.getBlockTimestamp() - 1;
 
         vm.expectRevert(IBlueFallbackRolling.Expired.selector);
-        fallbackContract.setConfigWithSig(signedStruct, signConfigSigStruct(signedStruct, borrower));
+        fallbackContract.setConfigWithSig(signedStruct, signRollingSigConfig(signedStruct, borrower));
     }
 
     function testSetConfigWithSigRevertsOnReplay() public {
         uint64 otherEnd = end + 1;
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
-        Signature memory sig = signConfigSigStruct(signedStruct, borrower);
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        Signature memory sig = signRollingSigConfig(signedStruct, borrower);
         fallbackContract.setConfigWithSig(signedStruct, sig);
 
         vm.expectRevert(IBlueFallbackRolling.InvalidNonce.selector);
@@ -1333,26 +1333,26 @@ contract BlueFallbackRollingTest is BaseTest {
     }
 
     function testSetConfigWithSigRevertsForFutureNonce() public {
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
         signedStruct.nonce = 1;
 
         vm.expectRevert(IBlueFallbackRolling.InvalidNonce.selector);
-        fallbackContract.setConfigWithSig(signedStruct, signConfigSigStruct(signedStruct, borrower));
+        fallbackContract.setConfigWithSig(signedStruct, signRollingSigConfig(signedStruct, borrower));
     }
 
     function testSetConfigWithSigRevertsForUnauthorizedSigner() public {
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
 
         vm.expectRevert(IBlueFallbackRolling.Unauthorized.selector);
-        fallbackContract.setConfigWithSig(signedStruct, signConfigSigStruct(signedStruct, otherLender));
+        fallbackContract.setConfigWithSig(signedStruct, signRollingSigConfig(signedStruct, otherLender));
     }
 
     function testSetConfigWithSigRevertsForInvalidSignature() public {
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
-        Signature memory sig = signConfigSigStruct(signedStruct, borrower);
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        Signature memory sig = signRollingSigConfig(signedStruct, borrower);
         // An out-of-range `v` makes ecrecover return the zero address.
         sig.v = 0;
 
@@ -1361,26 +1361,26 @@ contract BlueFallbackRollingTest is BaseTest {
     }
 
     function testSetConfigWithSigRevertsForEndNotAfterStart() public {
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, start, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, start, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
 
         vm.expectRevert(IBlueFallbackRolling.EndNotAfterStart.selector);
-        fallbackContract.setConfigWithSig(signedStruct, signConfigSigStruct(signedStruct, borrower));
+        fallbackContract.setConfigWithSig(signedStruct, signRollingSigConfig(signedStruct, borrower));
     }
 
     function testSetConfigWithSigRevertsForTooLargeIncentive() public {
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, end, INCENTIVE_AT_START, MAX_INCENTIVE + 1, true);
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, end, INCENTIVE_AT_START, MAX_INCENTIVE + 1, true);
 
         vm.expectRevert(IBlueFallbackRolling.IncentiveTooHigh.selector);
-        fallbackContract.setConfigWithSig(signedStruct, signConfigSigStruct(signedStruct, borrower));
+        fallbackContract.setConfigWithSig(signedStruct, signRollingSigConfig(signedStruct, borrower));
     }
 
     function testSetConfigWithSigRevertsOnAnotherChain(uint64 otherChainId) public {
         vm.assume(otherChainId != block.chainid && otherChainId != 0);
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
-        Signature memory sig = signConfigSigStruct(signedStruct, borrower);
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        Signature memory sig = signRollingSigConfig(signedStruct, borrower);
         vm.chainId(otherChainId);
 
         vm.expectRevert(IBlueFallbackRolling.Unauthorized.selector);
@@ -1389,23 +1389,23 @@ contract BlueFallbackRollingTest is BaseTest {
 
     function testSetConfigWithSigRevertsForAnotherVerifyingContract() public {
         BlueFallbackRolling otherFallbackContract = new BlueFallbackRolling(address(midnight), address(blue));
-        ConfigSigStruct memory signedStruct =
-            makeConfigSigStruct(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
-        Signature memory sig = signConfigSigStruct(signedStruct, borrower, address(otherFallbackContract));
+        RollingSigConfig memory signedStruct =
+            makeRollingSigConfig(borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, true);
+        Signature memory sig = signRollingSigConfig(signedStruct, borrower, address(otherFallbackContract));
 
         vm.expectRevert(IBlueFallbackRolling.Unauthorized.selector);
         fallbackContract.setConfigWithSig(signedStruct, sig);
     }
 
-    function makeConfigSigStruct(
+    function makeRollingSigConfig(
         address user,
         uint64 _start,
         uint64 _end,
         uint64 incentiveAtStart,
         uint64 incentiveAtEnd,
         bool enabled
-    ) internal view returns (ConfigSigStruct memory) {
-        return ConfigSigStruct({
+    ) internal view returns (RollingSigConfig memory) {
+        return RollingSigConfig({
             user: user,
             midnightId: toId(midnightMarket),
             blueId: Id.unwrap(blueMarketParams.id()),
@@ -1420,20 +1420,20 @@ contract BlueFallbackRollingTest is BaseTest {
         });
     }
 
-    function signConfigSigStruct(ConfigSigStruct memory signedStruct, address _signer)
+    function signRollingSigConfig(RollingSigConfig memory signedStruct, address _signer)
         internal
         view
         returns (Signature memory)
     {
-        return signConfigSigStruct(signedStruct, _signer, address(fallbackContract));
+        return signRollingSigConfig(signedStruct, _signer, address(fallbackContract));
     }
 
-    function signConfigSigStruct(ConfigSigStruct memory signedStruct, address _signer, address verifyingContract)
+    function signRollingSigConfig(RollingSigConfig memory signedStruct, address _signer, address verifyingContract)
         internal
         view
         returns (Signature memory)
     {
-        bytes32 hashStruct = keccak256(abi.encode(CONFIG_SIG_STRUCT_TYPEHASH, signedStruct));
+        bytes32 hashStruct = keccak256(abi.encode(ROLLING_SIG_CONFIG_TYPEHASH, signedStruct));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(verifyingContract), hashStruct));
         Signature memory sig;
         (sig.v, sig.r, sig.s) = vm.sign(privateKey[_signer], digest);
