@@ -756,6 +756,7 @@ contract BlueFallbackRollingTest is BaseTest {
     }
 
     function testRollRevertsForPartialRollWhenDebtIsBelowMinRollableAssets() public {
+        // forge-lint: disable-next-line(unsafe-typecast) as DEBT + 1 < type(uint128).max
         uint128 minRollableAssets = uint128(DEBT + 1);
         uint256 assets = DEBT / 4;
         vm.prank(borrower);
@@ -787,6 +788,7 @@ contract BlueFallbackRollingTest is BaseTest {
 
     /// @dev One wei of debt above `minRollableAssets` is enough for the constraint to apply.
     function testRollRevertsWhenDebtIsJustAboveMinRollableAssets() public {
+        // forge-lint: disable-next-line(unsafe-typecast) as DEBT - 1 < type(uint128).max
         uint128 minRollableAssets = uint128(DEBT - 1);
         vm.prank(borrower);
         fallbackContract.setConfig(
