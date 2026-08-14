@@ -62,6 +62,10 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
     }
 
     function setConfigWithSig(ConfigSigStruct memory signedStruct, Signature memory signature) external override {
+        require(signedStruct.start < signedStruct.end, EndNotAfterStart());
+        require(signedStruct.incentiveAtStart <= WAD, IncentiveTooHigh());
+        require(signedStruct.incentiveAtEnd <= WAD, IncentiveTooHigh());
+
         require(block.timestamp <= signedStruct.deadline, Expired());
         require(signedStruct.nonce == nonce[signedStruct.user]++, InvalidNonce());
 
@@ -75,10 +79,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         );
 
         emit SetConfigWithSig(msg.sender, signedStruct.user, signedStruct.nonce, signer);
-
-        require(signedStruct.start < signedStruct.end, EndNotAfterStart());
-        require(signedStruct.incentiveAtStart <= WAD, IncentiveTooHigh());
-        require(signedStruct.incentiveAtEnd <= WAD, IncentiveTooHigh());
 
         bytes32 configId = keccak256(
             abi.encode(
