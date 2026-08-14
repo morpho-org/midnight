@@ -84,7 +84,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
         uint128 minRollableAssets,
         bool enabled
     ) external;
-    function setConfigWithSig(RollingSigConfig memory signedStruct, Signature memory signature) external;
+    function setConfigWithSig(RollingSigConfig memory rollingSigConfig, Signature memory signature) external;
     function roll(
         Market memory midnightMarket,
         MarketParams memory blueMarketParams,

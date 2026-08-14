@@ -73,49 +73,50 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         );
     }
 
-    function setConfigWithSig(RollingSigConfig memory signedStruct, Signature memory signature) external override {
-        require(signedStruct.start < signedStruct.end, EndNotAfterStart());
-        require(signedStruct.incentiveAtStart <= WAD, IncentiveTooHigh());
-        require(signedStruct.incentiveAtEnd <= WAD, IncentiveTooHigh());
+    function setConfigWithSig(RollingSigConfig memory rollingSigConfig, Signature memory signature) external override {
+        require(rollingSigConfig.start < rollingSigConfig.end, EndNotAfterStart());
+        require(rollingSigConfig.incentiveAtStart <= WAD, IncentiveTooHigh());
+        require(rollingSigConfig.incentiveAtEnd <= WAD, IncentiveTooHigh());
 
-        require(block.timestamp <= signedStruct.deadline, Expired());
-        require(signedStruct.nonce == nonce[signedStruct.user]++, InvalidNonce());
+        require(block.timestamp <= rollingSigConfig.deadline, Expired());
+        require(rollingSigConfig.nonce == nonce[rollingSigConfig.user]++, InvalidNonce());
 
-        bytes32 hashStruct = keccak256(abi.encode(ROLLING_SIG_CONFIG_TYPEHASH, signedStruct));
+        bytes32 hashStruct = keccak256(abi.encode(ROLLING_SIG_CONFIG_TYPEHASH, rollingSigConfig));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
         address signer = ecrecover(digest, signature.v, signature.r, signature.s);
         require(signer != address(0), InvalidSignature());
         require(
-            signer == signedStruct.user || IMidnight(MIDNIGHT).isAuthorized(signedStruct.user, signer), Unauthorized()
+            signer == rollingSigConfig.user || IMidnight(MIDNIGHT).isAuthorized(rollingSigConfig.user, signer),
+            Unauthorized()
         );
 
-        emit SetConfigWithSig(msg.sender, signedStruct.user, signedStruct.nonce, signer);
+        emit SetConfigWithSig(msg.sender, rollingSigConfig.user, rollingSigConfig.nonce, signer);
 
         bytes32 configId = keccak256(
             abi.encode(
-                signedStruct.midnightId,
-                signedStruct.blueId,
-                signedStruct.start,
-                signedStruct.end,
-                signedStruct.incentiveAtStart,
-                signedStruct.incentiveAtEnd,
-                signedStruct.minRollableAssets
+                rollingSigConfig.midnightId,
+                rollingSigConfig.blueId,
+                rollingSigConfig.start,
+                rollingSigConfig.end,
+                rollingSigConfig.incentiveAtStart,
+                rollingSigConfig.incentiveAtEnd,
+                rollingSigConfig.minRollableAssets
             )
         );
-        isConfig[signedStruct.user][configId] = signedStruct.enabled;
+        isConfig[rollingSigConfig.user][configId] = rollingSigConfig.enabled;
 
         emit SetConfig(
             msg.sender,
-            signedStruct.user,
-            signedStruct.midnightId,
-            signedStruct.blueId,
-            signedStruct.start,
-            signedStruct.end,
-            signedStruct.incentiveAtStart,
-            signedStruct.incentiveAtEnd,
-            signedStruct.minRollableAssets,
-            signedStruct.enabled
+            rollingSigConfig.user,
+            rollingSigConfig.midnightId,
+            rollingSigConfig.blueId,
+            rollingSigConfig.start,
+            rollingSigConfig.end,
+            rollingSigConfig.incentiveAtStart,
+            rollingSigConfig.incentiveAtEnd,
+            rollingSigConfig.minRollableAssets,
+            rollingSigConfig.enabled
         );
     }
 
