@@ -11,9 +11,9 @@ import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";
 import {
     IBlueFallbackRolling,
-    ConfigAuthorization,
+    ConfigSigStruct,
     Signature,
-    CONFIG_AUTHORIZATION_TYPEHASH,
+    CONFIG_SIG_STRUCT_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IBlueFallbackRolling.sol";
 import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
@@ -48,60 +48,61 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint128 minRollableAssets,
         bool enabled
     ) external override {
-        _setConfig(
-            msg.sender, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets, enabled
-        );
-    }
-
-    function setConfigWithSig(ConfigAuthorization memory authorization, Signature memory signature) external override {
-        require(block.timestamp <= authorization.deadline, Expired());
-        require(authorization.nonce == nonce[authorization.user]++, InvalidNonce());
-
-        bytes32 hashStruct = keccak256(abi.encode(CONFIG_AUTHORIZATION_TYPEHASH, authorization));
-        bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
-        address signer = ecrecover(digest, signature.v, signature.r, signature.s);
-        require(signer != address(0), InvalidSignature());
-        require(
-            signer == authorization.user || IMidnight(MIDNIGHT).isAuthorized(authorization.user, signer), Unauthorized()
-        );
-
-        emit SetConfigWithSig(msg.sender, authorization.user, authorization.nonce, signer);
-
-        _setConfig(
-            authorization.user,
-            authorization.midnightId,
-            authorization.blueId,
-            authorization.start,
-            authorization.end,
-            authorization.incentiveAtStart,
-            authorization.incentiveAtEnd,
-            authorization.minRollableAssets,
-            authorization.enabled
-        );
-    }
-
-    function _setConfig(
-        address user,
-        bytes32 midnightId,
-        bytes32 blueId,
-        uint64 start,
-        uint64 end,
-        uint64 incentiveAtStart,
-        uint64 incentiveAtEnd,
-        uint128 minRollableAssets,
-        bool enabled
-    ) internal {
         require(start < end, EndNotAfterStart());
         require(incentiveAtStart <= WAD, IncentiveTooHigh());
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
 
         bytes32 configId =
             keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets));
-        isConfig[user][configId] = enabled;
+        isConfig[msg.sender][configId] = enabled;
 
         emit SetConfig(
-            user, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets, enabled
+            msg.sender, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets, enabled
+        );
+    }
+
+    function setConfigWithSig(ConfigSigStruct memory signedStruct, Signature memory signature) external override {
+        require(block.timestamp <= signedStruct.deadline, Expired());
+        require(signedStruct.nonce == nonce[signedStruct.user]++, InvalidNonce());
+
+        bytes32 hashStruct = keccak256(abi.encode(CONFIG_SIG_STRUCT_TYPEHASH, signedStruct));
+        bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+        address signer = ecrecover(digest, signature.v, signature.r, signature.s);
+        require(signer != address(0), InvalidSignature());
+        require(
+            signer == signedStruct.user || IMidnight(MIDNIGHT).isAuthorized(signedStruct.user, signer), Unauthorized()
+        );
+
+        emit SetConfigWithSig(msg.sender, signedStruct.user, signedStruct.nonce, signer);
+
+        require(signedStruct.start < signedStruct.end, EndNotAfterStart());
+        require(signedStruct.incentiveAtStart <= WAD, IncentiveTooHigh());
+        require(signedStruct.incentiveAtEnd <= WAD, IncentiveTooHigh());
+
+        bytes32 configId = keccak256(
+            abi.encode(
+                signedStruct.midnightId,
+                signedStruct.blueId,
+                signedStruct.start,
+                signedStruct.end,
+                signedStruct.incentiveAtStart,
+                signedStruct.incentiveAtEnd,
+                signedStruct.minRollableAssets
+            )
+        );
+        isConfig[signedStruct.user][configId] = signedStruct.enabled;
+
+        emit SetConfig(
+            signedStruct.user,
+            signedStruct.midnightId,
+            signedStruct.blueId,
+            signedStruct.start,
+            signedStruct.end,
+            signedStruct.incentiveAtStart,
+            signedStruct.incentiveAtEnd,
+            signedStruct.minRollableAssets,
+            signedStruct.enabled
         );
     }
 
