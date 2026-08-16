@@ -11,9 +11,9 @@ import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";
 import {
     IBlueFallbackRolling,
-    RollingSigConfig,
+    RollingConfigSig,
     Signature,
-    ROLLING_SIG_CONFIG_TYPEHASH,
+    ROLLING_CONFIG_SIG_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IBlueFallbackRolling.sol";
 import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
@@ -73,50 +73,50 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         );
     }
 
-    function setConfigWithSig(RollingSigConfig memory rollingSigConfig, Signature memory signature) external override {
-        require(rollingSigConfig.start < rollingSigConfig.end, EndNotAfterStart());
-        require(rollingSigConfig.incentiveAtStart <= WAD, IncentiveTooHigh());
-        require(rollingSigConfig.incentiveAtEnd <= WAD, IncentiveTooHigh());
+    function setConfigWithSig(RollingConfigSig memory rollingConfigSig, Signature memory signature) external override {
+        require(rollingConfigSig.start < rollingConfigSig.end, EndNotAfterStart());
+        require(rollingConfigSig.incentiveAtStart <= WAD, IncentiveTooHigh());
+        require(rollingConfigSig.incentiveAtEnd <= WAD, IncentiveTooHigh());
 
-        require(block.timestamp <= rollingSigConfig.deadline, Expired());
-        require(rollingSigConfig.nonce == nonce[rollingSigConfig.user]++, InvalidNonce());
+        require(block.timestamp <= rollingConfigSig.deadline, Expired());
+        require(rollingConfigSig.nonce == nonce[rollingConfigSig.user]++, InvalidNonce());
 
-        bytes32 hashStruct = keccak256(abi.encode(ROLLING_SIG_CONFIG_TYPEHASH, rollingSigConfig));
+        bytes32 hashStruct = keccak256(abi.encode(ROLLING_CONFIG_SIG_TYPEHASH, rollingConfigSig));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
         address signer = ecrecover(digest, signature.v, signature.r, signature.s);
         require(signer != address(0), InvalidSignature());
         require(
-            signer == rollingSigConfig.user || IMidnight(MIDNIGHT).isAuthorized(rollingSigConfig.user, signer),
+            signer == rollingConfigSig.user || IMidnight(MIDNIGHT).isAuthorized(rollingConfigSig.user, signer),
             Unauthorized()
         );
 
-        emit SetConfigWithSig(msg.sender, rollingSigConfig.user, rollingSigConfig.nonce, signer);
-
         bytes32 configId = keccak256(
             abi.encode(
-                rollingSigConfig.midnightId,
-                rollingSigConfig.blueId,
-                rollingSigConfig.start,
-                rollingSigConfig.end,
-                rollingSigConfig.incentiveAtStart,
-                rollingSigConfig.incentiveAtEnd,
-                rollingSigConfig.minRollableAssets
+                rollingConfigSig.midnightId,
+                rollingConfigSig.blueId,
+                rollingConfigSig.start,
+                rollingConfigSig.end,
+                rollingConfigSig.incentiveAtStart,
+                rollingConfigSig.incentiveAtEnd,
+                rollingConfigSig.minRollableAssets
             )
         );
-        isConfig[rollingSigConfig.user][configId] = rollingSigConfig.enabled;
+        isConfig[rollingConfigSig.user][configId] = rollingConfigSig.enabled;
 
-        emit SetConfig(
+        emit SetConfigWithSig(
             msg.sender,
-            rollingSigConfig.user,
-            rollingSigConfig.midnightId,
-            rollingSigConfig.blueId,
-            rollingSigConfig.start,
-            rollingSigConfig.end,
-            rollingSigConfig.incentiveAtStart,
-            rollingSigConfig.incentiveAtEnd,
-            rollingSigConfig.minRollableAssets,
-            rollingSigConfig.enabled
+            rollingConfigSig.user,
+            rollingConfigSig.midnightId,
+            rollingConfigSig.blueId,
+            rollingConfigSig.start,
+            rollingConfigSig.end,
+            rollingConfigSig.incentiveAtStart,
+            rollingConfigSig.incentiveAtEnd,
+            rollingConfigSig.minRollableAssets,
+            rollingConfigSig.enabled,
+            rollingConfigSig.nonce,
+            signer
         );
     }
 
