@@ -43,11 +43,10 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint128 minRollableAssets,
         bool enabled
     ) external override {
+        require(msg.sender == user || IMidnight(MIDNIGHT).isAuthorized(user, msg.sender), Unauthorized());
         require(start < end, EndNotAfterStart());
         require(incentiveAtStart <= WAD, IncentiveTooHigh());
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
-
-        require(msg.sender == user || IMidnight(MIDNIGHT).isAuthorized(user, msg.sender), Unauthorized());
 
         bytes32 configId =
             keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets));
