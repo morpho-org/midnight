@@ -656,6 +656,61 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
+    function testSetConfigByMidnightAuthorizedCaller() public {
+        vm.prank(borrower);
+        midnight.setIsAuthorized(lender, true, borrower);
+        uint64 otherEnd = end + 1;
+
+        vm.expectEmit(address(fallbackContract));
+        emit IBlueFallbackRolling.SetConfig(
+            lender,
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            otherEnd,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+
+        vm.prank(lender);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            otherEnd,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+
+        assertTrue(
+            fallbackContract.isConfig(
+                borrower, configId(start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS)
+            )
+        );
+    }
+
+    function testSetConfigRevertsForUnauthorizedCaller() public {
+        vm.expectRevert(IBlueFallbackRolling.Unauthorized.selector);
+        vm.prank(keeper);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+    }
+
     function testRollEmitsRoll() public {
         uint256 collateralAssets = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
         vm.warp(end);
