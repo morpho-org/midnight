@@ -38,41 +38,55 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
-    /// EXTERNAL CALLBACKS — prevent havoc of ghosts on unresolved calls in `take` /
-    /// `liquidate` / `flashLoan`. Signatures MUST match the real callbacks exactly
-    /// (ICallbacks.sol / IRatifier.sol); a mismatched arg list yields a different
-    /// selector, so the `_.` summary does NOT apply and the call falls through to
-    /// AUTO => DEFAULT HAVOC, which havocs the (non-persistent) credit ghosts.
+    /// EXTERNAL CALLBACKS — prevent havoc of ghosts and variables in callbacks.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
-    function _.isRatified(Midnight.Offer, bytes) external => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => NONDET;
     function _.onFlashLoan(address, address[], uint256[], bytes) external => NONDET;
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
-
-    /// EXTERNAL TOKEN CALLS — defensive, redundant with SafeTransferLib NONDET. ///
-    function _.transfer(address, uint256) external => NONDET;
-    function _.transferFrom(address, address, uint256) external => NONDET;
 }
 
-/// MULDIV FUNCTION SUMMARIES — axiomatic (deterministic ghost + rounding bound) instead of the exact
-/// `a*b/d`, to avoid a nonlinear division term at every call site. The only invariant-relevant mulDiv is
-/// liquidate's loss-index update (Midnight.sol:591) and the continuousFeeCredit slash (Midnight.sol:597),
-/// both of which need only the rounds-down bound `result*d <= a*b` (proved in MulDiv.spec:mulDivDownRoundsDown).
-/// mulDivUp's calls here feed badDebt / pendingFee, whose exact values are immaterial to sumOfCreditsBody,
-/// so it needs no bound (a bare deterministic ghost suffices).
+/// GHOSTS ///
+
+persistent ghost mathint PRECISION {
+    axiom PRECISION > 0;
+}
+
+ghost mapping(bytes32 => mathint) sumPreciseCreditDivIndex {
+    init_state axiom forall bytes32 id. sumPreciseCreditDivIndex[id] == 0;
+    axiom forall bytes32 id. sumPreciseCreditDivIndex[id] >= 0;
+}
+
+ghost mapping(bytes32 => mapping(address => mathint)) preciseCreditDivIndex {
+    init_state axiom forall bytes32 id. forall address user. preciseCreditDivIndex[id][user] == 0;
+    axiom forall bytes32 id. forall address user. preciseCreditDivIndex[id][user] >= 0;
+}
+
+// Instead of using the builtin `*`, which requires unstable non-linear arithemetic, we
+// use the uninterpreted function `multiply` and only instantiate those axioms we need for proving.
+// `multiply(a, b)` IS the product `a * b` declared as an uninterpreted function.
+persistent ghost multiply(mathint, mathint) returns mathint {
+    axiom forall mathint a. forall mathint b. (a > 0 && b > 0) => multiply(a, b) > 0;
+    axiom forall mathint a. multiply(a, 0) == 0;
+    axiom forall mathint b. multiply(0, b) == 0;
+}
+
+// Distributivity axiom.
+definition axiomDistributivity(mathint a, mathint b, mathint c) returns bool = multiply(a + b, c) == multiply(a, c) + multiply(b, c);
+
+// Symmetry axiom over associativity.
+definition axiomAssocComm(mathint a, mathint b, mathint c) returns bool = multiply(multiply(a, b), c) == multiply(multiply(a, c), b);
+
+// Linear order axiom for multiplication with positive constants.
+definition axiomLeMulPos(mathint a, mathint b, mathint c) returns bool = c > 0 => ((a <= b) <=> (multiply(a, c) <= multiply(b, c)));
+
+/// MULDIV FUNCTION SUMMARIES — axiomatic: TODO rebase on mulDivAxiom pull request.
 persistent ghost mulDivDownGhost(mathint, mathint, mathint) returns mathint {
     axiom forall mathint a. forall mathint b. forall mathint d. mulDivDownGhost(a, b, d) >= 0;
     axiom forall mathint a. forall mathint d. d > 0 => mulDivDownGhost(a, 0, d) == 0;
     axiom forall mathint b. forall mathint d. d > 0 => mulDivDownGhost(0, b, d) == 0;
 
-    // RAW-arithmetic form only (not also a multiply-wrapped duplicate): liquidate's
-    // closing argument grounds sum*M and (tu-cf)*PRECISION to real arithmetic (single,
-    // non-aggregate products -- cheap; see the liquidate rule), and lossFactorLeqLastLossFactor
-    // compares raw mapIndex values directly, never through `multiply`. Keeping only one
-    // form avoids giving the solver two redundant bounds to case on at the same call sites.
+    // The following is the mulDivBound axiom stated using the `multiply` function.
     axiom forall mathint a. forall mathint b. forall mathint d. d > 0 => multiply(d, mulDivDownGhost(a, b, d)) <= multiply(b, a);
     axiom forall mathint a. forall mathint b. forall mathint d. d > 0 => multiply(mulDivDownGhost(a, b, d), d) <= multiply(a, b);
 }
@@ -96,38 +110,6 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     }
     return require_uint256(mulDivUpGhost(a, b, d));
 }
-
-/// GHOSTS ///
-
-persistent ghost mathint PRECISION {
-    axiom PRECISION > 0;
-}
-
-ghost mapping(bytes32 => mathint) sumPreciseCreditDivIndex {
-    init_state axiom forall bytes32 id. sumPreciseCreditDivIndex[id] == 0;
-    axiom forall bytes32 id. sumPreciseCreditDivIndex[id] >= 0;
-}
-
-ghost mapping(bytes32 => mapping(address => mathint)) preciseCreditDivIndex {
-    init_state axiom forall bytes32 id. forall address user. preciseCreditDivIndex[id][user] == 0;
-    axiom forall bytes32 id. forall address user. preciseCreditDivIndex[id][user] >= 0;
-}
-
-// `multiply(a, b)` IS the product `a * b` declared as an uninterpreted function.
-persistent ghost multiply(mathint, mathint) returns mathint {
-    axiom forall mathint a. forall mathint b. (a > 0 && b > 0) => multiply(a, b) > 0;
-    axiom forall mathint a. multiply(a, 0) == 0;
-    axiom forall mathint b. multiply(0, b) == 0;
-}
-
-// Distributivity axiom.
-definition axiomDistributivity(mathint a, mathint b, mathint c) returns bool = multiply(a + b, c) == multiply(a, c) + multiply(b, c);
-
-// Symmetry axiom over associativity.
-definition axiomAssocComm(mathint a, mathint b, mathint c) returns bool = multiply(multiply(a, b), c) == multiply(multiply(a, c), b);
-
-// Linear order axiom for multiplication with nonnegative constants.
-definition axiomLeMulPos(mathint a, mathint b, mathint c) returns bool = c >= 0 => ((a <= b) <=> (multiply(a, c) <= multiply(b, c)));
 
 /// HELPER DEFINITIONS ///
 
@@ -299,7 +281,7 @@ strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
 // mulDivDownGhost rounds-down bound (it verifies in the parametric invariant),
 // and `sum` is a single snapshot here (not the touched-user delta), so the
 // withdraw-style NIA divergence does not occur.
-rule sumOfCreditsLeTotalUnits_liquidate(bytes32 id, env e, Midnight.Market obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
+rule sumOfCreditsLeTotalUnitsPreservedByLiquidate(bytes32 id, env e, Midnight.Market obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     require sumOfCreditsBody(id);
     requireInvariant preciseCreditCorrect(id, borrower);
     requireInvariant lossFactorLeqLastLossFactor(id, borrower);
@@ -363,7 +345,7 @@ rule sumOfCreditsLeTotalUnits_liquidate(bytes32 id, env e, Midnight.Market oblig
     assert sumOfCreditsBody(id);
 }
 
-rule sumOfCreditsLeTotalUnits_take(bytes32 id, env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
+rule sumOfCreditsLeTotalUnitsPreservedByTake(bytes32 id, env e, uint256 units, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, Midnight.Offer offer, bytes ratifierData, bytes32 root, bytes32[] proof) {
     require sumOfCreditsBody(id);
 
     // Determine buyer and seller
