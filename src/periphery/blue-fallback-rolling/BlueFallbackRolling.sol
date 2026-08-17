@@ -44,7 +44,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         bool enabled
     ) external override {
         require(msg.sender == user || IMidnight(MIDNIGHT).isAuthorized(user, msg.sender), Unauthorized());
-        require(start <= end, EndNotAfterStart());
+        require(start < end, EndNotAfterStart());
         require(incentiveAtStart <= WAD, IncentiveTooHigh());
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
 
