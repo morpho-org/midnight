@@ -13,6 +13,7 @@ import {IBlueFallbackRolling} from "./interfaces/IBlueFallbackRolling.sol";
 import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
+/// @dev Configs can be set by the user or by an address authorized for them on Midnight.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
     using UtilsLib for uint128;
@@ -29,6 +30,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
 
     /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
     function setConfig(
+        address user,
         bytes32 midnightId,
         bytes32 blueId,
         uint64 start,
@@ -40,11 +42,12 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         require(start < end, EndNotAfterStart());
         require(incentiveAtStart <= WAD, IncentiveTooHigh());
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
+        require(msg.sender == user || IMidnight(MIDNIGHT).isAuthorized(user, msg.sender), Unauthorized());
 
-        isConfig[msg.sender][keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd))] =
-            enabled;
+        isConfig[user][keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd))] =
+        enabled;
 
-        emit SetConfig(msg.sender, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, enabled);
+        emit SetConfig(msg.sender, user, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, enabled);
     }
 
     function roll(
