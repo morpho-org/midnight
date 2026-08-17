@@ -29,8 +29,8 @@ contract ERC20NoReturn is PermitExt {
         _transfer(_from, _to, _amount);
     }
 
-    function approve(address _spender, uint256 _amount) public returns (bool) {
+    /// @dev Declares no return value, so approvals on this token must go through `ERC20Lib.safeApprove`.
+    function approve(address _spender, uint256 _amount) public {
         allowance[msg.sender][_spender] = _amount;
-        return true;
     }
 }

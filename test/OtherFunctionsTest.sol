@@ -13,6 +13,7 @@ import {
 import {Midnight} from "../src/Midnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
+import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -155,7 +156,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(borrower);
         midnight.setIsAuthorized(caller, true, borrower);
         vm.prank(address(callback));
-        loanToken.approve(address(midnight), repaid);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), repaid);
 
         vm.prank(caller);
         midnight.repay(market, repaid, borrower, address(callback), data);
@@ -178,7 +179,7 @@ contract OtherFunctionsTest is BaseTest {
         address callback = address(new InvalidRepayCallback());
         deal(address(loanToken), callback, repaid);
         vm.prank(callback);
-        loanToken.approve(address(midnight), repaid);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), repaid);
 
         vm.expectRevert(IMidnight.WrongRepayCallbackReturnValue.selector);
         vm.prank(borrower);
@@ -828,7 +829,7 @@ contract RepayCallback {
     function repay(Midnight midnight, Market memory market, uint256 units, address onBehalf, bytes memory data)
         external
     {
-        ERC20(market.loanToken).approve(address(midnight), units);
+        ERC20Lib.safeApprove(market.loanToken, address(midnight), units);
         midnight.repay(market, units, onBehalf, address(this), data);
     }
 
