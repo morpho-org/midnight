@@ -726,6 +726,22 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
+    function testSetConfigChecksAuthorizationFirst() public {
+        vm.expectRevert(IBlueFallbackRolling.Unauthorized.selector);
+        vm.prank(keeper);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            start,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+    }
+
     function testRollEmitsRoll() public {
         uint256 collateralAssets = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
         vm.warp(end);
