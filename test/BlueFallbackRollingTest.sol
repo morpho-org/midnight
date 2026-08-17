@@ -818,7 +818,7 @@ contract BlueFallbackRollingTest is BaseTest {
     }
 
     function testRollRevertsForAssetsBelowMinRollableAssets() public {
-        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
+        vm.expectRevert(IBlueFallbackRolling.RolledAssetsTooLow.selector);
         vm.prank(keeper);
         fallbackContract.roll(
             midnightMarket,
@@ -867,7 +867,7 @@ contract BlueFallbackRollingTest is BaseTest {
             true
         );
 
-        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
+        vm.expectRevert(IBlueFallbackRolling.RolledAssetsTooLow.selector);
         vm.prank(keeper);
         fallbackContract.roll(
             midnightMarket,
@@ -899,7 +899,7 @@ contract BlueFallbackRollingTest is BaseTest {
             true
         );
 
-        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
+        vm.expectRevert(IBlueFallbackRolling.RolledAssetsTooLow.selector);
         vm.prank(keeper);
         fallbackContract.roll(
             midnightMarket,
@@ -996,7 +996,7 @@ contract BlueFallbackRollingTest is BaseTest {
             DEBT - remainder
         );
 
-        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
+        vm.expectRevert(IBlueFallbackRolling.RolledAssetsTooLow.selector);
         vm.prank(keeper);
         fallbackContract.roll(
             midnightMarket,
@@ -1071,7 +1071,7 @@ contract BlueFallbackRollingTest is BaseTest {
         );
         uint256 totalCollateralAssets = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
 
-        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
+        vm.expectRevert(IBlueFallbackRolling.RolledAssetsTooLow.selector);
         vm.prank(keeper);
         fallbackContract.roll(
             midnightMarket,

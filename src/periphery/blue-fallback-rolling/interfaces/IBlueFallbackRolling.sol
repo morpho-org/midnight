@@ -17,7 +17,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     error NotBlue();
     error NotConfigured();
     error NotStarted();
-    error RollableAssetsTooLow();
+    error RolledAssetsTooLow();
     error Unauthorized();
 
     // forgefmt: disable-start
