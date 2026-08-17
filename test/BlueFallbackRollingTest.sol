@@ -547,6 +547,26 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
+    function testSetConfigAllowsEndAtStart() public {
+        fallbackContract.setConfig(
+            address(this),
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            start,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_START,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+
+        assertTrue(
+            fallbackContract.isConfig(
+                address(this), configId(start, start, INCENTIVE_AT_START, INCENTIVE_AT_START, MIN_ROLLABLE_ASSETS)
+            )
+        );
+    }
+
     function testSetConfigAllowsOneIncentive() public {
         vm.prank(borrower);
         fallbackContract.setConfig(
