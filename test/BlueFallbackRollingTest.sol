@@ -19,6 +19,8 @@ contract BlueFallbackRollingTest is BaseTest {
     uint64 internal constant INCENTIVE_AT_END = 0.001e18;
     uint64 internal constant MAX_INCENTIVE = 1e18;
     uint256 internal constant DEBT = 10_000e18;
+    uint128 internal constant MIN_ROLLABLE_ASSETS = 2_500e18;
+    uint256 internal constant MIN_FUZZED_ASSETS = 0.0001e18;
 
     address internal keeper = makeAddr("keeper");
     IMorpho internal blue;
@@ -95,6 +97,7 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             true
         );
     }
@@ -105,7 +108,15 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
 
         uint256 incentiveAssets = DEBT * INCENTIVE_AT_END / WAD;
@@ -125,7 +136,15 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, debtAssets
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            debtAssets
         );
 
         uint256 incentiveAssets = debtAssets * INCENTIVE_AT_END / WAD;
@@ -151,13 +170,22 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             INCENTIVE_AT_START,
             INCENTIVE_AT_START,
+            MIN_ROLLABLE_ASSETS,
             true
         );
         vm.warp(start + elapsed);
 
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_START, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_START,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
 
         assertEq(loanToken.balanceOf(keeper), DEBT * INCENTIVE_AT_START / WAD);
@@ -169,7 +197,15 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
 
         assertEq(loanToken.balanceOf(keeper), DEBT * INCENTIVE_AT_END / WAD);
@@ -182,7 +218,15 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
 
         assertEq(loanToken.balanceOf(keeper), DEBT * expectedIncentive(elapsed) / WAD);
@@ -201,13 +245,22 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             INCENTIVE_AT_END,
             INCENTIVE_AT_START,
+            MIN_ROLLABLE_ASSETS,
             true
         );
         vm.warp(start + elapsed);
 
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_END, INCENTIVE_AT_START, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_END,
+            INCENTIVE_AT_START,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
 
         uint256 duration = end - start;
@@ -230,13 +283,22 @@ contract BlueFallbackRollingTest is BaseTest {
             lateEnd,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             true
         );
         vm.warp(midnightMarket.maturity);
 
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, lateEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            lateEnd,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
 
         uint256 elapsed = midnightMarket.maturity - start;
@@ -249,7 +311,15 @@ contract BlueFallbackRollingTest is BaseTest {
     function testRollAtStartPaysTheStartIncentive() public {
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
 
         assertEq(loanToken.balanceOf(keeper), DEBT * INCENTIVE_AT_START / WAD);
@@ -267,13 +337,22 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             true
         );
 
         vm.expectRevert(IBlueFallbackRolling.NotStarted.selector);
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, futureStart, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            futureStart,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
     }
 
@@ -284,7 +363,15 @@ contract BlueFallbackRollingTest is BaseTest {
         vm.expectRevert(IBlueFallbackRolling.Ended.selector);
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
     }
 
@@ -294,7 +381,15 @@ contract BlueFallbackRollingTest is BaseTest {
         vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
     }
 
@@ -302,7 +397,15 @@ contract BlueFallbackRollingTest is BaseTest {
         vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end + 1, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end + 1,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
     }
 
@@ -317,13 +420,22 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             true
         );
 
         vm.expectRevert(IBlueFallbackRolling.InconsistentLoanToken.selector);
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
     }
 
@@ -333,7 +445,15 @@ contract BlueFallbackRollingTest is BaseTest {
         vm.expectRevert(IBlueFallbackRolling.IncorrectActivatedCollateral.selector);
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
     }
 
@@ -347,33 +467,15 @@ contract BlueFallbackRollingTest is BaseTest {
         vm.expectRevert(IBlueFallbackRolling.InconsistentCollateralToken.selector);
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
-        );
-    }
-
-    function testRollRevertsWhenBlueLltvIsLowerThanMidnightLltv() public {
-        uint256 lowLltv = LLTV - 1;
-        blue.enableLltv(lowLltv);
-        MarketParams memory lowBlueMarketParams = blueMarketParams;
-        lowBlueMarketParams.lltv = lowLltv;
-        blue.createMarket(lowBlueMarketParams);
-
-        vm.prank(borrower);
-        fallbackContract.setConfig(
+            midnightMarket,
+            blueMarketParams,
             borrower,
-            toId(midnightMarket),
-            Id.unwrap(lowBlueMarketParams.id()),
             start,
             end,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
-            true
-        );
-
-        vm.expectRevert(IBlueFallbackRolling.BlueLltvTooLow.selector);
-        vm.prank(keeper);
-        fallbackContract.roll(
-            midnightMarket, lowBlueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
     }
 
@@ -389,7 +491,11 @@ contract BlueFallbackRollingTest is BaseTest {
     }
 
     function testSetConfig() public view {
-        assertTrue(fallbackContract.isConfig(borrower, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END)));
+        assertTrue(
+            fallbackContract.isConfig(
+                borrower, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS)
+            )
+        );
     }
 
     function testSetConfigRevertsForTooLargeIncentiveAtEnd() public {
@@ -404,6 +510,7 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             INCENTIVE_AT_START,
             incentiveAtEnd,
+            MIN_ROLLABLE_ASSETS,
             true
         );
     }
@@ -420,6 +527,7 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             incentiveAtStart,
             MAX_INCENTIVE,
+            MIN_ROLLABLE_ASSETS,
             true
         );
     }
@@ -434,6 +542,7 @@ contract BlueFallbackRollingTest is BaseTest {
             start - 1,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             true
         );
     }
@@ -448,6 +557,7 @@ contract BlueFallbackRollingTest is BaseTest {
             start,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             true
         );
     }
@@ -462,10 +572,13 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             MAX_INCENTIVE,
             MAX_INCENTIVE,
+            MIN_ROLLABLE_ASSETS,
             true
         );
 
-        assertTrue(fallbackContract.isConfig(borrower, configId(start, end, MAX_INCENTIVE, MAX_INCENTIVE)));
+        assertTrue(
+            fallbackContract.isConfig(borrower, configId(start, end, MAX_INCENTIVE, MAX_INCENTIVE, MIN_ROLLABLE_ASSETS))
+        );
     }
 
     function testSetConfigCanDisable() public {
@@ -478,14 +591,27 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             false
         );
 
-        assertFalse(fallbackContract.isConfig(borrower, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END)));
+        assertFalse(
+            fallbackContract.isConfig(
+                borrower, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS)
+            )
+        );
 
         vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
     }
 
@@ -500,11 +626,20 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             MAX_INCENTIVE,
             MAX_INCENTIVE,
+            MIN_ROLLABLE_ASSETS,
             true
         );
 
-        assertTrue(fallbackContract.isConfig(borrower, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END)));
-        assertTrue(fallbackContract.isConfig(borrower, configId(otherStart, end, MAX_INCENTIVE, MAX_INCENTIVE)));
+        assertTrue(
+            fallbackContract.isConfig(
+                borrower, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS)
+            )
+        );
+        assertTrue(
+            fallbackContract.isConfig(
+                borrower, configId(otherStart, end, MAX_INCENTIVE, MAX_INCENTIVE, MIN_ROLLABLE_ASSETS)
+            )
+        );
     }
 
     function testSetConfigEmitsSetConfig() public {
@@ -518,6 +653,7 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             false
         );
 
@@ -530,6 +666,7 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             false
         );
     }
@@ -549,6 +686,7 @@ contract BlueFallbackRollingTest is BaseTest {
             otherEnd,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             true
         );
 
@@ -561,10 +699,15 @@ contract BlueFallbackRollingTest is BaseTest {
             otherEnd,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             true
         );
 
-        assertTrue(fallbackContract.isConfig(borrower, configId(start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END)));
+        assertTrue(
+            fallbackContract.isConfig(
+                borrower, configId(start, otherEnd, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS)
+            )
+        );
     }
 
     function testSetConfigRevertsForUnauthorizedCaller() public {
@@ -578,6 +721,7 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
             true
         );
     }
@@ -599,7 +743,15 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
         );
     }
 
@@ -607,12 +759,20 @@ contract BlueFallbackRollingTest is BaseTest {
         elapsed = bound(elapsed, 0, end - start);
         vm.prank(borrower);
         fallbackContract.setConfig(
-            borrower, toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, end, 0, 0, true
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            0,
+            0,
+            MIN_ROLLABLE_ASSETS,
+            true
         );
         vm.warp(start + elapsed);
 
         vm.prank(keeper);
-        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, end, 0, 0, DEBT);
+        fallbackContract.roll(midnightMarket, blueMarketParams, borrower, start, end, 0, 0, MIN_ROLLABLE_ASSETS, DEBT);
 
         assertEq(loanToken.balanceOf(keeper), 0);
         assertEq(loanToken.balanceOf(address(fallbackContract)), 0);
@@ -621,18 +781,413 @@ contract BlueFallbackRollingTest is BaseTest {
 
     /// @dev Rolling with zero assets reverts in Blue's supply collateral.
     function testRollRevertsForZeroAssets() public {
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            0,
+            true
+        );
+
         vm.expectRevert(bytes("zero assets"));
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, 0
+            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, 0, 0
         );
+    }
+
+    function testRollRevertsForAssetsBelowMinRollableAssets() public {
+        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            MIN_ROLLABLE_ASSETS - 1
+        );
+    }
+
+    function testRollAtMinRollableAssets() public {
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            MIN_ROLLABLE_ASSETS
+        );
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), DEBT - MIN_ROLLABLE_ASSETS);
+    }
+
+    function testRollRevertsForPartialRollWhenDebtIsBelowMinRollableAssets() public {
+        // forge-lint: disable-next-line(unsafe-typecast) as DEBT + 1 < type(uint128).max
+        uint128 minRollableAssets = uint128(DEBT + 1);
+        uint256 assets = DEBT / 4;
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            true
+        );
+
+        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            assets
+        );
+    }
+
+    /// @dev One wei of debt above `minRollableAssets` is enough for the constraint to apply.
+    function testRollRevertsWhenDebtIsJustAboveMinRollableAssets() public {
+        // forge-lint: disable-next-line(unsafe-typecast) as DEBT - 1 < type(uint128).max
+        uint128 minRollableAssets = uint128(DEBT - 1);
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            true
+        );
+
+        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            minRollableAssets - 1
+        );
+    }
+
+    function testRollAllowsFullRollBelowMinRollableAssets() public {
+        uint128 minRollableAssets = type(uint128).max;
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            true
+        );
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            DEBT
+        );
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
+    }
+
+    function testRollAllowsFullRollOfRemainderBelowMinRollableAssets() public {
+        uint256 remainder = MIN_ROLLABLE_ASSETS - 1;
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT - remainder
+        );
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), remainder);
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            remainder
+        );
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
+        assertEq(midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex), 0);
+    }
+
+    function testRollRevertsForPartialRollOfRemainderBelowMinRollableAssets() public {
+        uint256 remainder = MIN_ROLLABLE_ASSETS - 1;
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT - remainder
+        );
+
+        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            remainder / 2
+        );
+    }
+
+    function testRollRevertsForUnconfiguredMinRollableAssets() public {
+        vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS + 1,
+            DEBT
+        );
+    }
+
+    function testSetConfigDoesNotReplaceConfigWithOtherMinRollableAssets() public {
+        uint128 otherMinRollableAssets = MIN_ROLLABLE_ASSETS + 1;
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            otherMinRollableAssets,
+            true
+        );
+
+        assertTrue(
+            fallbackContract.isConfig(
+                borrower, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS)
+            )
+        );
+        assertTrue(
+            fallbackContract.isConfig(
+                borrower, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, otherMinRollableAssets)
+            )
+        );
+    }
+
+    function testRollRevertsWithFuzzedMinRollableAssets(uint128 minRollableAssets, uint256 assets) public {
+        minRollableAssets = uint128(bound(minRollableAssets, 1, 2 * DEBT));
+        assets = bound(assets, 0, minRollableAssets < DEBT ? minRollableAssets - 1 : DEBT - 1);
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            true
+        );
+        uint256 totalCollateralAssets = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
+
+        vm.expectRevert(IBlueFallbackRolling.RollableAssetsTooLow.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            assets
+        );
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), DEBT);
+        assertEq(midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex), totalCollateralAssets);
+        assertEq(loanToken.balanceOf(keeper), 0);
+    }
+
+    function testRollSucceedsWithFuzzedMinRollableAssets(uint128 minRollableAssets, uint256 assets) public {
+        minRollableAssets = uint128(bound(minRollableAssets, 0, 2 * DEBT));
+        uint256 minAssets = MIN_FUZZED_ASSETS;
+        if (minRollableAssets > MIN_FUZZED_ASSETS) minAssets = minRollableAssets;
+        if (minAssets > DEBT) minAssets = DEBT;
+        assets = bound(assets, minAssets, DEBT);
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            true
+        );
+        uint256 totalCollateralAssets = midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex);
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            assets
+        );
+
+        uint256 collateralAssets = totalCollateralAssets * assets / DEBT;
+        assertEq(midnight.debt(toId(midnightMarket), borrower), DEBT - assets);
+        assertEq(
+            midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex),
+            totalCollateralAssets - collateralAssets
+        );
+        assertEq(blue.position(blueMarketParams.id(), borrower).collateral, collateralAssets);
+        assertEq(loanToken.balanceOf(keeper), assets * INCENTIVE_AT_START / WAD);
+        assertEq(loanToken.balanceOf(address(fallbackContract)), 0);
+    }
+
+    function testRollAllowsFullRollOfRemainderWithFuzzedMinRollableAssets(
+        uint128 minRollableAssets,
+        uint256 firstAssets
+    ) public {
+        minRollableAssets = uint128(bound(minRollableAssets, 1, DEBT - MIN_FUZZED_ASSETS));
+        firstAssets = bound(
+            firstAssets,
+            minRollableAssets > MIN_FUZZED_ASSETS ? minRollableAssets : MIN_FUZZED_ASSETS,
+            DEBT - MIN_FUZZED_ASSETS
+        );
+        uint256 remainder = DEBT - firstAssets;
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            true
+        );
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            firstAssets
+        );
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), remainder);
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            minRollableAssets,
+            remainder
+        );
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
+        assertEq(midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex), 0);
+        assertEq(loanToken.balanceOf(address(fallbackContract)), 0);
     }
 
     function testRollRevertsForAssetsGreaterThanDebt() public {
         vm.expectRevert(stdError.arithmeticError);
         vm.prank(keeper);
         fallbackContract.roll(
-            midnightMarket, blueMarketParams, borrower, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, DEBT + 1
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT + 1
         );
     }
 
@@ -641,14 +1196,22 @@ contract BlueFallbackRollingTest is BaseTest {
         return INCENTIVE_AT_START + (INCENTIVE_AT_END - INCENTIVE_AT_START) * elapsed / duration;
     }
 
-    function configId(uint64 _start, uint64 _end, uint64 incentiveAtStart, uint64 incentiveAtEnd)
-        internal
-        view
-        returns (bytes32)
-    {
+    function configId(
+        uint64 _start,
+        uint64 _end,
+        uint64 incentiveAtStart,
+        uint64 incentiveAtEnd,
+        uint128 minRollableAssets
+    ) internal view returns (bytes32) {
         return keccak256(
             abi.encode(
-                toId(midnightMarket), Id.unwrap(blueMarketParams.id()), _start, _end, incentiveAtStart, incentiveAtEnd
+                toId(midnightMarket),
+                Id.unwrap(blueMarketParams.id()),
+                _start,
+                _end,
+                incentiveAtStart,
+                incentiveAtEnd,
+                minRollableAssets
             )
         );
     }

@@ -13,6 +13,8 @@ import {IBlueFallbackRolling} from "./interfaces/IBlueFallbackRolling.sol";
 import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
+/// @dev Users must make sure that the oracle and the LLTV of the Blue market are appropriate; otherwise, their
+/// position on Blue could be left close to liquidation.
 /// @dev Configs can be set by the user or by an address authorized for them on Midnight.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
@@ -28,7 +30,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    /// @dev The LLTV of the Blue market must be greater than or equal to the LLTV of the Midnight market.
     function setConfig(
         address user,
         bytes32 midnightId,
@@ -37,6 +38,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint64 end,
         uint64 incentiveAtStart,
         uint64 incentiveAtEnd,
+        uint128 minRollableAssets,
         bool enabled
     ) external override {
         require(start < end, EndNotAfterStart());
@@ -44,10 +46,22 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
         require(msg.sender == user || IMidnight(MIDNIGHT).isAuthorized(user, msg.sender), Unauthorized());
 
-        isConfig[user][keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd))] =
-        enabled;
+        bytes32 configId =
+            keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets));
+        isConfig[user][configId] = enabled;
 
-        emit SetConfig(msg.sender, user, midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, enabled);
+        emit SetConfig(
+            msg.sender,
+            user,
+            midnightId,
+            blueId,
+            start,
+            end,
+            incentiveAtStart,
+            incentiveAtEnd,
+            minRollableAssets,
+            enabled
+        );
     }
 
     function roll(
@@ -58,14 +72,14 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint64 end,
         uint64 incentiveAtStart,
         uint64 incentiveAtEnd,
+        uint128 minRollableAssets,
         uint256 assets
     ) external override {
         bytes32 midnightId = IdLib.toId(midnightMarket);
         bytes32 blueId = Id.unwrap(blueMarketParams.id());
-        require(
-            isConfig[user][keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd))],
-            NotConfigured()
-        );
+        bytes32 configId =
+            keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets));
+        require(isConfig[user][configId], NotConfigured());
         require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
         require(block.timestamp >= start, NotStarted());
         require(block.timestamp <= end, Ended());
@@ -76,11 +90,14 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             blueMarketParams.collateralToken == midnightMarket.collateralParams[collateralIndex].token,
             InconsistentCollateralToken()
         );
-        require(midnightMarket.collateralParams[collateralIndex].lltv <= blueMarketParams.lltv, BlueLltvTooLow());
 
-        // Round in favor of the Midnight position.
-        uint256 collateralAssets = IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex)
-            .mulDivDown(assets, IMidnight(MIDNIGHT).debt(midnightId, user));
+        uint256 debtAssets = IMidnight(MIDNIGHT).debt(midnightId, user);
+        require(assets >= minRollableAssets || assets == debtAssets, RollableAssetsTooLow());
+
+        // Round in favor of the Midnight position. Thus, splitting the rolls can lower the blue final LTV. This is
+        // mitigated by the min rollable debt.
+        uint256 collateralAssets =
+            IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex).mulDivDown(assets, debtAssets);
         // Round against the roller.
         uint256 incentiveFactor = incentiveAtEnd >= incentiveAtStart
             ? incentiveAtStart
