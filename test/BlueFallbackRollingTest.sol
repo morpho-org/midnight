@@ -90,6 +90,7 @@ contract BlueFallbackRollingTest is BaseTest {
         blue.setAuthorization(address(fallbackContract), true);
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -162,6 +163,7 @@ contract BlueFallbackRollingTest is BaseTest {
         elapsed = bound(elapsed, 0, end - start);
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -236,6 +238,7 @@ contract BlueFallbackRollingTest is BaseTest {
         elapsed = bound(elapsed, 0, end - start);
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -273,6 +276,7 @@ contract BlueFallbackRollingTest is BaseTest {
         uint64 lateEnd = uint64(midnightMarket.maturity) + 1 days;
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -326,6 +330,7 @@ contract BlueFallbackRollingTest is BaseTest {
         uint64 futureStart = uint64(vm.getBlockTimestamp() + 1);
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             futureStart,
@@ -408,6 +413,7 @@ contract BlueFallbackRollingTest is BaseTest {
         blueMarketParams.loanToken = makeAddr("otherLoanToken");
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -497,6 +503,7 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.expectRevert(IBlueFallbackRolling.IncentiveTooHigh.selector);
         fallbackContract.setConfig(
+            address(this),
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -513,6 +520,7 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.expectRevert(IBlueFallbackRolling.IncentiveTooHigh.selector);
         fallbackContract.setConfig(
+            address(this),
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -527,6 +535,7 @@ contract BlueFallbackRollingTest is BaseTest {
     function testSetConfigRevertsForEndBeforeStart() public {
         vm.expectRevert(IBlueFallbackRolling.EndNotAfterStart.selector);
         fallbackContract.setConfig(
+            address(this),
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -541,6 +550,7 @@ contract BlueFallbackRollingTest is BaseTest {
     function testSetConfigRevertsForEndAtStart() public {
         vm.expectRevert(IBlueFallbackRolling.EndNotAfterStart.selector);
         fallbackContract.setConfig(
+            address(this),
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -555,6 +565,7 @@ contract BlueFallbackRollingTest is BaseTest {
     function testSetConfigAllowsOneIncentive() public {
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -573,6 +584,7 @@ contract BlueFallbackRollingTest is BaseTest {
     function testSetConfigCanDisable() public {
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -607,6 +619,7 @@ contract BlueFallbackRollingTest is BaseTest {
         uint64 otherStart = start + 1;
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             otherStart,
@@ -633,6 +646,7 @@ contract BlueFallbackRollingTest is BaseTest {
         vm.expectEmit(address(fallbackContract));
         emit IBlueFallbackRolling.SetConfig(
             borrower,
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -645,6 +659,7 @@ contract BlueFallbackRollingTest is BaseTest {
 
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -744,7 +759,15 @@ contract BlueFallbackRollingTest is BaseTest {
         elapsed = bound(elapsed, 0, end - start);
         vm.prank(borrower);
         fallbackContract.setConfig(
-            toId(midnightMarket), Id.unwrap(blueMarketParams.id()), start, end, 0, 0, MIN_ROLLABLE_ASSETS, true
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            0,
+            0,
+            MIN_ROLLABLE_ASSETS,
+            true
         );
         vm.warp(start + elapsed);
 
@@ -760,6 +783,7 @@ contract BlueFallbackRollingTest is BaseTest {
     function testRollRevertsForZeroAssets() public {
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -816,6 +840,7 @@ contract BlueFallbackRollingTest is BaseTest {
         uint256 assets = DEBT / 4;
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -847,6 +872,7 @@ contract BlueFallbackRollingTest is BaseTest {
         uint128 minRollableAssets = uint128(DEBT - 1);
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -876,6 +902,7 @@ contract BlueFallbackRollingTest is BaseTest {
         uint128 minRollableAssets = type(uint128).max;
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -988,6 +1015,7 @@ contract BlueFallbackRollingTest is BaseTest {
         uint128 otherMinRollableAssets = MIN_ROLLABLE_ASSETS + 1;
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -1015,6 +1043,7 @@ contract BlueFallbackRollingTest is BaseTest {
         assets = bound(assets, 0, minRollableAssets < DEBT ? minRollableAssets - 1 : DEBT - 1);
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -1053,6 +1082,7 @@ contract BlueFallbackRollingTest is BaseTest {
         assets = bound(assets, minAssets, DEBT);
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -1101,6 +1131,7 @@ contract BlueFallbackRollingTest is BaseTest {
         uint256 remainder = DEBT - firstAssets;
         vm.prank(borrower);
         fallbackContract.setConfig(
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
