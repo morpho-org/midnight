@@ -20,28 +20,10 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     error RollableAssetsTooLow();
     error Unauthorized();
 
+    // forgefmt: disable-start
     /// EVENTS ///
-    event SetConfig(
-        address caller,
-        address indexed user,
-        bytes32 indexed midnightId,
-        bytes32 indexed blueId,
-        uint256 start,
-        uint256 end,
-        uint256 incentiveAtStart,
-        uint256 incentiveAtEnd,
-        uint256 minRollableAssets,
-        bool enabled
-    );
-    event Roll(
-        address indexed caller,
-        address indexed user,
-        bytes32 indexed midnightId,
-        bytes32 blueId,
-        uint256 debtAssets,
-        uint256 collateralAssets,
-        uint256 incentiveAssets
-    );
+    event SetConfig(address caller, address indexed user, bytes32 indexed midnightId, bytes32 indexed blueId, uint256 start, uint256 end, uint256 incentiveAtStart, uint256 incentiveAtEnd, uint256 minRollableAssets, bool enabled);
+    event Roll(address indexed caller, address indexed user, bytes32 indexed midnightId, bytes32 blueId, uint256 debtAssets, uint256 collateralAssets, uint256 incentiveAssets);
 
     /// STORAGE GETTERS ///
     function MIDNIGHT() external view returns (address);
@@ -49,26 +31,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     function isConfig(address user, bytes32 configId) external view returns (bool);
 
     /// FUNCTIONS ///
-    function setConfig(
-        address user,
-        bytes32 midnightId,
-        bytes32 blueId,
-        uint64 start,
-        uint64 end,
-        uint64 incentiveAtStart,
-        uint64 incentiveAtEnd,
-        uint128 minRollableAssets,
-        bool enabled
-    ) external;
-    function roll(
-        Market memory midnightMarket,
-        MarketParams memory blueMarketParams,
-        address user,
-        uint64 start,
-        uint64 end,
-        uint64 incentiveAtStart,
-        uint64 incentiveAtEnd,
-        uint128 minRollableAssets,
-        uint256 assets
-    ) external;
+    function setConfig(address user, bytes32 midnightId, bytes32 blueId, uint64 start, uint64 end, uint64 incentiveAtStart, uint64 incentiveAtEnd, uint128 minRollableAssets, bool enabled) external;
+    function roll(Market memory midnightMarket, MarketParams memory blueMarketParams, address user, uint64 start, uint64 end, uint64 incentiveAtStart, uint64 incentiveAtEnd, uint128 minRollableAssets, uint256 assets) external;
+    // forgefmt: disable-end
 }
