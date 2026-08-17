@@ -29,6 +29,7 @@ It supplies the activated collateral to Blue before, through a callback, borrowi
 Users and accounts they authorize on Midnight may enable multiple fallback configurations per Midnight market. 
 Users must authorize the contract on both Midnight and Blue. 
 Each configuration selects a Blue market, a Midnight market, start timestamp, end timestamp, caller incentive at start, caller incentive at end, and minimum rollable amount, and can later be disabled. 
+The roll window `[start, end]` is inclusive on both ends, so it may be a single timestamp. 
 The caller incentive is a percentage of the debt, is capped at 100% and evolves linearly between start and end. 
 The minimum rollable amount is the smallest debt a single roll can migrate, and is bypassed by a roll migrating the whole remaining Midnight debt, so a position can always be closed out. 
 A roll requires the borrower to have exactly one activated Midnight collateral, matching the collateral token of the configured Blue market.

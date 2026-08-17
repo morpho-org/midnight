@@ -326,6 +326,38 @@ contract BlueFallbackRollingTest is BaseTest {
         assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
     }
 
+    function testRollPaysTheStartIncentiveWhenEndIsAtStart() public {
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            start,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            start,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+
+        assertEq(loanToken.balanceOf(keeper), DEBT * INCENTIVE_AT_START / WAD);
+        assertEq(loanToken.balanceOf(address(fallbackContract)), 0);
+        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
+    }
+
     function testCannotRollBeforeStart() public {
         uint64 futureStart = uint64(vm.getBlockTimestamp() + 1);
         vm.prank(borrower);
@@ -533,7 +565,7 @@ contract BlueFallbackRollingTest is BaseTest {
     }
 
     function testSetConfigRevertsForEndBeforeStart() public {
-        vm.expectRevert(IBlueFallbackRolling.EndNotAfterStart.selector);
+        vm.expectRevert(IBlueFallbackRolling.EndBeforeStart.selector);
         fallbackContract.setConfig(
             address(this),
             toId(midnightMarket),
@@ -547,10 +579,10 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
-    function testSetConfigRevertsForEndAtStart() public {
-        vm.expectRevert(IBlueFallbackRolling.EndNotAfterStart.selector);
+    function testSetConfigAllowsEndAtStart() public {
+        vm.prank(borrower);
         fallbackContract.setConfig(
-            address(this),
+            borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
@@ -559,6 +591,12 @@ contract BlueFallbackRollingTest is BaseTest {
             INCENTIVE_AT_END,
             MIN_ROLLABLE_ASSETS,
             true
+        );
+
+        assertTrue(
+            fallbackContract.isConfig(
+                borrower, configId(start, start, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS)
+            )
         );
     }
 
@@ -734,7 +772,7 @@ contract BlueFallbackRollingTest is BaseTest {
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
             start,
-            start,
+            start - 1,
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
             MIN_ROLLABLE_ASSETS,

@@ -42,7 +42,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         bool enabled
     ) external override {
         require(msg.sender == user || IMidnight(MIDNIGHT).isAuthorized(user, msg.sender), Unauthorized());
-        require(start < end, EndNotAfterStart());
+        require(start <= end, EndBeforeStart());
         require(incentiveAtStart <= WAD, IncentiveTooHigh());
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
 
@@ -98,12 +98,15 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         // mitigated by the min rollable debt.
         uint256 collateralAssets =
             IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex).mulDivDown(assets, debtAssets);
-        // Round against the roller.
-        uint256 incentiveFactor = incentiveAtEnd >= incentiveAtStart
+        uint256 duration = end - start;
+        // Round against the roller. A null duration means that the window is the single timestamp `start`.
+        uint256 incentiveFactor = duration == 0
             ? incentiveAtStart
-                + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, end - start)
-            : incentiveAtStart
-                - UtilsLib.mulDivUp(incentiveAtStart - incentiveAtEnd, block.timestamp - start, end - start);
+            : incentiveAtEnd >= incentiveAtStart
+                ? incentiveAtStart
+                    + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, duration)
+                : incentiveAtStart
+                    - UtilsLib.mulDivUp(incentiveAtStart - incentiveAtEnd, block.timestamp - start, duration);
         uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentiveFactor, WAD);
 
         emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
