@@ -9,6 +9,7 @@ import {Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {BlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/BlueFallbackRolling.sol";
 import {IBlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/interfaces/IBlueFallbackRolling.sol";
+import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 contract BlueFallbackRollingTest is BaseTest {
@@ -81,7 +82,7 @@ contract BlueFallbackRollingTest is BaseTest {
         setupMarket(midnightMarket, DEBT);
 
         deal(address(loanToken), address(this), 2 * DEBT);
-        loanToken.approve(address(blue), type(uint256).max);
+        ERC20Lib.safeApprove(address(loanToken), address(blue), type(uint256).max);
         blue.supply(blueMarketParams, 2 * DEBT, 0, lender, hex"");
 
         vm.prank(borrower);
