@@ -8,7 +8,7 @@ import {
     Signature,
     EIP712_DOMAIN_TYPEHASH,
     AUTHORIZATION_TYPEHASH
-} from "../src/periphery/interfaces/IEcrecoverAuthorizer.sol";
+} from "../src/periphery/ecrecover-authorizer/interfaces/IEcrecoverAuthorizer.sol";
 import {BaseTest} from "./BaseTest.sol";
 
 bytes constant AUTHORIZATION_TYPE =
@@ -110,6 +110,18 @@ contract EcrecoverAuthorizerTest is BaseTest {
         Signature memory sig = signAuthorization(auth, lender); // wrong signer
 
         vm.expectRevert(IEcrecoverAuthorizer.Unauthorized.selector);
+        ecrecoverAuthorizer.setIsAuthorized(auth, sig);
+
+        assertEq(midnight.isAuthorized(borrower, lender), false);
+        assertEq(ecrecoverAuthorizer.nonce(borrower), 0);
+    }
+
+    function testEcrecoverAuthorizerEcrecoverReturnsZero() public {
+        Authorization memory auth = makeAuthorization(borrower, lender, true);
+        Signature memory sig = signAuthorization(auth, borrower);
+        sig.v = 0; // Invalid v (valid values are 27/28) -> ecrecover returns address(0).
+
+        vm.expectRevert(IEcrecoverAuthorizer.InvalidSignature.selector);
         ecrecoverAuthorizer.setIsAuthorized(auth, sig);
 
         assertEq(midnight.isAuthorized(borrower, lender), false);

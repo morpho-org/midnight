@@ -7,7 +7,7 @@ import {WAD, DEFAULT_TICK_SPACING} from "../src/libraries/ConstantsLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
-import {TakeAmountsLib} from "../src/periphery/TakeAmountsLib.sol";
+import {TakeAmountsLib} from "../src/periphery/libraries/TakeAmountsLib.sol";
 
 contract TakeAmountsTest is BaseTest {
     using UtilsLib for uint256;
@@ -112,6 +112,26 @@ contract TakeAmountsTest is BaseTest {
         (uint256 buyerAssets,) = take(units, lender, offer);
 
         assertEq(buyerAssets, targetBuyerAssets, "e2e buyerAssets");
+    }
+
+    function buyerAssetsToUnitsExternal(bytes32 _id, Offer memory _offer, uint256 targetBuyerAssets)
+        external
+        view
+        returns (uint256)
+    {
+        return TakeAmountsLib.buyerAssetsToUnits(address(midnight), _id, _offer, targetBuyerAssets);
+    }
+
+    function testBuyerAssetsToUnitsRevertsWhenBuyerPriceAboveWad(uint256 settlementFee0, uint256 settlementFee1)
+        public
+    {
+        uint256 settlementFee = _setSettlementFees(settlementFee0, settlementFee1);
+        vm.assume(settlementFee > 0);
+        offer.tick = MAX_TICK;
+        assertEq(TickLib.tickToPrice(offer.tick), WAD, "offer price at MAX_TICK");
+
+        vm.expectRevert(TickLib.PriceGreaterThanOne.selector);
+        this.buyerAssetsToUnitsExternal(id, offer, 1);
     }
 
     function testSellerAssetsToUnitsBuyerIsLender(

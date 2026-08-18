@@ -14,6 +14,7 @@ The protocol is described in detail in the [Midnight Whitepaper](https://morpho.
 
 Compilation, testing and formatting are done with [forge](https://book.getfoundry.sh/getting-started/installation).
 If of interest, [BaseTest.sol](https://github.com/morpho-org/midnight/blob/main/test/BaseTest.sol) contains a re-usable testing setup and useful helpers.
+Optional helper contracts and libraries for interacting with Midnight are available in the [periphery folder](./src/periphery/).
 
 The repo contains some formal verification, done with [CVL](https://docs.certora.com/en/latest/docs/cvl/index.html).
 [This page](https://github.com/morpho-org/midnight/blob/main/certora/README.md) summarizes the proven properties.

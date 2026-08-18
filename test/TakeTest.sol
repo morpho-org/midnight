@@ -11,8 +11,8 @@ import {IBuyCallback, ISellCallback} from "../src/interfaces/ICallbacks.sol";
 import {IRatifier} from "../src/interfaces/IRatifier.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
+import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
-import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
 import {StdStorage, stdStorage} from "../lib/forge-std/src/StdStorage.sol";
 
@@ -1591,7 +1591,7 @@ contract BorrowCallback is ISellCallback {
         recordedPendingFeeDecrease = pendingFeeDecrease;
         (uint256 collateralIndex, uint256 amount,) = abi.decode(data, (uint256, uint256, bytes));
         address collateralToken = market.collateralParams[collateralIndex].token;
-        ERC20(collateralToken).approve(msg.sender, amount);
+        ERC20Lib.safeApprove(collateralToken, msg.sender, amount);
         Midnight(msg.sender).supplyCollateral(market, collateralIndex, amount, seller);
         return CALLBACK_SUCCESS;
     }
@@ -1619,13 +1619,13 @@ contract ReentrantLiquidateBorrowCallback is ISellCallback {
         (uint256 collateralIndex, uint256 collateralAmount, uint256 repaidUnits) =
             abi.decode(data, (uint256, uint256, uint256));
         address collateralToken = market.collateralParams[collateralIndex].token;
-        ERC20(collateralToken).approve(msg.sender, collateralAmount);
+        ERC20Lib.safeApprove(collateralToken, msg.sender, collateralAmount);
         Midnight(msg.sender).supplyCollateral(market, collateralIndex, collateralAmount, seller);
 
         Oracle oracle = Oracle(market.collateralParams[collateralIndex].oracle);
         uint256 healthyPrice = oracle.price();
         oracle.setPrice(healthyPrice / 2);
-        ERC20(market.loanToken).approve(msg.sender, repaidUnits);
+        ERC20Lib.safeApprove(market.loanToken, msg.sender, repaidUnits);
         try Midnight(msg.sender)
             .liquidate(market, collateralIndex, 0, repaidUnits, seller, false, address(this), address(0), "") returns (
             uint256, uint256
@@ -1676,7 +1676,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
         if (!reentered) {
             uint256 idx = storedCollateralIndex;
             address collateralToken = market.collateralParams[idx].token;
-            ERC20(collateralToken).approve(msg.sender, storedCollateralAmount);
+            ERC20Lib.safeApprove(collateralToken, msg.sender, storedCollateralAmount);
             Midnight(msg.sender).supplyCollateral(market, idx, storedCollateralAmount, seller);
 
             reentered = true;
@@ -1686,7 +1686,7 @@ contract NestedTakeReentrantLiquidateCallback is ISellCallback {
             Oracle oracle = Oracle(market.collateralParams[idx].oracle);
             uint256 healthyPrice = oracle.price();
             oracle.setPrice(healthyPrice / 2);
-            ERC20(market.loanToken).approve(msg.sender, storedRepaidUnits);
+            ERC20Lib.safeApprove(market.loanToken, msg.sender, storedRepaidUnits);
             try Midnight(msg.sender)
                 .liquidate(market, idx, 0, storedRepaidUnits, seller, false, address(this), address(0), "") returns (
                 uint256, uint256
@@ -1729,7 +1729,7 @@ contract LendCallback is IBuyCallback {
         recordedUnits = units;
         recordedData = data;
         recordedPendingFeeIncrease = pendingFeeIncrease;
-        ERC20(market.loanToken).approve(msg.sender, buyerAssets);
+        ERC20Lib.safeApprove(market.loanToken, msg.sender, buyerAssets);
         return CALLBACK_SUCCESS;
     }
 
