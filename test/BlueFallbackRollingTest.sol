@@ -235,44 +235,6 @@ contract BlueFallbackRollingTest is BaseTest {
         assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
     }
 
-    function testRollPaysTheAuctionedIncentiveWhenDecreasing(uint256 elapsed) public {
-        elapsed = bound(elapsed, 0, end - start);
-        vm.prank(borrower);
-        fallbackContract.setConfig(
-            borrower,
-            toId(midnightMarket),
-            Id.unwrap(blueMarketParams.id()),
-            start,
-            end,
-            INCENTIVE_AT_END,
-            INCENTIVE_AT_START,
-            MIN_ROLLABLE_ASSETS,
-            true
-        );
-        vm.warp(start + elapsed);
-
-        vm.prank(keeper);
-        fallbackContract.roll(
-            midnightMarket,
-            blueMarketParams,
-            borrower,
-            start,
-            end,
-            INCENTIVE_AT_END,
-            INCENTIVE_AT_START,
-            MIN_ROLLABLE_ASSETS,
-            DEBT
-        );
-
-        uint256 duration = end - start;
-        uint256 decrease = (INCENTIVE_AT_END - INCENTIVE_AT_START) * elapsed;
-
-        uint256 expected = INCENTIVE_AT_END - (decrease + duration - 1) / duration;
-        assertEq(loanToken.balanceOf(keeper), DEBT * expected / WAD);
-        assertEq(loanToken.balanceOf(address(fallbackContract)), 0);
-        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
-    }
-
     function testRollPaysTheAuctionedIncentiveWhenTheAuctionEndsAfterMaturity() public {
         uint64 lateEnd = uint64(midnightMarket.maturity) + 1 days;
         vm.prank(borrower);
@@ -528,6 +490,21 @@ contract BlueFallbackRollingTest is BaseTest {
             end,
             incentiveAtStart,
             MAX_INCENTIVE,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+    }
+
+    function testSetConfigRevertsForDecreasingIncentive() public {
+        vm.expectRevert(IBlueFallbackRolling.DecreasingIncentive.selector);
+        fallbackContract.setConfig(
+            address(this),
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_END,
+            INCENTIVE_AT_START,
             MIN_ROLLABLE_ASSETS,
             true
         );
