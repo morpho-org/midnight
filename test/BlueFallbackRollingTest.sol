@@ -489,7 +489,7 @@ contract BlueFallbackRollingTest is BaseTest {
             start,
             end,
             incentiveAtStart,
-            MAX_INCENTIVE,
+            incentiveAtStart,
             MIN_ROLLABLE_ASSETS,
             true
         );
