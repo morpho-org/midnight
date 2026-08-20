@@ -1185,6 +1185,42 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
+    function testRollRevertsForZeroDebt() public {
+        // `otherBorrower` has one activated collateral on the Midnight market, but no debt.
+        collateralize(midnightMarket, otherBorrower, DEBT, blueCollateralIndex);
+
+        vm.prank(otherBorrower);
+        midnight.setIsAuthorized(address(fallbackContract), true, otherBorrower);
+        vm.prank(otherBorrower);
+        blue.setAuthorization(address(fallbackContract), true);
+        vm.prank(otherBorrower);
+        fallbackContract.setConfig(
+            otherBorrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+
+        vm.expectRevert(IBlueFallbackRolling.NoDebt.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            otherBorrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            0
+        );
+    }
+
     function expectedIncentive(uint256 elapsed) internal view returns (uint256) {
         uint256 duration = end - start;
         return INCENTIVE_AT_START + (INCENTIVE_AT_END - INCENTIVE_AT_START) * elapsed / duration;
