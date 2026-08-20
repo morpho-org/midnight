@@ -108,6 +108,8 @@ rule postDropRbdLiquidateNonIncrease(env e, Midnight.Market market, uint256 coll
     if (repaidUnits == 0) {
         seizedAssetsOut = seizedAssets;
     } else {
+        // This computes an upper bound of the seizedAssetsOut computed by liquidate() (using maxLif).
+        // The proof reasons about the worst-case, the real case follows from this by the monotonicity axioms.
         seizedAssetsOut = ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price);
         require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivDownMonotoneA(a1, a2, b, d), "axiom";
         require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomMathMulDivDownMonotoneB(a, b1, b2, d), "axiom";
