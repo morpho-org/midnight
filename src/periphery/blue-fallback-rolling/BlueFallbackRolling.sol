@@ -95,7 +95,9 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         require(assets >= minRollableAssets || assets == debtAssets, RolledAssetsTooLow());
 
         // Round in favor of the Midnight position. Thus, splitting the rolls can raise the blue final LTV. This is
-        // mitigated by the min rollable debt.
+        // mitigated by the min rollable debt. Note that the Midnight position's health is not necessarily improving:
+        // the roll is proportional, so its LTV is essentially unchanged, and the roundings of maxDebt in isHealthy can
+        // even make it marginally worse.
         uint256 collateralAssets =
             IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex).mulDivDown(assets, debtAssets);
         // Round against the roller.
