@@ -730,6 +730,7 @@ contract BlueFallbackRollingTest is BaseTest {
             borrower,
             toId(midnightMarket),
             Id.unwrap(blueMarketParams.id()),
+            configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS),
             DEBT,
             collateralAssets,
             DEBT * INCENTIVE_AT_END / WAD

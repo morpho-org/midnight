@@ -105,7 +105,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, end - start);
         uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentiveFactor, WAD);
 
-        emit Roll(msg.sender, user, midnightId, blueId, assets, collateralAssets, incentiveAssets);
+        emit Roll(msg.sender, user, midnightId, blueId, configId, assets, collateralAssets, incentiveAssets);
 
         bytes memory data = abi.encode(midnightMarket, blueMarketParams, collateralIndex, assets, incentiveAssets, user);
         IMorpho(BLUE).supplyCollateral(blueMarketParams, collateralAssets, user, data);
