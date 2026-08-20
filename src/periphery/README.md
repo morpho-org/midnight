@@ -16,10 +16,22 @@ Anyone authorized to act for the owner on Midnight can trigger this callback thr
 
 ### `BlueBuyCallbackFactory`
 
-Deploys one deterministic `BlueBuyCallback` for an owner using `CREATE2` with a zero salt.
-The owner is included in the creation code, so different owners get different callback addresses.
+Deploys a deterministic `BlueBuyCallback` for an owner using `CREATE2` with a caller-provided salt, so an owner can have several callbacks.
+The owner is included in the creation code and combined with the salt, so different owners or salts get different callback addresses.
 
-The factory records callbacks in `callbackOf` and `isBlueCallback`.
+The factory records callbacks in `callbackOf` and `isBlueBuyCallback`.
+
+### `BlueFallbackRolling`
+
+Permissionlessly refinances a borrower's Midnight debt into a user-selected Morpho Blue market once the Midnight market reaches the configured start timestamp.
+It supplies the activated collateral to Blue before, through a callback, borrowing against it on Blue to reward the caller, repay the debt and withdraw the collateral on Midnight.
+
+Users and accounts they authorize on Midnight may enable multiple fallback configurations per Midnight market. 
+Users must authorize the contract on both Midnight and Blue. 
+Each configuration selects a Blue market, a Midnight market, start timestamp, end timestamp, caller incentive at start, caller incentive at end, and minimum rollable amount, and can later be disabled. 
+The caller incentive is a percentage of the debt, is capped at 100% and increases linearly between start and end. 
+The minimum rollable amount is the smallest debt a single roll can migrate, and is bypassed by a roll migrating the whole remaining Midnight debt, so a position can always be closed out. 
+A roll requires the borrower to have exactly one activated Midnight collateral, matching the collateral token of the configured Blue market.
 
 ### `EcrecoverAuthorizer`
 

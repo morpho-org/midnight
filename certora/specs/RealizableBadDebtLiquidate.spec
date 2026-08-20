@@ -1,28 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-// Property (issue #109), liquidate case:
-//   "Liquidation realizes the bad debt and leaves zero."
-//
-// This is the hard, full-args counterpart of the rules in RealizableBadDebt.spec: after a
-// liquidate with arbitrary seizedAssets/repaidUnits, realizableBadDebt recomputes to exactly zero.
-// It is isolated in its own spec (and CI leg) because it needs the getter-form mulDivUp
-// value-drop bound, which is heavy for the solver.
-//
-// realizableBadDebt(id, borrower) is the `badDebt` local computed at the top of
-// Midnight.liquidate (src/Midnight.sol:643-657), and per active collateral c it subtracts
-//   g(c) = mulDivUp(mulDivUp(c, price, ORACLE_PRICE_SCALE), WAD, maxLif).
-// Liquidate seizes from a single collateral (c_k -> c_k - seizedAssets) and repays repaidUnits.
-// The proof: the getter-sum drop g(c_k) - g(c_k - seizedAssets) is at most g(seizedAssets)
-// (mulDivUp is additive: apply the single-layer super-additivity lemma mulDivAddUpUp on both the
-// price/scale and WAD/maxLif layers, connected by the exact identity c_k = (c_k - seizedAssets) +
-// seizedAssets), and g(seizedAssets) <= repaidUnits (seize-value bound), so the getter-sum drops
-// by at least the debt drop and the recomputed bad debt is exactly zero.
-//
-// The rule is restricted to the non-post-maturity path (require !postMaturityMode), where the
-// seize factor lif equals maxLif (src/Midnight.sol:685-687); the post-maturity path (lif < maxLif)
-// is left for follow-up.
-
 import "BitmapSummaries.spec";
 
 using Utils as Utils;
@@ -31,15 +9,11 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function realizableBadDebt(Midnight.Market, bytes32, address) external returns (uint256) envfree;
-    function debt(bytes32, address) external returns (uint128) envfree;
-    function totalUnits(bytes32) external returns (uint128) envfree;
-    function lossFactor(bytes32) external returns (uint128) envfree;
-    function liquidationLocked(bytes32, address) external returns (bool) envfree;
     function tickSpacing(bytes32) external returns (uint8) envfree;
     function collateral(bytes32, address, uint256) external returns (uint128) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    // Per-callee constant price (no price update); named so the rule can reference it, matching LiquidationBoundedByLIF.spec.
+    // No price update.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
@@ -101,29 +75,6 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
 
-// Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
-definition axiomDownMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d);
-
-// Monotone in the second argument (proven in MulDiv.spec as mulDivMonotoneB).
-definition axiomDownMonotoneB(mathint a, mathint b1, mathint b2, mathint d) returns bool = 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => ghostMulDivDown(a, b1, d) <= ghostMulDivDown(a, b2, d);
-
-// Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
-definition axiomUpMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
-
-// Monotone in the third argument (proven in MulDiv.spec as mulDivMonotoneD).
-definition axiomUpMonotoneD(mathint a, mathint b, mathint d1, mathint d2) returns bool = 0 <= a && 0 <= b && 0 < d1 && d1 <= d2 => ghostMulDivUp(a, b, d2) <= ghostMulDivUp(a, b, d1);
-
-// Zero collateral values to zero (proven in MulDiv.spec as mulDivZero).
-definition axiomUpZero(mathint b, mathint d) returns bool = d > 0 => ghostMulDivUp(0, b, d) == 0;
-
-// proven in MulDiv.spec as mulDivAddUpUp:
-//   mulDivUp(a1 + a2, b, d) <= mulDivUp(a1, b, d) + mulDivUp(a2, b, d).
-definition axiomAddUpUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => ghostMulDivUp(a1 + a2, b, d) <= ghostMulDivUp(a1, b, d) + ghostMulDivUp(a2, b, d);
-
-// proven in MulDiv.spec as mulDivAddUpUp:
-//   mulDivUp(mulDivDown(a,b,d),d,b) <= a
-definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a;
-
 /// RULES ///
 
 // liquidate realizes the bad debt and doesn't create new bad debt: the recomputed realizable bad debt is exactly 0 after a liquidate.
@@ -138,23 +89,45 @@ rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralI
         seizedAssetsOut = seizedAssets;
     } else {
         seizedAssetsOut = ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price);
-        require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
-        require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomDownMonotoneB(a, b1, b2, d), "axiom";
-        require axiomInverseUpDown(repaidUnits, maxLif, WAD()), "axiom";
-        require axiomInverseUpDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
+    
+        require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d), "Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA)";
+    
+        require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => ghostMulDivDown(a, b1, d) <= ghostMulDivDown(a, b2, d), "Monotone in the second argument (proven in MulDiv.spec as mulDivMonotoneB)";
+    
+        require repaidUnits >= 0 && maxLif > 0 && WAD() > 0 => ghostMulDivUp(ghostMulDivDown(repaidUnits, maxLif, WAD()), WAD(), maxLif) <= repaidUnits, "Round-trip up-after-down is bounded (proven in MulDiv.spec as mulDivInverseUpDown)";
+    
+        require ghostMulDivDown(repaidUnits, maxLif, WAD()) >= 0 && ORACLE_PRICE_SCALE() > 0 && price > 0 => ghostMulDivUp(ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price), price, ORACLE_PRICE_SCALE()) <= ghostMulDivDown(repaidUnits, maxLif, WAD()), "Round-trip up-after-down is bounded (proven in MulDiv.spec as mulDivInverseUpDown)";
     }
 
-    uint256 collateralBefore = collateral(id, borrower, collateralIndex);
-    mathint collateralAfter = collateralBefore - seizedAssetsOut;
+    mathint collateralAfter = collateral(id, borrower, collateralIndex) - seizedAssetsOut;
 
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2), "axiom";
-    require axiomUpZero(price, ORACLE_PRICE_SCALE()), "axiom";
-    require axiomUpZero(WAD(), maxLif), "axiom";
-    require axiomAddUpUp(collateralAfter, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
-    require axiomAddUpUp(ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()), ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), WAD(), maxLif), "axiom";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA)";
+
+    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. 0 <= a && 0 <= b && 0 < d1 && d1 <= d2 => ghostMulDivUp(a, b, d2) <= ghostMulDivUp(a, b, d1), "Antitone in the denominator (proven in MulDiv.spec as mulDivMonotoneD)";
+
+    require ORACLE_PRICE_SCALE() > 0 => ghostMulDivUp(0, price, ORACLE_PRICE_SCALE()) == 0, "Zero numerator gives zero (proven in MulDiv.spec as mulDivZero)";
+
+    require maxLif > 0 => ghostMulDivUp(0, WAD(), maxLif) == 0, "Zero numerator gives zero (proven in MulDiv.spec as mulDivZero)";
+
+    require collateralAfter >= 0 && seizedAssetsOut >= 0 && price >= 0 && ORACLE_PRICE_SCALE() > 0 => ghostMulDivUp(collateralAfter + seizedAssetsOut, price, ORACLE_PRICE_SCALE()) <= ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) + ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "Sub-additive in the numerator (proven in MulDiv.spec as mulDivAddUpUp)";
+
+    require ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) >= 0 && ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()) >= 0 && WAD() >= 0 && maxLif > 0 => ghostMulDivUp(ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()) + ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), WAD(), maxLif) <= ghostMulDivUp(ghostMulDivUp(collateralAfter, price, ORACLE_PRICE_SCALE()), WAD(), maxLif) + ghostMulDivUp(ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), WAD(), maxLif), "Sub-additive in the numerator (proven in MulDiv.spec as mulDivAddUpUp)";
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     assert realizableBadDebt(market, id, borrower) == 0;
+}
+
+// liquidating one position does not increase the realizable bad debt of a different position.
+rule liquidateDoesNotIncreaseOtherRealizableBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market measuredMarket, address measuredBorrower) {
+    bytes32 id = summaryToId(market);
+    bytes32 measuredId = summaryToId(measuredMarket);
+
+    require measuredId != id || measuredBorrower != borrower;
+
+    uint256 rbdBefore = realizableBadDebt(measuredMarket, measuredId, measuredBorrower);
+
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+
+    assert realizableBadDebt(measuredMarket, measuredId, measuredBorrower) <= rbdBefore;
 }

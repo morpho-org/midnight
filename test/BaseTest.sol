@@ -26,7 +26,8 @@ import {
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Midnight} from "../src/Midnight.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
-import {EcrecoverAuthorizer} from "../src/periphery/EcrecoverAuthorizer.sol";
+import {EcrecoverAuthorizer} from "../src/periphery/ecrecover-authorizer/EcrecoverAuthorizer.sol";
+import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 uint256 constant MAX_TEST_AMOUNT = type(uint128).max;
 
 /// @dev The default LLTV enabled in tests.
@@ -128,19 +129,19 @@ abstract contract BaseTest is Test {
         oracle2 = new Oracle();
 
         vm.prank(lender);
-        loanToken.approve(address(midnight), type(uint256).max);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), type(uint256).max);
         vm.prank(otherLender);
-        loanToken.approve(address(midnight), type(uint256).max);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), type(uint256).max);
         vm.prank(borrower);
-        loanToken.approve(address(midnight), type(uint256).max);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), type(uint256).max);
         vm.prank(otherBorrower);
-        loanToken.approve(address(midnight), type(uint256).max);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), type(uint256).max);
         vm.prank(liquidator);
-        loanToken.approve(address(midnight), type(uint256).max);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), type(uint256).max);
 
-        loanToken.approve(address(midnight), type(uint256).max);
-        collateralToken1.approve(address(midnight), type(uint256).max);
-        collateralToken2.approve(address(midnight), type(uint256).max);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), type(uint256).max);
+        ERC20Lib.safeApprove(address(collateralToken1), address(midnight), type(uint256).max);
+        ERC20Lib.safeApprove(address(collateralToken2), address(midnight), type(uint256).max);
     }
 
     // helpers.
@@ -156,8 +157,8 @@ abstract contract BaseTest is Test {
         deal(address(market.collateralParams[collateralIndex].token), _borrower, collateral);
 
         vm.startPrank(_borrower);
-        ERC20(market.collateralParams[collateralIndex].token).approve(address(midnight), 0);
-        ERC20(market.collateralParams[collateralIndex].token).approve(address(midnight), collateral);
+        ERC20Lib.safeApprove(market.collateralParams[collateralIndex].token, address(midnight), 0);
+        ERC20Lib.safeApprove(market.collateralParams[collateralIndex].token, address(midnight), collateral);
         midnight.supplyCollateral(market, collateralIndex, collateral, _borrower);
         vm.stopPrank();
     }
@@ -195,7 +196,7 @@ abstract contract BaseTest is Test {
         privateKey[badBorrower] = badBorrowerPrivateKey;
         address unluckyLender = makeAddr("unluckyLender");
         vm.prank(unluckyLender);
-        loanToken.approve(address(midnight), type(uint256).max);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), type(uint256).max);
         Offer memory badBorrowerOffer;
         badBorrowerOffer.market = market;
         badBorrowerOffer.buy = false;

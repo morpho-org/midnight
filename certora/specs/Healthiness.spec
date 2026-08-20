@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 
 import "BitmapSummaries.spec";
+import "MulDivAxioms.spec";
 
 using Havoc as havocCallback;
 
@@ -50,35 +51,6 @@ definition WAD() returns uint256 = 10 ^ 18;
 definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 persistent ghost summaryPrice(address) returns uint256;
-
-persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
-
-persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
-
-/* Axioms that are proved by MulDiv.spec */
-
-/* proved in mulDivZero in MulDiv.spec */
-definition axiomDownZero(mathint b, mathint d) returns bool = d > 0 => ghostMulDivDown(0, b, d) == 0;
-
-/* proved in mulDivMonotoneA */
-definition axiomDownMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d);
-
-definition axiomUpMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
-
-/* proved in mulDivMonotoneB */
-definition axiomDownMonotoneB(mathint a, mathint b1, mathint b2, mathint d) returns bool = 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => ghostMulDivDown(a, b1, d) <= ghostMulDivDown(a, b2, d);
-
-/* proved in mulDivMonotoneD */
-definition axiomUpMonotoneD(mathint a, mathint b, mathint d1, mathint d2) returns bool = 0 <= a && 0 <= b && 0 < d1 && d1 <= d2 => ghostMulDivUp(a, b, d1) >= ghostMulDivUp(a, b, d2);
-
-/* proved in mulDivAddDownUp */
-definition axiomAddDownUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => ghostMulDivDown(a1, b, d) + ghostMulDivUp(a2, b, d) >= ghostMulDivDown(a1 + a2, b, d);
-
-/* proved in mulDivInverseUpDown */
-definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a;
-
-/* proved in ExactMath.spec (mulDivLifLLTV) */
-definition axiomLifLLTV(mathint a, mathint lif, mathint lltv) returns bool = a >= 0 && lltv * lif <= WAD() * WAD() => ghostMulDivUp(a, lltv, WAD()) <= ghostMulDivUp(a, WAD(), lif);
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
@@ -270,17 +242,17 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     mathint price = summaryPrice(globalMarket.collateralParams[collateralIndex].oracle);
 
     // require all the axioms that are needed to prove the healthiness after liquidation. These are the same axioms that are proved in the MulDiv.spec
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomDownMonotoneB(a, b1, b2, d), "axiom";
-    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2), "axiom";
-    require axiomDownZero(price, ORACLE_PRICE_SCALE()), "axiom";
-    require axiomDownZero(globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
-    require axiomInverseUpDown(repaidUnitsOut, maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), WAD()), "axiom";
-    require axiomInverseUpDown(ghostMulDivDown(repaidUnitsOut, maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
-    require axiomLifLLTV(ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), globalMarketCollateralLLTV[collateralIndex]), "axiom";
-    require axiomAddDownUp(collateralAfter, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
-    require axiomAddDownUp(ghostMulDivDown(collateralAfter, price, ORACLE_PRICE_SCALE()), ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivDownMonotoneA(a1, a2, b, d), "axiom";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivUpMonotoneA(a1, a2, b, d), "axiom";
+    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomMathMulDivDownMonotoneB(a, b1, b2, d), "axiom";
+    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomMathMulDivUpMonotoneD(a, b, d1, d2), "axiom";
+    require axiomMathMulDivDownZeroA(price, ORACLE_PRICE_SCALE()), "axiom";
+    require axiomMathMulDivDownZeroA(globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
+    require axiomMathMulDivInverseUpDown(repaidUnitsOut, maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), WAD()), "axiom";
+    require axiomMathMulDivInverseUpDown(ghostMulDivDown(repaidUnitsOut, maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
+    require axiomMathMulDivUpMonotoneBD(ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]), WAD(), WAD(), globalMarketCollateralLLTV[collateralIndex]), "axiom";
+    require axiomMathMulDivAddDownUp(collateralAfter, seizedAssetsOut, price, ORACLE_PRICE_SCALE()), "axiom";
+    require axiomMathMulDivAddDownUp(ghostMulDivDown(collateralAfter, price, ORACLE_PRICE_SCALE()), ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE()), globalMarketCollateralLLTV[collateralIndex], WAD()), "axiom";
 
     // check that the user was healthy before all callbacks.  We can only assert this after we included all the needed axioms.
     assert healthyOrLockedBeforeCallbacks, "user is healthy or locked before callbacks";
@@ -315,7 +287,7 @@ rule stayHealthyOrLocked(env e, method f, calldataarg args) filtered { f -> f.se
     // This variable is set to false whenever isHealthy() is violated before a callback.  Initially we set it to true to indicate no violations detected.
     healthyOrLockedBeforeCallbacks = true;
 
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivDownMonotoneA(a1, a2, b, d), "axiom";
 
     Midnight.Market globalMarket = getGlobalMarket();
 
