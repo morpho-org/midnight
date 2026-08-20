@@ -13,6 +13,7 @@
 // This shows that timely liquidations before a price drop are never disadvantageous to the creditors.
 
 import "BitmapSummaries.spec";
+import "MulDivAxioms.spec";
 
 using Utils as Utils;
 
@@ -63,10 +64,6 @@ persistent ghost maxLifGhost(uint256, uint256) returns uint256;
 
 persistent ghost mapping(address => uint256) summaryPrice;
 
-persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
-
-persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
-
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
@@ -91,32 +88,6 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
 
-// Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
-definition axiomDownMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d);
-
-// Monotone in the second argument (proven in MulDiv.spec as mulDivMonotoneB).
-definition axiomDownMonotoneB(mathint a, mathint b1, mathint b2, mathint d) returns bool = 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => ghostMulDivDown(a, b1, d) <= ghostMulDivDown(a, b2, d);
-
-// Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA).
-definition axiomUpMonotoneA(mathint a1, mathint a2, mathint b, mathint d) returns bool = 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d);
-
-// Monotone in the second argument (proven in MulDiv.spec as mulDivMonotoneB).
-definition axiomUpMonotoneB(mathint a, mathint b1, mathint b2, mathint d) returns bool = 0 <= a && 0 <= b1 && b1 <= b2 && 0 < d => ghostMulDivUp(a, b1, d) <= ghostMulDivUp(a, b2, d);
-
-// Monotone in the third argument (proven in MulDiv.spec as mulDivMonotoneD).
-definition axiomUpMonotoneD(mathint a, mathint b, mathint d1, mathint d2) returns bool = 0 <= a && 0 <= b && 0 < d1 && d1 <= d2 => ghostMulDivUp(a, b, d2) <= ghostMulDivUp(a, b, d1);
-
-// Zero collateral values to zero (proven in MulDiv.spec as mulDivZero).
-definition axiomUpZero(mathint b, mathint d) returns bool = d > 0 => ghostMulDivUp(0, b, d) == 0;
-
-// proven in MulDiv.spec as mulDivAddUpUp:
-//   mulDivUp(a1 + a2, b, d) <= mulDivUp(a1, b, d) + mulDivUp(a2, b, d).
-definition axiomAddUpUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => ghostMulDivUp(a1 + a2, b, d) <= ghostMulDivUp(a1, b, d) + ghostMulDivUp(a2, b, d);
-
-// proven in MulDiv.spec as mulDivAddUpUp:
-//   mulDivUp(mulDivDown(a,b,d),d,b) <= a
-definition axiomInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a;
-
 /// RULES ///
 
 // Realizable bad debt cannot increase from liquidating before a price drop.
@@ -138,24 +109,24 @@ rule postDropRbdLiquidateNonIncrease(env e, Midnight.Market market, uint256 coll
         seizedAssetsOut = seizedAssets;
     } else {
         seizedAssetsOut = ghostMulDivDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price);
-        require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomDownMonotoneA(a1, a2, b, d), "axiom";
-        require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomDownMonotoneB(a, b1, b2, d), "axiom";
-        require axiomInverseUpDown(repaidUnits, maxLif, WAD()), "axiom";
-        require axiomInverseUpDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
+        require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivDownMonotoneA(a1, a2, b, d), "axiom";
+        require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomMathMulDivDownMonotoneB(a, b1, b2, d), "axiom";
+        require axiomMathMulDivInverseUpDown(repaidUnits, maxLif, WAD()), "axiom";
+        require axiomMathMulDivInverseUpDown(ghostMulDivDown(repaidUnits, maxLif, WAD()), ORACLE_PRICE_SCALE(), price), "axiom";
     }
 
     uint256 collateralBefore = collateral(id, borrower, collateralIndex);
     mathint collateralAfter = collateralBefore - seizedAssetsOut;
 
-    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomDownMonotoneB(a, b1, b2, d), "axiom";
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomUpMonotoneA(a1, a2, b, d), "axiom";
-    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomUpMonotoneB(a, b1, b2, d), "axiom";
-    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomUpMonotoneD(a, b, d1, d2), "axiom";
+    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomMathMulDivDownMonotoneB(a, b1, b2, d), "axiom";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivUpMonotoneA(a1, a2, b, d), "axiom";
+    require forall mathint a. forall mathint b1. forall mathint b2. forall mathint d. axiomMathMulDivUpMonotoneB(a, b1, b2, d), "axiom";
+    require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomMathMulDivUpMonotoneD(a, b, d1, d2), "axiom";
 
-    require axiomUpZero(pDrop, ORACLE_PRICE_SCALE()), "axiom";
-    require axiomUpZero(WAD(), maxLif), "axiom";
-    require axiomAddUpUp(collateralAfter, seizedAssetsOut, pDrop, ORACLE_PRICE_SCALE()), "axiom";
-    require axiomAddUpUp(ghostMulDivUp(collateralAfter, pDrop, ORACLE_PRICE_SCALE()), ghostMulDivUp(seizedAssetsOut, pDrop, ORACLE_PRICE_SCALE()), WAD(), maxLif), "axiom";
+    require axiomMathMulDivUpZeroA(pDrop, ORACLE_PRICE_SCALE()), "axiom";
+    require axiomMathMulDivUpZeroA(WAD(), maxLif), "axiom";
+    require axiomMathMulDivAddUpUp(collateralAfter, seizedAssetsOut, pDrop, ORACLE_PRICE_SCALE()), "axiom";
+    require axiomMathMulDivAddUpUp(ghostMulDivUp(collateralAfter, pDrop, ORACLE_PRICE_SCALE()), ghostMulDivUp(seizedAssetsOut, pDrop, ORACLE_PRICE_SCALE()), WAD(), maxLif), "axiom";
 
     // scenario 1: price drops, then realize bad debt
     summaryPrice[market.collateralParams[collateralIndex].oracle] = pDrop;
