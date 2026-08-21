@@ -24,7 +24,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     // forgefmt: disable-start
     /// EVENTS ///
     event SetConfig(address caller, address indexed user, bytes32 indexed midnightId, bytes32 indexed blueId, uint256 start, uint256 end, uint256 incentiveAtStart, uint256 incentiveAtEnd, uint256 minRollableAssets, bool enabled);
-    event Roll(address indexed caller, address indexed user, bytes32 indexed midnightId, bytes32 blueId, bytes32 configId, uint256 debtAssets, uint256 collateralAssets, uint256 incentiveAssets);
+    event Roll(address caller, address indexed user, bytes32 indexed midnightId, bytes32 indexed blueId, bytes32 configId, uint256 debtAssets, uint256 collateralAssets, uint256 incentiveAssets);
 
     /// STORAGE GETTERS ///
     function MIDNIGHT() external view returns (address);
