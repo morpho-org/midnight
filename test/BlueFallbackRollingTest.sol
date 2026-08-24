@@ -463,7 +463,6 @@ contract BlueFallbackRollingTest is BaseTest {
             blueMarketParams, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS, DEBT / 2
         );
         deal(address(loanToken), lender, 2 * units);
-        // Collateralize the sold units, so that the roll would succeed if the lock were not checked.
         collateralize(midnightMarket, borrower, units, blueCollateralIndex);
 
         vm.expectRevert(IBlueFallbackRolling.LiquidationLocked.selector);
