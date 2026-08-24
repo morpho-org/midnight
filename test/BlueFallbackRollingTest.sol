@@ -6,7 +6,7 @@ import {stdError} from "../lib/forge-std/src/Test.sol";
 import {IMorpho, Id, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
 import {Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE} from "../src/libraries/ConstantsLib.sol";
 import {BlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/BlueFallbackRolling.sol";
 import {IBlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/interfaces/IBlueFallbackRolling.sol";
 import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
@@ -451,6 +451,33 @@ contract BlueFallbackRollingTest is BaseTest {
                 midnightMarket, blueMarketParams, blueCollateralIndex, DEBT, DEBT * INCENTIVE_AT_END / WAD, borrower
             )
         );
+    }
+
+    // A roll cannot engage the liquidation lock, which is only ever written inside take.
+    function testRollDoesNotLockLiquidation() public {
+        vm.warp(end);
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT / 2
+        );
+
+        assertFalse(midnight.liquidationLocked(toId(midnightMarket), borrower));
+
+        // Liquidating the remaining position would revert with NotLiquidatable if the roll had left the lock engaged.
+        oracle1.setPrice(ORACLE_PRICE_SCALE * 9 / 10);
+        assertFalse(midnight.isHealthy(midnightMarket, toId(midnightMarket), borrower));
+        deal(address(loanToken), address(this), 1);
+        midnight.liquidate(midnightMarket, blueCollateralIndex, 0, 1, borrower, false, address(this), address(0), hex"");
+        assertEq(midnight.debt(toId(midnightMarket), borrower), DEBT / 2 - 1);
     }
 
     function testSetConfig() public view {
