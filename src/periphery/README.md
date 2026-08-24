@@ -32,7 +32,7 @@ Each configuration selects a Blue market, a Midnight market, start timestamp, en
 The caller incentive is a percentage of the debt, is capped at 100% and increases linearly between start and end. 
 The minimum rollable amount is the smallest debt a single roll can migrate, and is bypassed by a roll migrating the whole remaining Midnight debt, so a position can always be closed out. 
 A roll requires the borrower to have exactly one activated Midnight collateral, matching the collateral token of the configured Blue market. 
-A roll requires the borrower's liquidation lock to be clear, so it cannot be performed from inside a take's callback.
+It also requires the borrower's liquidation lock to be clear, so it cannot be performed from inside a take's callback to prevent position health manipulations.
 
 ### `EcrecoverAuthorizer`
 
