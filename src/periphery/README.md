@@ -39,7 +39,7 @@ The minimum rollable amount mitigates this by limiting how many times the roundi
 A decreasing Midnight LTV does not mean an improving Midnight health.
 A position is healthy when `debt <= maxDebt`, where `maxDebt` sums `collateral * price / ORACLE_PRICE_SCALE * lltv / WAD` over the activated collaterals, with both divisions rounded down.
 Those roundings lose an amount that does not scale with the position, so after a partial roll the smaller remaining collateral pays proportionally more for them, and `debt / maxDebt` can end up higher than before the roll.
-The effect is bounded by one wei of `maxDebt` and cannot leave the position liquidatable: `withdrawCollateral` checks the health after the repay, so such a roll reverts instead.
+The effect is bounded by `maxDebt`'s roundings and cannot leave the position unhealthy: `withdrawCollateral` checks the health after the repay, so such a roll reverts instead.
 
 ### `EcrecoverAuthorizer`
 
