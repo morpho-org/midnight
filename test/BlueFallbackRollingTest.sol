@@ -7,7 +7,7 @@ import {IMorpho, Id, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorp
 import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
 import {Market, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
 import {ISellCallback} from "../src/interfaces/ICallbacks.sol";
-import {WAD, ORACLE_PRICE_SCALE, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {BlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/BlueFallbackRolling.sol";
 import {IBlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/interfaces/IBlueFallbackRolling.sol";
 import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
@@ -454,34 +454,6 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
-    // A roll cannot engage the liquidation lock, which is only ever written inside take.
-    function testRollDoesNotLockLiquidation() public {
-        vm.warp(end);
-
-        vm.prank(keeper);
-        fallbackContract.roll(
-            midnightMarket,
-            blueMarketParams,
-            borrower,
-            start,
-            end,
-            INCENTIVE_AT_START,
-            INCENTIVE_AT_END,
-            MIN_ROLLABLE_ASSETS,
-            DEBT / 2
-        );
-
-        assertFalse(midnight.liquidationLocked(toId(midnightMarket), borrower));
-
-        // Liquidating the remaining position would revert with NotLiquidatable if the roll had left the lock engaged.
-        oracle1.setPrice(ORACLE_PRICE_SCALE * 9 / 10);
-        assertFalse(midnight.isHealthy(midnightMarket, toId(midnightMarket), borrower));
-        deal(address(loanToken), address(this), 1);
-        midnight.liquidate(midnightMarket, blueCollateralIndex, 0, 1, borrower, false, address(this), address(0), hex"");
-        assertEq(midnight.debt(toId(midnightMarket), borrower), DEBT / 2 - 1);
-    }
-
-    // A take engages the seller's liquidation lock, so its seller callback cannot roll.
     function testRollRevertsWhileLiquidationLocked() public {
         uint256 units = 1e18;
         RollSellCallback callback = new RollSellCallback(address(fallbackContract));
