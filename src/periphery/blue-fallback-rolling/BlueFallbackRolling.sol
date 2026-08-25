@@ -15,6 +15,10 @@ import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
 /// @dev Users must make sure that the oracle and the LLTV of the Blue market are appropriate; otherwise, their
 /// position on Blue could be left close to liquidation.
+/// @dev The source position can move before it is rolled, notably if the borrower has outstanding sell offers, in
+/// which case the LTV of the destination position can be difficult to predict.
+/// @dev Contrary to Midnight, Blue positions can be liquidated because of interest accrual, which should be taken into
+/// account when deciding which LTV is acceptable on Blue.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
     using UtilsLib for uint128;
@@ -64,6 +68,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         );
     }
 
+    /// @dev A roll cannot be performed from inside a take's callback on the position, which prevents manipulating its
+    /// health before it is rolled.
     function roll(
         Market memory midnightMarket,
         MarketParams memory blueMarketParams,
