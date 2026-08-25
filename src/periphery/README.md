@@ -33,9 +33,10 @@ The caller incentive is a percentage of the debt, is capped at 100% and increase
 The minimum rollable amount is the smallest debt a single roll can migrate, and is bypassed by a roll migrating the whole remaining Midnight debt, so a position can always be closed out. 
 A roll requires the borrower to have exactly one activated Midnight collateral, matching the collateral token of the configured Blue market.
 
-The collateral moved from Midnight to Blue is `collateral * assets / debtAssets` rounded down so it favors the Midnight position health against the resulting Blue position health.
-Note that the Midnight position health (defined by `debt/maxDebt`) could still worsen because of the multiple rounding during `maxDebt`'s computation.
-The minimum rollable amount mitigates this by limiting how many times the rounding can be applied.
+The collateral moved from Midnight to Blue is `collateral * assets / debtAssets` rounded down, so the Midnight position keeps a bit more collateral than the share of debt being rolled, at the expense of the resulting Blue position.
+Even so, the Midnight position health (defined by `debt/maxDebt`) can worsen, because `maxDebt` is itself computed with roundings.
+The minimum rollable amount mitigates this by limiting how many times the roundings can be applied.
+
 ### `EcrecoverAuthorizer`
 
 Lets an address grant or revoke a Midnight authorization using an EIP-712 signature.
