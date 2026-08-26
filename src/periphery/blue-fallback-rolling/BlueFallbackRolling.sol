@@ -94,8 +94,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint256 debtAssets = IMidnight(MIDNIGHT).debt(midnightId, user);
         require(assets >= minRollableAssets || assets == debtAssets, RolledAssetsTooLow());
 
-        // collateralAssets is rounded down, in favor of the Midnight position and at the expense of the Blue one, which
-        // the min rollable debt mitigates. The Midnight position's health can still worsen, from maxDebt's roundings.
+        // collateralAssets is rounded down, so the Midnight position keeps a bit more collateral than the share of debt being rolled, at the expense of the resulting Blue position.
+        // min rollable assets mitigates this by limiting how many times the rounding can be applied.
         uint256 collateralAssets =
             IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex).mulDivDown(assets, debtAssets);
         // Round against the roller.
