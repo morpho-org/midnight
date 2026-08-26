@@ -71,8 +71,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         );
     }
 
-    /// @dev A roll cannot be performed from inside a take's callback on the position, which prevents manipulating its
-    /// health before it is rolled.
+    /// @dev A roll cannot be performed from inside a take's callback on the position, which prevents manipulating the
+    /// collateral amount that is moved.
     function roll(
         Market memory midnightMarket,
         MarketParams memory blueMarketParams,
