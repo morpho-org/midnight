@@ -29,16 +29,16 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    /// @dev The caller must be `user` or an address authorized for `user` on Midnight.
+    /// @dev The caller must be user or an address authorized for user on Midnight.
     function setConfig(
         address user,
         bytes32 midnightId,
         bytes32 blueId,
-        uint64 start,
-        uint64 end,
-        uint64 incentiveAtStart,
-        uint64 incentiveAtEnd,
-        uint128 minRollableAssets,
+        uint256 start,
+        uint256 end,
+        uint256 incentiveAtStart,
+        uint256 incentiveAtEnd,
+        uint256 minRollableAssets,
         bool enabled
     ) external override {
         require(msg.sender == user || IMidnight(MIDNIGHT).isAuthorized(user, msg.sender), Unauthorized());
@@ -68,11 +68,11 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         Market memory midnightMarket,
         MarketParams memory blueMarketParams,
         address user,
-        uint64 start,
-        uint64 end,
-        uint64 incentiveAtStart,
-        uint64 incentiveAtEnd,
-        uint128 minRollableAssets,
+        uint256 start,
+        uint256 end,
+        uint256 incentiveAtStart,
+        uint256 incentiveAtEnd,
+        uint256 minRollableAssets,
         uint256 assets
     ) external override {
         bytes32 midnightId = IdLib.toId(midnightMarket);
@@ -80,7 +80,6 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         bytes32 configId =
             keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets));
         require(isConfig[user][configId], NotConfigured());
-        require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
         require(block.timestamp >= start, NotStarted());
         require(block.timestamp <= end, Ended());
         uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
@@ -90,12 +89,14 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             blueMarketParams.collateralToken == midnightMarket.collateralParams[collateralIndex].token,
             InconsistentCollateralToken()
         );
+        require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
 
         uint256 debtAssets = IMidnight(MIDNIGHT).debt(midnightId, user);
         require(assets >= minRollableAssets || assets == debtAssets, RolledAssetsTooLow());
 
-        // collateralAssets is rounded down, so the Midnight position keeps a bit more collateral than the share of debt being rolled, at the expense of the resulting Blue position.
-        // min rollable assets mitigates this by limiting how many times the rounding can be applied.
+        // collateralAssets is rounded down, so the Midnight position keeps a bit more collateral than the share of debt
+        // being rolled, at the expense of the resulting Blue position. min rollable assets mitigates this by limiting
+        // how many times the rounding can be applied.
         uint256 collateralAssets =
             IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex).mulDivDown(assets, debtAssets);
         // Round against the roller.
