@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 
 import "BitmapSummaries.spec";
+import "MulDivAxioms.spec";
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -32,10 +33,12 @@ methods {
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
-    // Summarizing mulDivDown and mulDivUp by unconstrained deterministic ghosts adds no assumption about
-    // mulDiv: the ghosts are arbitrary, and the summaries reproduce exactly the revert condition of the real
-    // mulDiv, so every real mulDiv behaviour is still allowed. All the arithmetic the rule actually needs is
-    // required explicitly below, one ground instance per rule proved over the concrete mulDiv in MulDiv.spec.
+    // Summarizing mulDivDown and mulDivUp by the shared ghosts of MulDivAxioms.spec adds no assumption
+    // about mulDiv: the ghosts are arbitrary, and the summaries reproduce exactly the revert condition of the
+    // real mulDiv, so every real mulDiv behaviour is still allowed. All the arithmetic the rules need is
+    // required explicitly below as ground instances of the axioms of MulDivAxioms.spec, each proved over the
+    // real math functions in MulDiv.spec. Those axioms are stated over mathint, so requiring them never
+    // prunes a case where an intermediate sum or product exceeds 256 bits.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
@@ -61,24 +64,20 @@ definition WAD_SQUARED() returns uint256 = 10 ^ 36;
 
 persistent ghost summaryPrice(address) returns uint256;
 
-persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
-
-persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
-
 // Deterministic overflow: the real mulDiv reverts iff d == 0 or the checked product overflows 256 bits. Modeling
 // that exact condition (rather than a nondeterministic overflow flag) is what makes revert-freedom provable.
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (d == 0 || to_mathint(a) * to_mathint(b) > max_uint256) {
         revert();
     }
-    return ghostMulDivDown(a, b, d);
+    return require_uint256(ghostMulDivDown(a, b, d));
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (d == 0 || to_mathint(a) * to_mathint(b) + (to_mathint(d) - 1) > max_uint256) {
         revert();
     }
-    return ghostMulDivUp(a, b, d);
+    return require_uint256(ghostMulDivUp(a, b, d));
 }
 
 // Pin every field that contributes to the market id, making the toId summary deterministic and injective.
@@ -182,7 +181,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
         uint256 otherCollatBefore = collateral(globalId, borrower, otherIndex);
         uint256 otherLltv = globalMarketCollateralLLTV[otherIndex];
         uint256 otherPrice = summaryPrice(globalMarket.collateralParams[otherIndex].oracle);
-        otherContrib = ghostMulDivDown(ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()), otherLltv, WAD());
+        otherContrib = require_uint256(mathMulDivDown(mathMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()), otherLltv, WAD()));
     }
 
     // The activated collaterals are exactly [0, globalMarketCollateralLength), so liquidate's bitmap maxDebt /
@@ -207,27 +206,34 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     /// MAX-DEBT DROP BOUND ///
     // Establish curContrib - newContrib <= maxDebtDropBound. When it seizes, liquidate computes
     // seizedOut = floor(floor(repaidUnits * lif / WAD) * ORACLE_PRICE_SCALE / price), matching the ghost terms
-    // below. Each require is one ground instance of a rule proved in MulDiv.spec.
+    // below. Each require is one ground instance of an axiom of MulDivAxioms.spec, proved in MulDiv.spec.
 
-    uint256 maxSeizedValue = ghostMulDivDown(repaidUnits, lif, WAD());
+    uint256 maxSeizedValue = require_uint256(mathMulDivDown(repaidUnits, lif, WAD()));
 
-    // By that same computation, seizedOut == ghostMulDivDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price).
-    uint256 curCollatValue = ghostMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE());
-    uint256 newCollatValue = ghostMulDivDown(collatAfter, price, ORACLE_PRICE_SCALE());
+    // By that same computation, seizedOut == mathMulDivDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price).
+    uint256 curCollatValue = require_uint256(mathMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE()));
+    uint256 newCollatValue = require_uint256(mathMulDivDown(collatAfter, price, ORACLE_PRICE_SCALE()));
 
-    uint256 curContrib = ghostMulDivDown(curCollatValue, lltv, WAD());
-    uint256 newContrib = ghostMulDivDown(newCollatValue, lltv, WAD());
+    uint256 curContrib = require_uint256(mathMulDivDown(curCollatValue, lltv, WAD()));
+    uint256 newContrib = require_uint256(mathMulDivDown(newCollatValue, lltv, WAD()));
 
     uint256 lifTimesLltv = assert_uint256(lif * lltv);
-    uint256 maxDebtDropBound = ghostMulDivUp(repaidUnits, lifTimesLltv, WAD_SQUARED());
+    uint256 maxDebtDropBound = require_uint256(mathMulDivUp(repaidUnits, lifTimesLltv, WAD_SQUARED()));
 
-    require price > 0 => ghostMulDivUp(seizedOut, price, ORACLE_PRICE_SCALE()) <= maxSeizedValue, "L1: mulDivInverseUpDown with a=maxSeizedValue, b=ORACLE_PRICE_SCALE, d=price (MulDiv.spec)";
-    require curCollatValue <= newCollatValue + ghostMulDivUp(seizedOut, price, ORACLE_PRICE_SCALE()), "L2: mulDivAddDownUp with a1=collatAfter, a2=seizedOut, b=price, d=ORACLE_PRICE_SCALE (MulDiv.spec)";
-    require curCollatValue <= newCollatValue + maxSeizedValue => curContrib <= newContrib + ghostMulDivUp(maxSeizedValue, lltv, WAD()), "L3: mulDivMonotoneA then mulDivAddDownUp with a1=newCollatValue, a2=maxSeizedValue, b=lltv, d=WAD (MulDiv.spec)";
-    require ghostMulDivUp(maxSeizedValue, lltv, WAD()) <= maxDebtDropBound, "L4: mulDivDownUpComposition with a=repaidUnits, b=lif, c=lltv, d=WAD (MulDiv.spec)";
+    // L1: what liquidate seized is worth at most maxSeizedValue.
+    require axiomMathMulDivInverseUpDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price), "proved in mathMulDivInverseUpDown";
 
-    // L1-L2 bound the collateral-value decrease by maxSeizedValue. L3 transports that bound through the LLTV
-    // contribution, and L4 bounds the composed rounding by maxDebtDropBound.
+    // L2: the collateral value falls by at most the value of the seized collateral.
+    require axiomMathMulDivAddDownUp(collatAfter, seizedOut, price, ORACLE_PRICE_SCALE()), "proved in mathMulDivAddDownUp";
+
+    // L3: transport that bound through the LLTV contribution. Monotonicity in the first argument plus
+    // sub-additivity give curContrib <= newContrib + ceil(maxSeizedValue * lltv / WAD). Both axioms are over
+    // mathint, so newCollatValue + maxSeizedValue is never assumed to fit in 256 bits.
+    require axiomMathMulDivDownMonotoneA(curCollatValue, newCollatValue + maxSeizedValue, lltv, WAD()), "proved in mathMulDivMonotoneA";
+    require axiomMathMulDivAddDownUp(newCollatValue, maxSeizedValue, lltv, WAD()), "proved in mathMulDivAddDownUp";
+
+    // L4: bound the two-step rounding by the single-step maxDebtDropBound.
+    require axiomMathMulDivDownUpComposition(repaidUnits, lif, lltv, WAD()), "proved in mathMulDivDownUpComposition";
 
     /// FINAL HEALTH BOUND ///
     // repaidUnits is ceil(gap * WAD^2 / (WAD^2 - lif * lltv)). The two rounding facts below imply
@@ -238,9 +244,9 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // Safe: maxRepaidFor's non-reverting subtraction establishes debtBefore >= maxDebtBefore.
     uint256 gap = require_uint256(debtBefore - maxDebtBefore);
     uint256 rcfDenominator = assert_uint256(WAD_SQUARED() - lifTimesLltv);
-    require rcfDenominator > 0 => gap * WAD_SQUARED() <= ghostMulDivUp(gap, WAD_SQUARED(), rcfDenominator) * rcfDenominator, "proved in mulDivUpRoundsUp";
+    require axiomMathMulDivUpRoundsUp(gap, WAD_SQUARED(), rcfDenominator), "proved in mathMulDivUpRoundsUp";
     uint256 repaidExcess = assert_uint256(repaidUnits - gap);
-    require repaidUnits * lifTimesLltv <= repaidExcess * WAD_SQUARED() => ghostMulDivUp(repaidUnits, lifTimesLltv, WAD_SQUARED()) <= repaidExcess, "proved in mulDivCeilLeOfMulGe";
+    require axiomMathMulDivCeilLeOfMulGe(repaidUnits, lifTimesLltv, WAD_SQUARED(), repaidExcess), "proved in mathMulDivCeilLeOfMulGe";
 
     assert isHealthyNoBitmap(globalMarket, globalId, borrower);
 }
@@ -281,10 +287,10 @@ rule liquidateAtCapDoesNotRevert(env e, uint256 collateralIndex, address borrowe
     require lif > 0, "positive maxLif for the liquidated collateral (created-market invariant)";
     require lif <= 2 * WAD(), "maxLif <= 2 * WAD";
     require collatBefore * price + ORACLE_PRICE_SCALE() <= max_uint256, "collateral value (index) fits 256 bits";
-    require ghostMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE()) * lltv <= max_uint256, "maxDebt term (index) fits 256 bits";
-    require ghostMulDivUp(collatBefore, price, ORACLE_PRICE_SCALE()) * WAD() + lif <= max_uint256, "badDebt term (index) fits 256 bits";
+    require mathMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE()) * lltv <= max_uint256, "maxDebt term (index) fits 256 bits";
+    require mathMulDivUp(collatBefore, price, ORACLE_PRICE_SCALE()) * WAD() + lif <= max_uint256, "badDebt term (index) fits 256 bits";
     require repaidUnits * lif <= max_uint256, "maxSeizedValue product fits 256 bits";
-    require ghostMulDivDown(repaidUnits, lif, WAD()) * ORACLE_PRICE_SCALE() <= max_uint256, "seized value fits 256 bits";
+    require mathMulDivDown(repaidUnits, lif, WAD()) * ORACLE_PRICE_SCALE() <= max_uint256, "seized value fits 256 bits";
 
     // The other collateral's no-overflow bounds are needed only when liquidate's loop visits that collateral.
     if (globalMarketCollateralLength == 2) {
@@ -295,8 +301,8 @@ rule liquidateAtCapDoesNotRevert(env e, uint256 collateralIndex, address borrowe
         uint256 maxLifOther = maxLifGhost(otherLltv, globalMarketCollateralLiquidationCursor[otherIndex]);
         require maxLifOther > 0, "positive maxLif for the other collateral (created-market invariant)";
         require otherCollatBefore * otherPrice + ORACLE_PRICE_SCALE() <= max_uint256, "collateral value (other) fits 256 bits";
-        require ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()) * otherLltv <= max_uint256, "maxDebt term (other) fits 256 bits";
-        require ghostMulDivUp(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()) * WAD() + maxLifOther <= max_uint256, "badDebt term (other) fits 256 bits";
+        require mathMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()) * otherLltv <= max_uint256, "maxDebt term (other) fits 256 bits";
+        require mathMulDivUp(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()) * WAD() + maxLifOther <= max_uint256, "badDebt term (other) fits 256 bits";
     }
 
     // The activated collaterals are exactly [0, globalMarketCollateralLength): liquidate's bitmap loop ranges
@@ -314,7 +320,7 @@ rule liquidateAtCapDoesNotRevert(env e, uint256 collateralIndex, address borrowe
     // The seized collateral does not exceed the position collateral, so liquidate's collateral subtraction
     // does not underflow. Left as an explicit hypothesis pending review; implied by no bad debt + the
     // maxRepaidFor debt clamp.
-    require collatBefore >= ghostMulDivDown(ghostMulDivDown(repaidUnits, lif, WAD()), ORACLE_PRICE_SCALE(), price), "seized <= collateral";
+    require collatBefore >= mathMulDivDown(mathMulDivDown(repaidUnits, lif, WAD()), ORACLE_PRICE_SCALE(), price), "seized <= collateral";
 
     // No overflow of the market's withdrawable when the repaid units are credited.
     require currentContract.marketState[globalId].withdrawable + repaidUnits <= max_uint128, "withdrawable credit does not overflow";

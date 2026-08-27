@@ -58,6 +58,12 @@ definition axiomMathMulDivAddUpUpTight(mathint a1, mathint a2, mathint b, mathin
 
 definition axiomMathMulDivAddDownUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 => mathMulDivDown(a1, b, d) + mathMulDivUp(a2, b, d) >= mathMulDivDown(a1 + a2, b, d);
 
+// Rounding down the first scaling step cannot increase the result of a second scaling rounded up.
+definition axiomMathMulDivDownUpComposition(mathint a, mathint b, mathint c, mathint d) returns bool = a >= 0 && b >= 0 && c >= 0 && d > 0 => mathMulDivUp(mathMulDivDown(a, b, d), c, d) <= mathMulDivUp(a, b * c, d * d);
+
+// If the exact product is at most bound * d, then the ceiling is at most bound.
+definition axiomMathMulDivCeilLeOfMulGe(mathint a, mathint b, mathint d, mathint bound) returns bool = a >= 0 && b >= 0 && d > 0 && a * b <= bound * d => mathMulDivUp(a, b, d) <= bound;
+
 definition axiomMathMulDivInverseDownUp(mathint a, mathint b, mathint d) returns bool = b > 0 && d > 0 => a <= mathMulDivDown(mathMulDivUp(a, b, d), d, b);
 
 definition axiomMathMulDivInverseUpDown(mathint a, mathint b, mathint d) returns bool = a >= 0 && b >= 0 && d > 0 => mathMulDivUp(mathMulDivDown(a, b, d), d, b) <= a;
