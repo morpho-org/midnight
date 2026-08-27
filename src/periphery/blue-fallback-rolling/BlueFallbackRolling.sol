@@ -15,6 +15,13 @@ import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
 /// @dev Users must make sure that the oracle and the LLTV of the Blue market are appropriate; otherwise, their
 /// position on Blue could be left close to liquidation.
+/// @dev The rolling incentive corresponds to the percentage of the debt repaid on Midnight that is given as incentive
+/// equivalent to added interest on Blue.
+/// @dev The rolling incentive cap at 100% is arbitrary from a technical POV.
+/// @dev The source position can move before it is rolled, notably if the borrower has outstanding sell offers, in
+/// which case the destination position debt and collateral can be difficult to predict.
+/// @dev Contrary to Midnight, Blue positions can be liquidated because of interest accrual, which should be taken into
+/// account when deciding/approving the rolling configuration.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
     using UtilsLib for uint128;
@@ -29,18 +36,16 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         BLUE = _blue;
     }
 
-    /// @dev The caller must be `user` or an address authorized for `user` on Midnight.
-    /// @dev `minRollableAssets` is the minimum debt that a single roll can move to Blue, unless the roll moves the
-    /// whole remaining Midnight debt.
+    /// @dev The caller must be user or an address authorized for user on Midnight.
     function setConfig(
         address user,
         bytes32 midnightId,
         bytes32 blueId,
-        uint64 start,
-        uint64 end,
-        uint64 incentiveAtStart,
-        uint64 incentiveAtEnd,
-        uint128 minRollableAssets,
+        uint256 start,
+        uint256 end,
+        uint256 incentiveAtStart,
+        uint256 incentiveAtEnd,
+        uint256 minRollableAssets,
         bool enabled
     ) external override {
         require(msg.sender == user || IMidnight(MIDNIGHT).isAuthorized(user, msg.sender), Unauthorized());
@@ -66,15 +71,17 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         );
     }
 
+    /// @dev A roll cannot be performed from inside a take's callback on the position, which prevents manipulating the
+    /// collateral amount that is moved.
     function roll(
         Market memory midnightMarket,
         MarketParams memory blueMarketParams,
         address user,
-        uint64 start,
-        uint64 end,
-        uint64 incentiveAtStart,
-        uint64 incentiveAtEnd,
-        uint128 minRollableAssets,
+        uint256 start,
+        uint256 end,
+        uint256 incentiveAtStart,
+        uint256 incentiveAtEnd,
+        uint256 minRollableAssets,
         uint256 assets
     ) external override {
         bytes32 midnightId = IdLib.toId(midnightMarket);
@@ -82,9 +89,9 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         bytes32 configId =
             keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets));
         require(isConfig[user][configId], NotConfigured());
-        require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
         require(block.timestamp >= start, NotStarted());
         require(block.timestamp <= end, Ended());
+        require(!IMidnight(MIDNIGHT).liquidationLocked(midnightId, user), LiquidationLocked());
         uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
         require(UtilsLib.countBits(collateralBitmap) == 1, IncorrectActivatedCollateral());
         uint256 collateralIndex = UtilsLib.msb(collateralBitmap);
@@ -92,12 +99,14 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             blueMarketParams.collateralToken == midnightMarket.collateralParams[collateralIndex].token,
             InconsistentCollateralToken()
         );
+        require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
 
         uint256 debtAssets = IMidnight(MIDNIGHT).debt(midnightId, user);
         require(assets >= minRollableAssets || assets == debtAssets, RolledAssetsTooLow());
 
-        // Round in favor of the Midnight position. Thus, splitting the rolls can raise the blue final LTV. This is
-        // mitigated by the min rollable debt.
+        // collateralAssets is rounded down, so the share of the collateral leaving the Midnight position can be less
+        // than the share of debt being rolled, at the expense of the resulting Blue position. minRollableAssets
+        // mitigates this by limiting how many times the rounding can be applied.
         uint256 collateralAssets =
             IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex).mulDivDown(assets, debtAssets);
         // Round against the roller.

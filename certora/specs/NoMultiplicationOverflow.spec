@@ -84,8 +84,8 @@ function boundedTickPrice() returns uint256 {
 
 function mulDivDownSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     uint256 result;
-    mathint product = x * y;
-    if (product > max_uint256) {
+    mathint product = to_mathint(x) * y;
+    if (d != 0 && x * y >= 2 ^ 256) {
         // overflow in mulDivDown
         if (x == lastCollateralAmount && y == lastOraclePrice && d == ORACLE_PRICE_SCALE()) {
             // Explicitly allow to revert when some user's collateral is priced at too many debt units
@@ -111,7 +111,7 @@ function mulDivDownSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
 function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     uint256 result;
     mathint product = x * y;
-    if (product > max_uint256 || (d > 0 && product + d - 1 > max_uint256)) {
+    if (d != 0 && x * y + d - 1 >= 2 ^ 256) {
         // overflow in mulDivUp
         if (x == lastCollateralAmount && y == lastOraclePrice && d == ORACLE_PRICE_SCALE()) {
             // Explicitly allow to revert when some user's collateral is priced at too many debt units

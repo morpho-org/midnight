@@ -24,15 +24,25 @@ Global invariants on positions, markets and accounting.
   It also checks that the loss-factor arithmetic in `updatePosition` and `liquidate` does not revert on a created market.
 - [`UpdateBeforeCredit.spec`](specs/UpdateBeforeCredit.spec) checks that credit is never loaded or stored before `_updatePosition` has run for that position.
 - [`MarketNotReadBeforeCreated.spec`](specs/MarketNotReadBeforeCreated.spec) checks that no code path reads a non-empty market or position field before the market is created (its `tickSpacing` is still zero).
+- [`NetCredit.spec`](specs/NetCredit.spec) checks the net credit of a position, its up-to-date credit minus its pending continuous fee.
+  Only `withdraw`, `take` and `liquidate` can change it, `withdraw` can only decrease it and leaves other positions untouched, and a `take` moves only the buyer's and the seller's.
+  `liquidate` can only decrease it, and leaves every position untouched as long as it realizes no bad debt on that position's market.
+  It also checks that the pending fee is zero once a position has been accrued at or after maturity.
+- [`PostMaturityDebt.spec`](specs/PostMaturityDebt.spec) checks that a position's debt can never increase after its market's maturity.
+- [`Reentrancy.spec`](specs/Reentrancy.spec) and [`ReentrancyView.spec`](specs/ReentrancyView.spec) check that within a single entry point, external calls, respectively external view calls, only happen before the first storage write or after the last one, so no external call observes an intermediate state.
+  The writes of `touchMarket` and `_updatePosition` are ignored, as they leave the state valid, and `Reentrancy.spec` also ignores the transient `LIQUIDATION_LOCK` writes of `UtilsLib.tExchange`, which deliberately happen after the external calls.
 
 ## Positions health and liquidation
 
 Healthy positions stay healthy, and liquidations only touch liquidatable positions within the incentive bound.
 
-- [`Healthiness.spec`](specs/Healthiness.spec) checks that no action (except oracle update) can turn a healthy borrower unhealthy.
+- [`Healthiness.spec`](specs/Healthiness.spec) checks that after any action (except oracle update) a healthy borrower is still healthy, or is liquidation-locked: a transient state that cannot be liquidated and that is always cleared by the end of the transaction.
 - [`Liquidate.spec`](specs/Liquidate.spec) checks that `liquidate` can only act on a liquidatable position, leaves credit unchanged, and can only decrease the borrower's debt and the seized collateral.
 - [`LiquidationProfitability.spec`](specs/LiquidationProfitability.spec) shows that the liquidation is profitable.
 - [`LiquidationBoundedByLIF.spec`](specs/LiquidationBoundedByLIF.spec) checks the upper side: liquidation profit is bounded by `maxLif`.
+- [`NoDebtWithoutCollateral.spec`](specs/NoDebtWithoutCollateral.spec) checks that a position with an empty collateral bitmap has no debt, unless it is under the transient liquidation lock, together with the lemmas that the lock is clear at every transaction boundary and left unchanged by external calls.
+- [`RealizableBadDebt.spec`](specs/RealizableBadDebt.spec) checks that no function other than `liquidate` can increase the realizable bad debt of a position that is not under the liquidation lock, and that `liquidate` decreases the market's total units by exactly the bad debt it realizes.
+- [`RealizableBadDebtLiquidate.spec`](specs/RealizableBadDebtLiquidate.spec) checks the `liquidate` side: a liquidated position has no realizable bad debt left, and liquidating one position never increases the realizable bad debt of another.
 
 ## Offers and consumption
 
@@ -43,6 +53,8 @@ How offers are consumed when taken.
   It never decreases, a take's delta matches the units taken and stays within the offer's max, and once at the max it stops moving: a fully-consumed offer then admits only no-op takes.
 - [`EmptyOffer.spec`](specs/EmptyOffer.spec) checks that taking an empty offer always reverts (so the offer tree can be padded with empty offers).
 - [`Ratification.spec`](specs/Ratification.spec) checks that every successful take requires the maker to have authorized the ratifier.
+- [`SplitPreservesAccounting.spec`](specs/SplitPreservesAccounting.spec) checks that taking `A` units at once leaves the same credit, debt, total units, loss factors, accrual timestamps and continuous fee credit as taking `B` then `C`, with `A = B + C`.
+- [`SplitDoesNotPunishMakerOrFavorTaker.spec`](specs/SplitDoesNotPunishMakerOrFavorTaker.spec) checks the asset side of that split: splitting a take never makes the maker pay more or receive less, nor the taker pay less or receive more, up to one wei of rounding.
 
 ## Offer trees
 
@@ -94,6 +106,7 @@ Who may change state, sign authorizations and hold roles, and how failures propa
 
 - [`OnlyAuthorizedCanChange.spec`](specs/OnlyAuthorizedCanChange.spec) checks that an unauthorized caller cannot change a user's credit or debt (outside `liquidate` and `updatePosition`), collateral (outside `liquidate`), `consumed` (outside `take`), or `isAuthorized` entry.
   It also checks that `take` requires the caller to be the taker or authorized by them, and that `setIsAuthorized` changes only the targeted pair.
+- [`OnlyAuthorizedCanChangeUpdatedValues.spec`](specs/OnlyAuthorizedCanChangeUpdatedValues.spec) checks the same on the accrued view of a position: outside `liquidate`, an unauthorized caller cannot change a user's updated credit or updated pending fee.
 - [`EcrecoverAuthorizer.spec`](specs/EcrecoverAuthorizer.spec) checks signature-based authorization: a successful call increments only the signer's nonce, and an expired deadline, wrong nonce or reused nonce reverts.
 - [`Role.spec`](specs/Role.spec) checks both liveness and access control for every role.
   The configurator and only the configurator can reassign each role.
@@ -129,6 +142,15 @@ Round-trip properties ensuring that helper computations can reach any target amo
 
 - [`TakeAmountsLibInvertibility.spec`](specs/TakeAmountsLibInvertibility.spec) checks that `TakeAmountsLib.buyerAssetsToUnits` and `sellerAssetsToUnits` are exact inverses of `take`: feeding the returned units back into `take` produces exactly the target buyer (resp. seller) assets.
 
+## Tick math
+
+Conversion between ticks and prices.
+
+- [`TickToPrice.spec`](specs/TickToPrice.spec) checks the `wExp` exponential underpinning the conversion: its casts, its output bound, and its monotonicity.
+  It also checks that `tickToPrice` is zero at tick zero, `WAD` at `maxTick`, at most `WAD` everywhere, and always a multiple of `priceRoundingStep`.
+- [`TickToPriceIsMonotonic.spec`](specs/TickToPriceIsMonotonic.spec) checks that `tickToPrice` is non-decreasing, using the `wExp` monotonicity proven in [`TickToPrice.spec`](specs/TickToPrice.spec).
+- [`PriceToTick.spec`](specs/PriceToTick.spec) checks that `priceToTick` is monotonic, returns the lowest multiple of the tick spacing whose price is at least the input price (assuming input price is less than `WAD`), and round-trips with `tickToPrice` on multiples of the spacing.
+
 ## Fixed-point math
 
 Properties of the fixed-point primitives the protocol relies on.
@@ -143,11 +165,11 @@ Properties of the fixed-point primitives the protocol relies on.
 Verification is performed according to the following modeling conventions:
 
 - loops are modeled as bounded, see the respective configuration files for the specific bounds used.
-  This includes the `for` and `while` loops with the `optimistic_loop` flag, but also the hashing loops with the `optimitic_hashing` flag.
+  This includes the `for` and `while` loops with the `optimistic_loop` flag, but also the hashing loops with the `optimistic_hashing` flag.
 - `multicall` is removed, so each rule reasons about a single entry point.
   This is sound because `multicall` can only call functions of the current contract.
   So if all other functions respect an invariant, by induction `multicall` also respects it.
-- `mulDivDown`/`mulDivUp` are replaced by ghost functions whose axioms are proven in [`MulDiv.spec`](specs/MulDiv.spec).
+- `mulDivDown`/`mulDivUp` are replaced by ghost functions whose axioms are proven in [`MulDiv.spec`](specs/MulDiv.spec), and shared as [`MulDivAxioms.spec`](specs/MulDivAxioms.spec).
 - bitmap operations are replaced by the ghost summaries in [`BitmapSummaries.spec`](specs/BitmapSummaries.spec), justified by [`Bitmap.spec`](specs/Bitmap.spec).
 - ERC20 tokens are assumed well-behaved, see the comments in the respective files for more detail.
 - unless a property is specifically about callbacks, external calls are assumed not to re-enter Midnight.
@@ -161,5 +183,5 @@ You can also pass additional arguments, notably to verify a specific rule.
 For example, at the root of the repository:
 
 ```
-certoraRun certora/confs/Healthiness.conf --rule stayHealthy
+certoraRun certora/confs/Healthiness.conf --rule stayHealthyOrLocked
 ```
