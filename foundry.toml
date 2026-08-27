@@ -21,6 +21,9 @@ exclude_lints = [
     "internal-function-used-once",
     "pragma-inconsistent",
     "missing-zero-check",
+    "low-level-calls",
+    "inline-assembly",
+    "literal-instead-of-constant",
 ]
 
 [[profile.default.compilation_restrictions]]

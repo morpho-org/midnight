@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {IMorpho, Id, MarketParams, Authorization, Signature} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {IMorpho, MarketParams, Authorization, Signature} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {AUTHORIZATION_TYPEHASH, DOMAIN_TYPEHASH} from "../../../lib/morpho-blue/src/libraries/ConstantsLib.sol";
 import {MarketParamsLib} from "../../../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
 import {MorphoBalancesLib} from "../../../lib/morpho-blue/src/libraries/periphery/MorphoBalancesLib.sol";
