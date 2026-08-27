@@ -141,7 +141,7 @@ Verification is performed according to the following modeling conventions:
 - `mulDivDown`/`mulDivUp` are replaced by ghost functions whose axioms are proven in [`MulDiv.spec`](specs/MulDiv.spec), and shared as [`MulDivAxioms.spec`](specs/MulDivAxioms.spec) where a spec needs the whole axiom set.
 - bitmap operations are replaced by the ghost summaries in [`BitmapSummaries.spec`](specs/BitmapSummaries.spec), justified by [`Bitmap.spec`](specs/Bitmap.spec).
 - ERC20 tokens are assumed well-behaved, see the comments in the respective files for more detail.
-- unless a property is specifically about callbacks, external calls are assumed not to re-enter Midnight, justified by [`Reentrancy.spec`](specs/Reentrancy.spec) and [`ReentrancyView.spec`](specs/ReentrancyView.spec).
+- unless a property is specifically about callbacks, external calls are assumed not to re-enter Midnight.
 
 # Getting started
 
