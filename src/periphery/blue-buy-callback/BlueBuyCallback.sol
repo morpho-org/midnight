@@ -58,6 +58,9 @@ contract BlueBuyCallback is IBlueBuyCallback {
         bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+        // forge-lint: disable-next-item(ecrecover) as malleability is handled by the contract nonce consumed
+        // above, so a malleated variant replays against a spent nonce; the require below also pins the signer to
+        // OWNER, leaving a second valid encoding of the same signature no extra authority.
         address signer = ecrecover(digest, signature.v, signature.r, signature.s);
         require(signer != address(0) && signer == authorization.authorizer && signer == OWNER, InvalidSignature());
 

@@ -530,6 +530,9 @@ contract Midnight is IMidnight {
         _marketState.withdrawable -= UtilsLib.toUint128(units);
         _marketState.totalUnits -= UtilsLib.toUint128(units);
 
+        // forge-lint: disable-next-item(uninitialized-local) as pendingFeeDecrease (line 524) stays 0 exactly
+        // when credit is 0, and credit is 0 only for a zero-unit withdraw (the credit subtraction above underflows
+        // otherwise), so there is no fee to prorate and 0 is the right value to report.
         emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, pendingFeeDecrease);
 
         SafeTransferLib.safeTransfer(market.loanToken, receiver, units);
@@ -648,6 +651,9 @@ contract Midnight is IMidnight {
             uint256 price = IOracle(_collateralParam.oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
             uint256 _collateral = _position.collateral[i];
+            // forge-lint: disable-next-item(uninitialized-local) as maxDebt (line 640) starts at the empty-sum
+            // zero deliberately: with no collateral activated, the NotLiquidatable require below then reads the
+            // position as liquidatable, which is the intended outcome.
             maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateralParam.lltv, WAD);
             badDebt = badDebt.zeroFloorSub(
                 _collateral.mulDivUp(price, ORACLE_PRICE_SCALE)
@@ -687,6 +693,10 @@ contract Midnight is IMidnight {
                 : _maxLif;
 
             if (seizedAssets > 0) {
+                // forge-lint: disable-next-item(uninitialized-local) as liquidatedCollatPrice (line 641) is left
+                // at 0 only when collateralIndex is not activated, which by nonZeroCollateralsAreActivated
+                // (CollateralBitmap.spec) forces collateral[collateralIndex] == 0: the seize then underflows below
+                // and the repaidUnits branch divides by zero, so no completing execution reads the 0.
                 repaidUnits = seizedAssets.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
             } else {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
@@ -802,6 +812,9 @@ contract Midnight is IMidnight {
             address previousCollateralToken;
             for (uint256 i = 0; i < market.collateralParams.length; i++) {
                 address collateralToken = market.collateralParams[i].token;
+                // forge-lint: disable-next-item(uninitialized-local) as the zero default of
+                // previousCollateralToken (line 802) is the intended sentinel: it opens the strictly-ascending
+                // ordering check, and therefore also rejects address(0) as a collateral token.
                 require(collateralToken > previousCollateralToken, CollateralParamsNotSorted());
                 uint256 lltv = market.collateralParams[i].lltv;
                 require(isLltvEnabled[lltv], LltvNotEnabled());
@@ -882,6 +895,8 @@ contract Midnight is IMidnight {
         _position.credit = newCredit;
         _position.lastLossFactor = marketState[id].lossFactor;
         _position.pendingFee = newPendingFee;
+        // forge-lint: disable-next-item(unsafe-typecast) as there is no range check to elide here: block.timestamp
+        // cannot reach 2**128, so narrowing it to the uint128 lastAccrual field is unconditionally exact.
         _position.lastAccrual = uint128(block.timestamp);
         marketState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
 
@@ -905,6 +920,9 @@ contract Midnight is IMidnight {
                 uint256 i = UtilsLib.msb(_collateralBitmap);
                 CollateralParams memory collateralParam = market.collateralParams[i];
                 uint256 price = IOracle(collateralParam.oracle).price();
+                // forge-lint: disable-next-item(uninitialized-local) as maxDebt (line 901) is a sum whose zero
+                // default is the empty-sum identity: when _debt is 0 the loop is skipped entirely and the 0 >= 0
+                // below is what reports a debt-free position as healthy.
                 maxDebt += _position.collateral[i]
                     .mulDivDown(price, ORACLE_PRICE_SCALE)
                     .mulDivDown(collateralParam.lltv, WAD);

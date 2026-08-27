@@ -30,6 +30,9 @@ contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
         bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+        // forge-lint: disable-next-item(ecrecover) as malleability is handled by the nonce rather than by the
+        // signature: nonce[authorization.authorizer] is consumed above, so a malleated variant carries an
+        // already-spent nonce and reverts with InvalidNonce.
         address signer = ecrecover(digest, signature.v, signature.r, signature.s);
         require(signer != address(0), InvalidSignature());
         require(

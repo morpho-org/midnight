@@ -41,6 +41,9 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         bytes32 structHash = keccak256(abi.encode(HashLib.offerTreeTypeHash(proof.length), root));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
+        // forge-lint: disable-next-item(ecrecover) as s-malleability buys nothing here: this function is view and
+        // never stores the signature, cancellation is keyed on (maker, root) via isRootCanceled and consumption is
+        // tracked by Midnight, so a malleated variant recovers the same signer against the same state.
         address _signer = ecrecover(digest, sig.v, sig.r, sig.s);
         require(_signer != address(0), InvalidSignature());
         require(_signer == offer.maker || IMidnight(MIDNIGHT).isAuthorized(offer.maker, _signer), Unauthorized());

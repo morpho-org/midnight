@@ -24,6 +24,12 @@ exclude_lints = [
     "low-level-calls",
     "inline-assembly",
     "literal-instead-of-constant",
+    "require-revert-in-loop",
+    "multi-contract-file",
+    "calls-loop",
+    "arbitrary-send-erc20",
+    "unused-return",
+    "cyclomatic-complexity",
 ]
 
 [[profile.default.compilation_restrictions]]

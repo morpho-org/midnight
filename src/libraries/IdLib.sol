@@ -23,6 +23,8 @@ library IdLib {
     bytes constant SSTORE2_PREFIX = hex"600b380380600b5f395ff3";
 
     function toId(Market memory market) internal pure returns (bytes32) {
+        // forge-lint: disable-next-item(encode-packed-collision) as the inner encodePacked cannot be ambiguous:
+        // SSTORE2_PREFIX is a fixed 11-byte constant, so exactly one of the two arguments is variable-length.
         return keccak256(
             abi.encodePacked(
                 uint8(0xff),
@@ -35,6 +37,8 @@ library IdLib {
 
     /// @dev Stores the market in the code of the contract at the address given by the last 20 bytes of its id.
     function storeInCode(Market memory market) internal returns (address create2Address) {
+        // forge-lint: disable-next-item(encode-packed-collision) as this concatenation is creation code, not a
+        // hash preimage, and the constant-length SSTORE2_PREFIX keeps the market encoding it prefixes unambiguous.
         bytes memory creationCode = abi.encodePacked(SSTORE2_PREFIX, abi.encode(market));
         assembly ("memory-safe") {
             create2Address := create2(0, add(creationCode, 0x20), mload(creationCode), 0)
