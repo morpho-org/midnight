@@ -56,23 +56,4 @@ contract MidnightWrapper is Midnight {
         uint256 lif = maxLif(lltv, liquidatedParam.liquidationCursor);
         return (debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv);
     }
-
-    /* badDebtFor recomputes the badDebt of Midnight.liquidate (see src/Midnight.sol:643-655) through a
-     * bitmap-free, array-based code path. Used to pin the no-bad-debt case (badDebtFor == 0), under which
-     * liquidate does not reduce _position.debt before the L699 cap computation. */
-    function badDebtFor(Market memory market, bytes32 id, address borrower) public view returns (uint256) {
-        Position storage _position = position[id][borrower];
-        uint256 badDebt = _position.debt;
-        uint256 len = market.collateralParams.length;
-        for (uint256 i = len; i > 0;) {
-            i--;
-            CollateralParams memory collateralParam = market.collateralParams[i];
-            uint256 price = IOracle(collateralParam.oracle).price();
-            badDebt = badDebt.zeroFloorSub(
-                _position.collateral[i].mulDivUp(price, ORACLE_PRICE_SCALE)
-                    .mulDivUp(WAD, maxLif(collateralParam.lltv, collateralParam.liquidationCursor))
-            );
-        }
-        return badDebt;
-    }
 }

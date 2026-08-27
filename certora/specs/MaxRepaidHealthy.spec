@@ -14,12 +14,25 @@ methods {
     // Assumption: price does not change during the rule (same value in maxRepaidFor, in liquidate and in the
     // post-state isHealthyNoBitmap). Deterministic per oracle address, as in Healthiness.spec.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
+
+    // The three summaries below do not restrict the verified behaviours:
+    // - tickToPrice: NONDET havocs the return value, which is an over-approximation (it allows every tick
+    //   price, including the real one). Tick prices only feed the order-book accounting, never the health
+    //   computation this rule reasons about, so losing that information costs nothing.
+    // - toId: replaces the keccak derivation by a ghost that is only required to be deterministic and
+    //   injective on the pinned market. Both hold for the real derivation up to hash collisions, which is
+    //   the standing assumption everywhere ids are summarized (see Healthiness.spec).
+    // - storeInCode: NONDET havocs the returned address. The function only mirrors the market into code for
+    //   cheap retrieval; the position and market storage the rule reads is untouched, so over-approximating
+    //   the address it returns cannot hide a counterexample.
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
-    // Summarize mulDivDown and mulDivUp deterministically; the tight rounding facts about them are proved
-    // over concrete mulDiv in MulDiv.spec and injected below only at the specific instances the rule needs.
+    // Summarizing mulDivDown and mulDivUp by unconstrained deterministic ghosts adds no assumption about
+    // mulDiv: the ghosts are arbitrary, and the summaries revert on a nondeterministic overflow flag, so
+    // every real mulDiv behaviour is still allowed. All the arithmetic the rule actually needs is required
+    // explicitly below, one ground instance per rule proved over the concrete mulDiv in MulDiv.spec.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
@@ -43,15 +56,6 @@ persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
 
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
 
-// Tight rounding facts proved over concrete mulDiv in MulDiv.spec. The rule assumes only the ground instances
-// it uses, avoiding quantified background axioms.
-
-// Proved in mulDivUpRoundsUp: a * b <= ceil(a * b / d) * d.
-definition axiomUpRoundsUp(uint256 a, uint256 b, uint256 d) returns bool = d > 0 => a * b <= ghostMulDivUp(a, b, d) * d;
-
-// Proved in mulDivCeilLeOfMulGe: a * b <= bound * d => ceil(a * b / d) <= bound.
-definition axiomCeilLeOfMulGe(uint256 a, uint256 b, uint256 d, uint256 bound) returns bool = d > 0 && a * b <= bound * d => ghostMulDivUp(a, b, d) <= bound;
-
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
@@ -69,14 +73,18 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 }
 
 // Pin every field that contributes to the market id, making the toId summary deterministic and injective.
-// The rule specializes this market to two collaterals.
 
 persistent ghost address globalMarketLoanToken;
 
 persistent ghost uint256 globalMarketChainId;
 
+// Exactly two collaterals is not a restriction on the result. Liquidating touches a single collateral, so the
+// whole contribution of every other collateral to maxDebt enters the reasoning as one arbitrary non-negative
+// value, and one extra collateral with an arbitrary amount, price and LLTV already realizes every such value.
+// The second collateral therefore plays the role of the arbitrary otherCollatContribution of the Rocq proof,
+// and a market with more collaterals is covered by the same argument.
 persistent ghost uint256 globalMarketCollateralLength {
-    axiom globalMarketCollateralLength <= 2;
+    axiom globalMarketCollateralLength == 2;
 }
 
 persistent ghost mapping(uint256 => address) globalMarketCollateralOracle;
@@ -124,11 +132,10 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 /// RULE ///
 
 // In a two-collateral market, liquidating at the amount computed by maxRepaidFor leaves the position healthy.
-// The call uses normal mode and covers the strictly unhealthy and health-boundary cases.
+// The call uses normal mode and covers the strictly unhealthy and health-boundary cases. See the
+// globalMarketCollateralLength axiom for why two collaterals is general enough.
 rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrower, address receiver, address callback, bytes data) {
     Midnight.Market globalMarket = getGlobalMarket();
-
-    require globalMarketCollateralLength == 2, "two-collateral market";
 
     uint256 collatBefore = collateral(globalId, borrower, collateralIndex);
     uint256 debtBefore = debt(globalId, borrower);
@@ -149,7 +156,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     uint256 collatAfter = assert_uint256(collatBefore - seizedOut);
 
     /// MAX-DEBT DROP BOUND ///
-    // Establish curContrib - newContrib <= maxDebtDropBound. At Midnight.sol:692, liquidate computes
+    // Establish curContrib - newContrib <= maxDebtDropBound. When it seizes, liquidate computes
     // seizedOut = floor(floor(repaidUnits * lif / WAD) * ORACLE_PRICE_SCALE / price), matching the ghost terms
     // below. Each require is one ground instance of a rule proved in MulDiv.spec.
 
@@ -158,7 +165,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     uint256 maxSeizedValue = ghostMulDivDown(repaidUnits, lif, WAD());
     uint256 price = summaryPrice(globalMarket.collateralParams[collateralIndex].oracle);
 
-    // By Midnight.sol:692, seizedOut == ghostMulDivDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price).
+    // By that same computation, seizedOut == ghostMulDivDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price).
     uint256 curCollatValue = ghostMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE());
     uint256 newCollatValue = ghostMulDivDown(collatAfter, price, ORACLE_PRICE_SCALE());
 
@@ -170,7 +177,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
 
     require price > 0 => ghostMulDivUp(seizedOut, price, ORACLE_PRICE_SCALE()) <= maxSeizedValue, "L1: mulDivInverseUpDown with a=maxSeizedValue, b=ORACLE_PRICE_SCALE, d=price (MulDiv.spec)";
     require curCollatValue <= newCollatValue + ghostMulDivUp(seizedOut, price, ORACLE_PRICE_SCALE()), "L2: mulDivAddDownUp with a1=collatAfter, a2=seizedOut, b=price, d=ORACLE_PRICE_SCALE (MulDiv.spec)";
-    require curCollatValue <= newCollatValue + maxSeizedValue => curContrib <= newContrib + ghostMulDivUp(maxSeizedValue, lltv, WAD()), "L3: mulDivDownBoundedIncrease with a1=curCollatValue, a2=newCollatValue, delta=maxSeizedValue, b=lltv, d=WAD (MulDiv.spec)";
+    require curCollatValue <= newCollatValue + maxSeizedValue => curContrib <= newContrib + ghostMulDivUp(maxSeizedValue, lltv, WAD()), "L3: mulDivMonotoneA then mulDivAddDownUp with a1=newCollatValue, a2=maxSeizedValue, b=lltv, d=WAD (MulDiv.spec)";
     require ghostMulDivUp(maxSeizedValue, lltv, WAD()) <= maxDebtDropBound, "L4: mulDivDownUpComposition with a=repaidUnits, b=lif, c=lltv, d=WAD (MulDiv.spec)";
 
     // L1-L2 bound the collateral-value decrease by maxSeizedValue. L3 transports that bound through the LLTV
@@ -187,9 +194,9 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // Safe: maxRepaidFor's non-reverting subtraction establishes debtBefore >= maxDebtBefore.
     uint256 gap = require_uint256(debtBefore - maxDebtBefore);
     uint256 rcfDenominator = assert_uint256(WAD_SQUARED() - lifTimesLltv);
-    require axiomUpRoundsUp(gap, WAD_SQUARED(), rcfDenominator), "proved in mulDivUpRoundsUp";
+    require rcfDenominator > 0 => gap * WAD_SQUARED() <= ghostMulDivUp(gap, WAD_SQUARED(), rcfDenominator) * rcfDenominator, "proved in mulDivUpRoundsUp";
     uint256 repaidExcess = assert_uint256(repaidUnits - gap);
-    require axiomCeilLeOfMulGe(repaidUnits, lifTimesLltv, WAD_SQUARED(), repaidExcess), "proved in mulDivCeilLeOfMulGe";
+    require repaidUnits * lifTimesLltv <= repaidExcess * WAD_SQUARED() => ghostMulDivUp(repaidUnits, lifTimesLltv, WAD_SQUARED()) <= repaidExcess, "proved in mulDivCeilLeOfMulGe";
 
     assert isHealthyNoBitmap(globalMarket, globalId, borrower);
 }
