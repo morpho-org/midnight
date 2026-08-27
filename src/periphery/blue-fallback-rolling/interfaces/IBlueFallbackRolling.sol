@@ -15,6 +15,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     error IncorrectActivatedCollateral();
     error InconsistentCollateralToken();
     error InconsistentLoanToken();
+    error LiquidationLocked();
     error NotBlue();
     error NotConfigured();
     error NotStarted();

@@ -18,6 +18,10 @@ import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 /// @dev The rolling incentive corresponds to the percentage of the debt repaid on Midnight that is given as incentive
 /// equivalent to added interest on Blue.
 /// @dev The rolling incentive cap at 100% is arbitrary from a technical POV.
+/// @dev The source position can move before it is rolled, notably if the borrower has outstanding sell offers, in
+/// which case the destination position debt and collateral can be difficult to predict.
+/// @dev Contrary to Midnight, Blue positions can be liquidated because of interest accrual, which should be taken into
+/// account when deciding/approving the rolling configuration.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
     using UtilsLib for uint128;
@@ -67,6 +71,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         );
     }
 
+    /// @dev A roll cannot be performed from inside a take's callback on the position, which prevents manipulating the
+    /// collateral amount that is moved.
     function roll(
         Market memory midnightMarket,
         MarketParams memory blueMarketParams,
@@ -85,6 +91,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         require(isConfig[user][configId], NotConfigured());
         require(block.timestamp >= start, NotStarted());
         require(block.timestamp <= end, Ended());
+        require(!IMidnight(MIDNIGHT).liquidationLocked(midnightId, user), LiquidationLocked());
         uint128 collateralBitmap = IMidnight(MIDNIGHT).collateralBitmap(midnightId, user);
         require(UtilsLib.countBits(collateralBitmap) == 1, IncorrectActivatedCollateral());
         uint256 collateralIndex = UtilsLib.msb(collateralBitmap);

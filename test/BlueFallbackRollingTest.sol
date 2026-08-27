@@ -5,8 +5,9 @@ pragma solidity ^0.8.0;
 import {stdError} from "../lib/forge-std/src/Test.sol";
 import {IMorpho, Id, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
-import {Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
-import {WAD} from "../src/libraries/ConstantsLib.sol";
+import {Market, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
+import {ISellCallback} from "../src/interfaces/ICallbacks.sol";
+import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {BlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/BlueFallbackRolling.sol";
 import {IBlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/interfaces/IBlueFallbackRolling.sol";
 import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
@@ -451,6 +452,22 @@ contract BlueFallbackRollingTest is BaseTest {
                 midnightMarket, blueMarketParams, blueCollateralIndex, DEBT, DEBT * INCENTIVE_AT_END / WAD, borrower
             )
         );
+    }
+
+    function testRollRevertsWhileLiquidationLocked() public {
+        uint256 units = 1e18;
+        RollSellCallback callback = new RollSellCallback(address(fallbackContract));
+        Offer memory borrowerOffer = _setupMarketOffer(midnightMarket);
+        borrowerOffer.callback = address(callback);
+        borrowerOffer.callbackData = abi.encode(
+            blueMarketParams, start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS, DEBT / 2
+        );
+        deal(address(loanToken), lender, 2 * units);
+        collateralize(midnightMarket, borrower, units, blueCollateralIndex);
+
+        vm.expectRevert(IBlueFallbackRolling.LiquidationLocked.selector);
+        vm.prank(lender);
+        midnight.take(borrowerOffer, hex"", units, lender, address(0), address(0), hex"");
     }
 
     function testSetConfig() public view {
@@ -1207,5 +1224,38 @@ contract BlueFallbackRollingTest is BaseTest {
                 minRollableAssets
             )
         );
+    }
+}
+
+contract RollSellCallback is ISellCallback {
+    IBlueFallbackRolling internal immutable FALLBACK_CONTRACT;
+
+    constructor(address fallbackContract) {
+        FALLBACK_CONTRACT = IBlueFallbackRolling(fallbackContract);
+    }
+
+    function onSell(
+        bytes32,
+        Market memory market,
+        uint256,
+        uint256,
+        uint256,
+        address seller,
+        address,
+        bytes memory data
+    ) external returns (bytes32) {
+        (
+            MarketParams memory blueMarketParams,
+            uint64 start,
+            uint64 end,
+            uint64 incentiveAtStart,
+            uint64 incentiveAtEnd,
+            uint128 minRollableAssets,
+            uint256 assets
+        ) = abi.decode(data, (MarketParams, uint64, uint64, uint64, uint64, uint128, uint256));
+        FALLBACK_CONTRACT.roll(
+            market, blueMarketParams, seller, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets, assets
+        );
+        return CALLBACK_SUCCESS;
     }
 }
