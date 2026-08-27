@@ -9,7 +9,7 @@ import {
     MAX_CONTINUOUS_FEE,
     CALLBACK_SUCCESS
 } from "../src/libraries/ConstantsLib.sol";
-import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Market, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -910,6 +910,24 @@ contract LiquidationTest is BaseTest {
         midnight.setIsAuthorized(address(this), true, borrower);
         midnight.withdrawCollateral(market, 0, collateral, borrower, borrower);
         assertEq(midnight.collateral(id, borrower, 0), 0, "collateral withdrawn");
+    }
+
+    function testFullBadDebtTakeReverts(uint256 units) public {
+        units = bound(units, 10, MAX_UNITS);
+        collateralize(market, borrower, units);
+        setupMarket(market, units);
+
+        Oracle(market.collateralParams[0].oracle).setPrice(0);
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
+        assertEq(midnight.lossFactor(id), type(uint128).max, "loss factor");
+
+        // The market is now permanently unusable: any take reverts.
+        Offer memory borrowerOffer = _setupMarketOffer(market);
+        deal(address(loanToken), lender, units);
+
+        vm.expectRevert(IMidnight.MarketLossFactorMaxedOut.selector);
+        vm.prank(lender);
+        midnight.take(borrowerOffer, hex"", units, lender, address(0), address(0), hex"");
     }
 
     // helpers.

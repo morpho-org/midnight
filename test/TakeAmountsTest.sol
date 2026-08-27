@@ -114,6 +114,26 @@ contract TakeAmountsTest is BaseTest {
         assertEq(buyerAssets, targetBuyerAssets, "e2e buyerAssets");
     }
 
+    function buyerAssetsToUnitsExternal(bytes32 _id, Offer memory _offer, uint256 targetBuyerAssets)
+        external
+        view
+        returns (uint256)
+    {
+        return TakeAmountsLib.buyerAssetsToUnits(address(midnight), _id, _offer, targetBuyerAssets);
+    }
+
+    function testBuyerAssetsToUnitsRevertsWhenBuyerPriceAboveWad(uint256 settlementFee0, uint256 settlementFee1)
+        public
+    {
+        uint256 settlementFee = _setSettlementFees(settlementFee0, settlementFee1);
+        vm.assume(settlementFee > 0);
+        offer.tick = MAX_TICK;
+        assertEq(TickLib.tickToPrice(offer.tick), WAD, "offer price at MAX_TICK");
+
+        vm.expectRevert(TickLib.PriceGreaterThanOne.selector);
+        this.buyerAssetsToUnitsExternal(id, offer, 1);
+    }
+
     function testSellerAssetsToUnitsBuyerIsLender(
         uint256 targetSellerAssets,
         uint256 tick,
