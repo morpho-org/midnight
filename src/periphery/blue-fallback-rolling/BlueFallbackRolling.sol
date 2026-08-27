@@ -22,7 +22,7 @@ import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 /// which case the destination position debt and collateral can be difficult to predict.
 /// @dev Contrary to Midnight, Blue positions can be liquidated because of interest accrual, which should be taken into
 /// account when deciding/approving the rolling configuration.
-/// @dev Positions liquidatable on Midnight can only be fully rolled on Blue, given it is not liquidatable on Blue.
+/// @dev Unhealthy positions on Midnight can only be fully rolled, given the resulting position is healthy on Blue.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
     using UtilsLib for uint128;
