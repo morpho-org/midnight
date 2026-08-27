@@ -35,6 +35,22 @@ jobs:
       - name: Run forge lint
         run: forge lint src test script certora --deny notes
 
+  lint-inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+
+      - name: Emit lint findings as JSON
+        run: |
+          echo "INVENTORY_BEGIN"
+          forge lint src test script certora --json || true
+          echo "INVENTORY_END"
+
   sizes:
     runs-on: ubuntu-latest
     steps:
