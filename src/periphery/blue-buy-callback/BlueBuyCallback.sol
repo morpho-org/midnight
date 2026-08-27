@@ -109,7 +109,9 @@ contract BlueBuyCallback is IBlueBuyCallback {
 
         (uint256 totalSupplyAssets, uint256 totalSupplyShares, uint256 totalBorrowAssets,) =
             IMorpho(BLUE).expectedMarketBalances(marketParams);
-        uint256 supplyAssets = IMorpho(BLUE).position(marketParams.id(), address(this)).supplyShares
+        uint256 supplyAssets = IMorpho(BLUE)
+            .position(marketParams.id(), address(this))
+            .supplyShares
             .toAssetsDown(totalSupplyAssets, totalSupplyShares);
         uint256 liquidity = totalSupplyAssets - totalBorrowAssets;
         uint256 blueBalance = IERC20Extended(marketParams.loanToken).balanceOf(BLUE);

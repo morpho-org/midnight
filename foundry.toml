@@ -18,6 +18,7 @@ exclude_lints = [
     "unsafe-cheatcode",
     "incorrect-shift",
     "block-timestamp",
+    "internal-function-used-once",
 ]
 
 [[profile.default.compilation_restrictions]]

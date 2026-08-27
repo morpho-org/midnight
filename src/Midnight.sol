@@ -700,7 +700,8 @@ contract Midnight is IMidnight {
                 require(
                     repaidUnits <= maxRepaid
                         || _position.collateral[collateralIndex].mulDivDown(liquidatedCollatPrice, ORACLE_PRICE_SCALE)
-                            .mulDivDown(WAD, lif).zeroFloorSub(maxRepaid) < market.rcfThreshold,
+                            .mulDivDown(WAD, lif)
+                            .zeroFloorSub(maxRepaid) < market.rcfThreshold,
                     RecoveryCloseFactorConditionsViolated()
                 );
             }
@@ -904,7 +905,8 @@ contract Midnight is IMidnight {
                 uint256 i = UtilsLib.msb(_collateralBitmap);
                 CollateralParams memory collateralParam = market.collateralParams[i];
                 uint256 price = IOracle(collateralParam.oracle).price();
-                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                maxDebt += _position.collateral[i]
+                    .mulDivDown(price, ORACLE_PRICE_SCALE)
                     .mulDivDown(collateralParam.lltv, WAD);
                 _collateralBitmap = _collateralBitmap.clearBit(i);
             }
