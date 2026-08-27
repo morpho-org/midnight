@@ -3,13 +3,14 @@
 pragma solidity ^0.8.0;
 
 import {Market} from "../../src/interfaces/IMidnight.sol";
+import {IFlashLoanCallback} from "../../src/interfaces/ICallbacks.sol";
 import {CALLBACK_SUCCESS} from "../../src/libraries/ConstantsLib.sol";
 
 interface IHavoc {
     function havoc() external;
 }
 
-contract FlashLiquidateCallback {
+contract FlashLiquidateCallback is IFlashLoanCallback {
     function startFlashloan(address token, uint256 amount) internal {
         // Dummy function to insert the flashloan logic in the spec.
     }
