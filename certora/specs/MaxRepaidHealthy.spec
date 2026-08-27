@@ -46,8 +46,10 @@ methods {
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 
     // Token transfers move external ERC20 balances only, never the borrower's position storage, so summarizing
-    // them as non-reverting no-ops is sound for this direction. The liquidator gate and callback are ruled out by
-    // the liquidatorGate == 0 and callback == 0 preconditions, so canLiquidate / onLiquidate are never called.
+    // them as non-reverting no-ops is sound for this direction. liquidateAtCapDoesNotRevert additionally
+    // constrains liquidatorGate == 0 and callback == 0, so canLiquidate / onLiquidate are never reached there.
+    // liquidateAtCapRestoresHealth constrains neither, so a reentrant callee is not modelled: reentrancy is out
+    // of scope for these rules and is covered by Reentrancy.spec and Healthiness.spec.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function _.transferFrom(address from, address to, uint256 amount) external => NONDET;
