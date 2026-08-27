@@ -175,24 +175,6 @@ function genericCallback() {
     require isHealthyOrLiquidationLocked(globalMarket, globalId, globalBorrower), "user is healthy or locked after callback";
 }
 
-// Lighter summary for token transfer callbacks (safeTransfer, safeTransferFrom).
-// Skips the "before" isHealthy check (which genericCallback does) to halve the isHealthy
-// evaluation cost per transfer, avoiding timeouts.  Still models reentrancy via havoc and
-// requires healthiness after the callback. The "before" check for subsequent genericCallback
-// invocations (e.g. onLiquidate) will catch any violation that occurred between callbacks.
-function transferCallback() {
-    address dummy;
-    env e;
-    Midnight.Market globalMarket = getGlobalMarket();
-
-    bool liquidationLockedBefore = liquidationLocked(globalId, globalBorrower);
-
-    havocCallback.callHavoc(e, dummy);
-
-    require liquidationLocked(globalId, globalBorrower) == liquidationLockedBefore, "liquidationLocked is preserved over calls";
-    require isHealthyOrLiquidationLocked(globalMarket, globalId, globalBorrower), "user is healthy or locked after callback";
-}
-
 // Same as genericCallback except that it also returns a non-deterministic value.
 function genericCallbackBool() returns (bool) {
     bool result;
