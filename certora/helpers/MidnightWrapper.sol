@@ -60,9 +60,9 @@ contract MidnightWrapper is Midnight {
         return UtilsLib.min(maxRepaid, debt);
     }
 
-    /* badDebtFor recomputes the badDebt of Midnight.liquidate (see src/Midnight.sol:643-655) through a
-     * bitmap-free, array-based code path. Used to pin the no-bad-debt case (badDebtFor == 0), under which
-     * liquidate does not reduce _position.debt before the L699 cap computation. */
+    /* badDebtFor recomputes the badDebt of Midnight.liquidate through a bitmap-free, array-based code path.
+     * Used to pin the no-bad-debt case (badDebtFor == 0), under which liquidate does not reduce the position
+     * debt before computing the RCF cap. */
     function badDebtFor(Market memory market, bytes32 id, address borrower) public view returns (uint256) {
         Position storage _position = position[id][borrower];
         uint256 badDebt = _position.debt;
