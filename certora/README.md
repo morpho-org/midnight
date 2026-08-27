@@ -30,7 +30,6 @@ Global invariants on positions, markets and accounting.
   It also checks that the pending fee is zero once a position has been accrued at or after maturity.
 - [`PostMaturityDebt.spec`](specs/PostMaturityDebt.spec) checks that a position's debt can never increase after its market's maturity.
 - [`Reentrancy.spec`](specs/Reentrancy.spec) and [`ReentrancyView.spec`](specs/ReentrancyView.spec) check that within a single entry point, external calls, respectively external view calls, only happen before the first storage write or after the last one, so no external call observes an intermediate state.
-  `multicall` is summarized away here, and unlike an invariant this ordering property does not follow by induction, so a `multicall` chaining two entry points is not covered.
   The writes of `touchMarket` and `_updatePosition` are ignored, as they leave the state valid, and `Reentrancy.spec` also ignores the transient `LIQUIDATION_LOCK` writes of `UtilsLib.tExchange`, which deliberately happen after the external calls.
 
 ## Positions health and liquidation
