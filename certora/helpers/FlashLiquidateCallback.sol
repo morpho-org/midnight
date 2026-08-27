@@ -11,10 +11,14 @@ interface IHavoc {
 }
 
 contract FlashLiquidateCallback is IFlashLoanCallback, ILiquidateCallback, IRepayCallback {
+    // forge-lint: disable-next-item(empty-block) as the empty body is the point: Solvency.spec
+    // summarizes this function and inserts the flashloan accounting in its place.
     function startFlashloan(address token, uint256 amount) internal {
         // Dummy function to insert the flashloan logic in the spec.
     }
 
+    // forge-lint: disable-next-item(empty-block) as the empty body is the point: Solvency.spec
+    // summarizes this function and inserts the flashloan accounting in its place.
     function endFlashloan(address token, uint256 amount) internal {
         // Dummy function to insert the flashloan logic in the spec.
     }
