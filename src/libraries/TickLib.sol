@@ -29,8 +29,12 @@ library TickLib {
                 // offset is chosen such that 2 * expR(-offset) == expR(ln2 - offset - 1), so wExp is non-decreasing.
                 int256 offset = 0.32261121498945987e18;
                 int256 q = (x + offset) / ln2;
+                // forge-lint: disable-next-item(divide-before-multiply) as q is deliberately
+                // floor((x + offset) / ln2) and r is the Taylor range-reduction remainder.
                 int256 r = x - q * ln2;
                 int256 secondTerm = r * r / (2 * 1e18);
+                // forge-lint: disable-next-item(divide-before-multiply) as secondTerm is already
+                // a scaled fixed-point quotient; this is the nested Taylor term.
                 int256 thirdTerm = secondTerm * r / (3 * 1e18);
                 int256 expR = 1e18 + r + secondTerm + thirdTerm;
                 // forge-lint: disable-next-item(unsafe-typecast)
@@ -64,6 +68,8 @@ library TickLib {
                 else high = mid;
             }
         }
+        // forge-lint: disable-next-item(divide-before-multiply) as this is
+        // ceil(x / spacing) * spacing quantization; multiplying first would defeat the rounding.
         return (low + spacing - 1) / spacing * spacing;
     }
 }
