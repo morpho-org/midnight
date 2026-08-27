@@ -133,8 +133,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     uint256 collatBefore = collateral(globalId, borrower, collateralIndex);
     uint256 debtBefore = debt(globalId, borrower);
 
-    // maxRepaidFor reproduces the RCF cap at Midnight.sol:699. Passing that value to liquidate satisfies the
-    // first disjunct of the RCF check at Midnight.sol:700-705, independently of the dust waiver.
+    // This rule checks that using `repaidUnits == maxRepaid` is enough to put the account healthy. This means that the RCF doesn't prevent to put the position back to health.
     uint256 repaidUnits = maxRepaidFor(globalMarket, globalId, collateralIndex, borrower);
 
     // maxRepaidFor's non-reverting collateral lookup establishes collateralIndex < 2.
