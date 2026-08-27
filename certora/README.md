@@ -74,7 +74,6 @@ Who may change state, sign authorizations and hold roles, and how failures propa
 - [`OnlyAuthorizedCanChange.spec`](specs/OnlyAuthorizedCanChange.spec) checks that an unauthorized caller cannot change a user's credit or debt (outside `liquidate` and `updatePosition`), collateral (outside `liquidate`), `consumed` (outside `take`), or `isAuthorized` entry.
   It also checks that `take` requires the caller to be the taker or authorized by them, and that `setIsAuthorized` changes only the targeted pair.
 - [`OnlyAuthorizedCanChangeUpdatedValues.spec`](specs/OnlyAuthorizedCanChangeUpdatedValues.spec) checks the same on the accrued view of a position: outside `liquidate`, an unauthorized caller cannot change a user's updated credit or updated pending fee.
-  A `take` on a ratified offer is exempt, since the maker authorizes the offer's ratifier instead of the caller.
 - [`EcrecoverAuthorizer.spec`](specs/EcrecoverAuthorizer.spec) checks signature-based authorization: a successful call increments only the signer's nonce, and an expired deadline, wrong nonce or reused nonce reverts.
 - [`Role.spec`](specs/Role.spec) checks both liveness and access control for every role.
   The configurator and only the configurator can reassign each role.
@@ -114,11 +113,10 @@ Round-trip properties ensuring that helper computations can reach any target amo
 
 Conversion between ticks and prices.
 
-- [`TickToPrice.spec`](specs/TickToPrice.spec) checks the `wExp` exponential underpinning the conversion: its casts, its output bound, and its monotonicity on the negative and positive ranges.
+- [`TickToPrice.spec`](specs/TickToPrice.spec) checks the `wExp` exponential underpinning the conversion: its casts, its output bound, and its monotonicity.
   It also checks that `tickToPrice` is zero at tick zero, `WAD` at `maxTick`, at most `WAD` everywhere, and always a multiple of `priceRoundingStep`.
 - [`TickToPriceIsMonotonic.spec`](specs/TickToPriceIsMonotonic.spec) checks that `tickToPrice` is non-decreasing, using the `wExp` monotonicity proven in [`TickToPrice.spec`](specs/TickToPrice.spec).
-- [`PriceToTick.spec`](specs/PriceToTick.spec) checks that `priceToTick` is monotonic, returns the lowest multiple of the tick spacing whose price is at least the input price, and round-trips with `tickToPrice` on multiples of the spacing.
-  The price bound is only checked for prices at most `WAD` and for a spacing dividing `maxTick`, the documented precondition of `TickLib.priceToTick`: another spacing can round the returned tick above `maxTick`, where `tickToPrice` reverts.
+- [`PriceToTick.spec`](specs/PriceToTick.spec) checks that `priceToTick` is monotonic, returns the lowest multiple of the tick spacing whose price is at least the input price (assuming input price is less than `WAD`), and round-trips with `tickToPrice` on multiples of the spacing.
 
 ## Fixed-point math
 
@@ -138,7 +136,7 @@ Verification is performed according to the following modeling conventions:
 - `multicall` is removed, so each rule reasons about a single entry point.
   This is sound because `multicall` can only call functions of the current contract.
   So if all other functions respect an invariant, by induction `multicall` also respects it.
-- `mulDivDown`/`mulDivUp` are replaced by ghost functions whose axioms are proven in [`MulDiv.spec`](specs/MulDiv.spec), and shared as [`MulDivAxioms.spec`](specs/MulDivAxioms.spec) where a spec needs the whole axiom set.
+- `mulDivDown`/`mulDivUp` are replaced by ghost functions whose axioms are proven in [`MulDiv.spec`](specs/MulDiv.spec), and shared as [`MulDivAxioms.spec`](specs/MulDivAxioms.spec).
 - bitmap operations are replaced by the ghost summaries in [`BitmapSummaries.spec`](specs/BitmapSummaries.spec), justified by [`Bitmap.spec`](specs/Bitmap.spec).
 - ERC20 tokens are assumed well-behaved, see the comments in the respective files for more detail.
 - unless a property is specifically about callbacks, external calls are assumed not to re-enter Midnight.
