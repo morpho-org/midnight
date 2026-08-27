@@ -8,6 +8,7 @@ import {SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
 import {IFlashLoanCallback} from "../src/interfaces/ICallbacks.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
+import {IMidnight} from "../src/interfaces/IMidnight.sol";
 
 contract FlashLoanTest is BaseTest, IFlashLoanCallback {
     address[] internal recordedTokens;
@@ -78,6 +79,51 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
         midnight.flashLoan(tokens, amounts, address(this), data);
     }
 
+    function testFlashLoanInconsistentInput(uint256 amount0, uint256 amount1, bytes memory data) public {
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(loanToken);
+        tokens[1] = address(collateralToken1);
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = amount0;
+        amounts[1] = amount1;
+
+        vm.expectRevert(IMidnight.InconsistentInput.selector);
+        midnight.flashLoan(tokens, amounts, address(this), data);
+
+        // Also revert the other way around: more tokens than amounts.
+        address[] memory tokens2 = new address[](3);
+        tokens2[0] = address(loanToken);
+        tokens2[1] = address(collateralToken1);
+        tokens2[2] = address(collateralToken2);
+        uint256[] memory amounts2 = new uint256[](2);
+        amounts2[0] = amount0;
+        amounts2[1] = amount1;
+
+        vm.expectRevert(IMidnight.InconsistentInput.selector);
+        midnight.flashLoan(tokens2, amounts2, address(this), data);
+    }
+
+    function testFlashLoanWrongCallbackReturnValue(uint256 amount0, uint256 amount1, bytes memory data) public {
+        amount0 = bound(amount0, 1, type(uint256).max);
+        amount1 = bound(amount1, 1, type(uint256).max);
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(loanToken);
+        tokens[1] = address(collateralToken1);
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = amount0;
+        amounts[1] = amount1;
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            deal(tokens[i], address(midnight), amounts[i]);
+        }
+
+        address callback = address(new InvalidFlashLoanCallback());
+
+        vm.expectRevert(IMidnight.WrongFlashLoanCallbackReturnValue.selector);
+        midnight.flashLoan(tokens, amounts, callback, data);
+    }
+
     function onFlashLoan(address caller, address[] memory tokens, uint256[] memory amounts, bytes memory data)
         external
         returns (bytes32)
@@ -92,5 +138,11 @@ contract FlashLoanTest is BaseTest, IFlashLoanCallback {
             }
         }
         return CALLBACK_SUCCESS;
+    }
+}
+
+contract InvalidFlashLoanCallback is IFlashLoanCallback {
+    function onFlashLoan(address, address[] memory, uint256[] memory, bytes memory) external pure returns (bytes32) {
+        return bytes32(0);
     }
 }

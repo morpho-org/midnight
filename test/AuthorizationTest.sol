@@ -8,6 +8,7 @@ import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
+import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 
 contract AuthorizationTest is BaseTest {
     using UtilsLib for uint256;
@@ -83,7 +84,7 @@ contract AuthorizationTest is BaseTest {
 
         deal(collateralToken, user, collateralAmount);
         vm.prank(user);
-        ERC20(collateralToken).approve(address(midnight), collateralAmount);
+        ERC20Lib.safeApprove(collateralToken, address(midnight), collateralAmount);
 
         vm.prank(user);
         midnight.supplyCollateral(market, 0, collateralAmount, user);
@@ -131,7 +132,7 @@ contract AuthorizationTest is BaseTest {
         deal(collateralToken, user, collateralAmount);
 
         vm.prank(user);
-        ERC20(collateralToken).approve(address(midnight), collateralAmount);
+        ERC20Lib.safeApprove(collateralToken, address(midnight), collateralAmount);
 
         vm.prank(user);
         midnight.supplyCollateral(market, 0, collateralAmount, user);
@@ -151,7 +152,7 @@ contract AuthorizationTest is BaseTest {
 
         deal(collateralToken, operator, collateralAmount);
         vm.prank(operator);
-        ERC20(collateralToken).approve(address(midnight), collateralAmount);
+        ERC20Lib.safeApprove(collateralToken, address(midnight), collateralAmount);
 
         vm.prank(operator);
         vm.expectRevert(IMidnight.Unauthorized.selector);
@@ -192,7 +193,7 @@ contract AuthorizationTest is BaseTest {
 
         deal(collateralToken, user, collateralAmount);
         vm.prank(user);
-        ERC20(collateralToken).approve(address(midnight), collateralAmount);
+        ERC20Lib.safeApprove(collateralToken, address(midnight), collateralAmount);
         vm.prank(user);
         midnight.supplyCollateral(market, 0, collateralAmount, user);
 
@@ -263,9 +264,9 @@ contract AuthorizationTest is BaseTest {
 
         deal(address(loanToken), authorized, units);
         vm.prank(authorized);
-        loanToken.approve(address(midnight), 0);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), 0);
         vm.prank(authorized);
-        loanToken.approve(address(midnight), units);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), units);
 
         vm.prank(authorized);
         vm.expectRevert(IMidnight.Unauthorized.selector);

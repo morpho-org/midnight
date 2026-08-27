@@ -29,8 +29,7 @@ contract ERC20NoReturn is PermitExt {
         _transfer(_from, _to, _amount);
     }
 
-    function approve(address _spender, uint256 _amount) public returns (bool) {
+    function approve(address _spender, uint256 _amount) public {
         allowance[msg.sender][_spender] = _amount;
-        return true;
     }
 }
