@@ -81,7 +81,7 @@ definition axiomDistributivity(mathint a, mathint b, mathint c) returns bool = m
 definition axiomAssocComm(mathint a, mathint b, mathint c) returns bool = multiply(multiply(a, b), c) == multiply(multiply(a, c), b);
 
 // Linear order axiom for multiplication with positive constants.
-definition axiomLeMulPos(mathint a, mathint b, mathint c) returns bool = c >= 0 => ((a <= b) <=> (multiply(a, c) <= multiply(b, c)));
+definition axiomLeMulPos(mathint a, mathint b, mathint c) returns bool = c > 0 => ((a <= b) <=> (multiply(a, c) <= multiply(b, c)));
 
 // The following is RoundsDown axiom stated using the `multiply` function.
 definition axiomMathMulDivDownRoundsDownMultiply(mathint a, mathint b, mathint d) returns bool = a >= 0 && b >= 0 => multiply(mathMulDivDown(a, b, d), d) <= multiply(a, b);
