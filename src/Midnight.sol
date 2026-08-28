@@ -919,9 +919,7 @@ contract Midnight is IMidnight {
                 uint256 i = UtilsLib.msb(_collateralBitmap);
                 CollateralParams memory collateralParam = market.collateralParams[i];
                 uint256 price = IOracle(collateralParam.oracle).price();
-                // forge-lint: disable-next-item(uninitialized-local) as maxDebt (line 901) is a sum whose zero
-                // default is the empty-sum identity: when _debt is 0 the loop is skipped entirely and the 0 >= 0
-                // below is what reports a debt-free position as healthy.
+                // forge-lint: disable-next-item(uninitialized-local) as maxDebt is a sum.
                 maxDebt += _position.collateral[i]
                     .mulDivDown(price, ORACLE_PRICE_SCALE)
                     .mulDivDown(collateralParam.lltv, WAD);
