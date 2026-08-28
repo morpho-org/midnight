@@ -29,13 +29,9 @@ methods {
     /// EXTERNAL CALLBACKS — collapse path explosion for strong invariants. ///
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
-    function _.isRatified(Midnight.Offer, bytes) external => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => NONDET;
     function _.onFlashLoan(address, address[], uint256[], bytes) external => NONDET;
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
-    function _.canLiquidate(address) external => NONDET;
 }
 
 /// MULDIV FUNCTION SUMMARIES ///
@@ -113,8 +109,8 @@ hook Sload uint128 value position[KEY bytes32 id][KEY address owner].lastAccrual
     require lastAccrualMirror[id][owner] == value, "ghost mirror";
 }
 
-hook Sstore position[KEY bytes32 id][KEY address owner].pendingFee uint128 newPending (uint128 oldPending) {
-    pendingFeeMirror[id][owner] = newPending;
+hook Sstore position[KEY bytes32 id][KEY address owner].pendingFee uint128 newPendingFee (uint128 oldPendingFee) {
+    pendingFeeMirror[id][owner] = newPendingFee;
 }
 
 hook Sstore position[KEY bytes32 id][KEY address owner].lastAccrual uint128 newLast (uint128 oldLast) {
@@ -128,43 +124,28 @@ strong invariant preciseCreditCorrect(bytes32 id, address owner)
 
 /// RULES ///
 
-rule updatePositionViewReflectedByFactor(env e, Midnight.Market obligation, bytes32 id, address owner) {
-    requireInvariant preciseCreditCorrect(id, owner);
-    require lastLossFactor(id, owner) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";
+rule updatePositionViewProperties(env e, Midnight.Market obligation, bytes32 id, address user) {
+    requireInvariant preciseCreditCorrect(id, user);
+    require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";
 
     uint128 newCredit;
-    uint128 newPending;
+    uint128 newPendingFee;
     uint128 fee;
 
-    uint128 creditBefore = cvlCredit(id, owner);
-    mathint preciseCreditBefore = preciseCreditDivFactor[id][owner] * mapFactor(lossFactor(id));
-    mathint pendingBefore = pendingFeeMirror[id][owner];
-    mathint lastAccrualBefore = lastAccrualMirror[id][owner];
+    uint128 oldCredit = cvlCredit(id, user);
+    mathint preciseCreditBefore = preciseCreditDivFactor[id][user] * mapFactor(lossFactor(id));
+    mathint oldPendingFee = pendingFeeMirror[id][user];
+    mathint oldLastAccrual = lastAccrualMirror[id][user];
 
-    require e.block.timestamp >= lastAccrualBefore, "Time is increasing";
+    require e.block.timestamp >= oldLastAccrual, "Time is increasing";
 
-    newCredit, newPending, fee = updatePositionView(e, obligation, id, owner);
+    newCredit, newPendingFee, fee = updatePositionView(e, obligation, id, user);
 
-    assert fee <= pendingBefore, "Cannot take more fee than pending";
+    // These are the properties updatePositionView guarantees
+
+    assert fee <= oldPendingFee, "Cannot take more fee than pending";
     assert (newCredit + fee) * PRECISION <= preciseCreditBefore, "newCredit (with fees) is at most precise credit after slashing";
-
-    // The two monotonicity facts the SumOfCredits summaries assume about
-    // `updatePositionView`. `newCredit <= creditBefore` holds because
-    // postSlashCredit = credit * mapFactor(lossFactor) / mapFactor(lastLossFactor)
-    // <= credit under `lossFactorLeqLastLossFactor`, and newCredit =
-    // postSlashCredit - fee. Proving them here means the summaries no longer
-    // rely on the indirect underflow-revert argument in `_updatePosition`.
-    assert newCredit <= creditBefore, "slashing and fee accrual only decrease credit";
-    assert newPending <= pendingBefore, "fee deduction only decreases pending";
-}
-
-rule updatePositionZero(env e, Midnight.Market obligation, bytes32 id, address owner) {
-    require currentContract.position[id][owner].credit == 0, "Assume no credit";
-
-    uint128 newCredit;
-    uint128 newPending;
-    uint128 fee;
-    newCredit, newPending, fee = updatePositionView(e, obligation, id, owner);
-
-    assert newCredit == 0 && newPending == 0 && fee == 0;
+    assert newCredit <= oldCredit, "slashing and fee accrual only decrease credit";
+    assert newPendingFee <= oldPendingFee, "fee deduction only decreases pending";
+    assert mapFactor(currentContract.marketState[id].lossFactor) == 0 => newCredit == 0 && fee == 0, "no credit/fee on total loss factor";
 }

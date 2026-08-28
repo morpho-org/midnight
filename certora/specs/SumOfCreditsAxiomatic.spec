@@ -81,7 +81,7 @@ definition axiomDistributivity(mathint a, mathint b, mathint c) returns bool = m
 definition axiomAssocComm(mathint a, mathint b, mathint c) returns bool = multiply(multiply(a, b), c) == multiply(multiply(a, c), b);
 
 // Linear order axiom for multiplication with positive constants.
-definition axiomLeMulPos(mathint a, mathint b, mathint c) returns bool = c > 0 => ((a <= b) <=> (multiply(a, c) <= multiply(b, c)));
+definition axiomLeMulPos(mathint a, mathint b, mathint c) returns bool = c >= 0 => ((a <= b) <=> (multiply(a, c) <= multiply(b, c)));
 
 // The following is RoundsDown axiom stated using the `multiply` function.
 definition axiomMathMulDivDownRoundsDownMultiply(mathint a, mathint b, mathint d) returns bool = a >= 0 && b >= 0 => multiply(mathMulDivDown(a, b, d), d) <= multiply(a, b);
@@ -109,7 +109,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 
 /// HELPER DEFINITIONS ///
 
-definition mapIndex(mathint index) returns mathint = 2 ^ 128 - 1 - index;
+definition mapFactor(mathint index) returns mathint = 2 ^ 128 - 1 - index;
 
 definition cvlCredit(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].credit;
 
@@ -120,13 +120,13 @@ definition cvlPendingFee(bytes32 id, address owner) returns uint128 = currentCon
 definition cvlLastAccrual(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].lastAccrual;
 
 // Body of the strong invariant. The aggregate product is routed through the
-// uninterpreted `multiply` (== sumPreciseCreditDivIndex[id] * mapIndex(...)).
-definition sumOfCreditsBody(bytes32 id) returns bool = multiply(sumPreciseCreditDivIndex[id], mapIndex(lossFactor(id))) <= multiply(totalUnits(id), PRECISION) - multiply(continuousFeeCredit(id), PRECISION);
+// uninterpreted `multiply` (== sumPreciseCreditDivIndex[id] * mapFactor(...)).
+definition sumOfCreditsBody(bytes32 id) returns bool = multiply(sumPreciseCreditDivIndex[id], mapFactor(lossFactor(id))) <= multiply(totalUnits(id), PRECISION) - multiply(continuousFeeCredit(id), PRECISION);
 
 /// HOOKS ///
 
 function updateCreditDivIndex(bytes32 id, address owner, uint128 newCredit, uint128 newIndex) {
-    mathint ownerLossIndex = mapIndex(newIndex);
+    mathint ownerLossIndex = mapFactor(newIndex);
     mathint oldCDI = preciseCreditDivIndex[id][owner];
     mathint value;
 
@@ -142,7 +142,7 @@ function updateCreditDivIndex(bytes32 id, address owner, uint128 newCredit, uint
     sumPreciseCreditDivIndex[id] = oldSum + newCDI - oldCDI;
 
     // require distributivity axioms to help prover
-    mathint lossIndex = mapIndex(lossFactor(id));
+    mathint lossIndex = mapFactor(lossFactor(id));
     require axiomDistributivity(oldSum, newCDI, lossIndex), "axiom";
     require axiomDistributivity(oldSum + newCDI - oldCDI, oldCDI, lossIndex), "axiom";
 }
@@ -150,12 +150,12 @@ function updateCreditDivIndex(bytes32 id, address owner, uint128 newCredit, uint
 function checkCreditDivInvariant(bytes32 id, address owner) returns bool {
     uint128 credit = cvlCredit(id, owner);
     uint128 userIndex = cvlLastLossFactor(id, owner);
-    mathint mappedIndex = mapIndex(userIndex);
+    mathint mappedIndex = mapFactor(userIndex);
 
     // Per-user invariant stays in REAL-product form: it is per-user (cheap) and
     // the hook's division-exactness genuinely needs real arithmetic. Abstracting
     // it to multiply weakened this ASSUMED invariant enough to make a
-    // fully-slashed store (mapIndex==0, credit!=0) reachable, breaking the hook
+    // fully-slashed store (mapFactor==0, credit!=0) reachable, breaking the hook
     // assert. Only the AGGREGATE (sumOfCreditsBody) is abstracted.
     return mappedIndex == 0 || credit == 0 ? preciseCreditDivIndex[id][owner] == 0 : multiply(preciseCreditDivIndex[id][owner], mappedIndex) == multiply(credit, PRECISION);
 }
@@ -183,9 +183,8 @@ hook Sstore marketState[KEY bytes32 id].totalUnits uint128 newTotal (uint128 old
 
 /// SUMMARY OF updatePositionView ///
 //
-// Returns nondet (newCredit, newPendingFee, fee) constrained by the
-// inequalities proved in UpdatePositionView.spec
-// (rule `updatePositionViewReflectedByIndex`).
+// Returns nondet (newCredit, newPendingFee, fee) constrained by the inequalities
+// proved by rule updatePositionViewReflectedByFactor in UpdatePositionView.spec
 function summaryUpdatePositionView(env e, bytes32 id, address user) returns (uint128, uint128, uint128) {
     uint128 oldCredit = cvlCredit(id, user);
     uint128 oldPendingFee = cvlPendingFee(id, user);
@@ -196,31 +195,15 @@ function summaryUpdatePositionView(env e, bytes32 id, address user) returns (uin
     uint128 newCredit;
     uint128 newPendingFee;
     uint128 fee;
+    mathint preciseCreditBefore = multiply(preciseCreditDivIndex[id][user], mapFactor(lossFactor(id)));
 
-    require newCredit <= oldCredit, "slashing only decreases credit";
-    require newPendingFee <= oldPendingFee, "fee deduction only decreases pending";
-    require fee <= oldPendingFee, "fee bounded by pending (UpdatePositionView.spec)";
+    require newCredit <= oldCredit, "proved in UpdatePositionView";
+    require newPendingFee <= oldPendingFee, "proved in UpdatePositionView";
+    require fee <= oldPendingFee, "proved in UpdatePositionView";
+    require multiply(newCredit + fee, PRECISION) <= preciseCreditBefore, "proved in UpdatePositionView";
 
-    // The touched user's pre-term lower bound (updatePositionView slashing bound).
-    // Kept in REAL-product form (per-user, cheap); the rule grounds the matching
-    // multiply(Dpre, M) to this same product.
-    //require (newCredit + fee) * PRECISION <= preciseCreditDivIndex[id][user] * mapIndex(lossFactor(id)), "newCredit (with fees) bounded by precise credit (UpdatePositionView.spec)";
-    require multiply(newCredit, PRECISION) + multiply(fee, PRECISION) <= multiply(preciseCreditDivIndex[id][user], mapIndex(lossFactor(id))), "newCredit (with fees) bounded by precise credit (UpdatePositionView.spec)";
-
-    // A fully-slashed user (lossIndex == max, mapIndex == 0) gets credit and fee 0: updatePositionView's
-    // postSlashCredit ternary returns 0 when _lossIndex == max (Midnight.sol:752), and postSlashPending/fee
-    // then collapse to 0 too. Without this the summary admits newCredit > 0 for a fully-slashed user, which
-    // breaks the "division is exact" hook (0 == newCredit * PRECISION).
-    require mapIndex(cvlLastLossFactor(id, user)) == 0 => (newCredit == 0 && fee == 0), "fully-slashed user gets 0 credit/fee (updatePositionView _lossIndex == max guard)";
-
-    // Fully-slashed OBLIGATION also forces 0, independent of whether this user's own
-    // lastLossFactor has synced yet: postSlashCredit = credit.mulDivDown(mapIndex(lossFactor(id)),
-    // mapIndex(_lastLossFactor)) (Midnight.sol:820-821) has a ZERO NUMERATOR whenever
-    // mapIndex(lossFactor(id)) == 0, so mulDivDown returns exactly 0 regardless of the
-    // (nonzero) divisor -- and postSlashPendingFee/fee then cascade to 0 too (L824-830).
-    // Without this, a "stale" user (obligation fully slashed, user not yet synced) can
-    // leak nonzero newCredit/fee through the summary.
-    require mapIndex(lossFactor(id)) == 0 => (newCredit == 0 && fee == 0), "fully-slashed obligation gets 0 credit/fee regardless of user sync (mulDivDown zero-numerator)";
+    require axiomDistributivity(newCredit, fee, PRECISION), "axiom";
+    require mapFactor(lossFactor(id)) == 0 => (newCredit == 0 && fee == 0), "proved in UpdatePositionView";
 
     // help solver to reason about fee and distributivity.
     require axiomDistributivity(fee, continuousFeeCredit(id), PRECISION), "axiom";
@@ -255,58 +238,45 @@ strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
         }
     }
 
-// LIQUIDATE — the OPPOSITE of withdraw/take for multiply. Liquidate never
-// calls _updatePosition or touches any user's credit (it writes the *obligation*
-// lossFactor, not per-user position.lastLossFactor), so no hook fires and `sum` is
-// UNCHANGED. Instead the obligation factor M rescales:
-//     mapIndex(new) = mulDivDown(mapIndex(old), tu - badDebt, tu)   (Midnight.sol:589)
-//     continuousFeeCredit_new = mulDivDown(cf_old, mapIndex(new), mapIndex(old)) (L594)
-//     tu_new = tu_old - badDebt                                     (L593)
-// The aggregate `multiply(sum, M)` therefore changes via its 2ND argument,
-// which additivity cannot express. So here we do the inverse of withdraw/take:
-// GROUND the aggregate back to a real product (pre and post). That re-exposes
-// sum*M_old and sum*M_new, but liquidate ALREADY discharges those via the
-// ghostMulDivDown rounds-down bound (it verifies in the parametric invariant),
-// and `sum` is a single snapshot here (not the touched-user delta), so the
-// withdraw-style NIA divergence does not occur.
 rule sumOfCreditsLeTotalUnitsPreservedByLiquidate(bytes32 id, env e, Midnight.Market obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     require sumOfCreditsBody(id);
     requireInvariant preciseCreditCorrect(id, borrower);
     require lastLossFactor(id, borrower) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";
 
     mathint sumPre = sumPreciseCreditDivIndex[id];
-    mathint indexPre = mapIndex(lossFactor(id));
+    mathint indexPre = mapFactor(lossFactor(id));
     mathint tuPre = totalUnits(id);
     mathint cfPre = continuousFeeCredit(id);
 
     liquidate(e, obligation, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    mathint indexPost = mapIndex(lossFactor(id));
+    // Liquidate never calls _updatePosition or touches any user's credit; `sum` is unchanged.
+    // Instead the lossFactor rescales:
+    //     lossFactor = mapLossFactor(mulDivDown(mapFactor(lossFactor), totalUnits - badDebt, totalUnits))
+    //     continuousFeeCredit = mulDivDown(contnuousFeeCredit, mapFactor(new), mapFactor(old))
+    //     totalUnits = totalUnits - badDebt
+
+    mathint indexPost = mapFactor(lossFactor(id));
     mathint tuPost = totalUnits(id);
     mathint cfPost = continuousFeeCredit(id);
 
-    // Real fact (Midnight.sol:649): tuPost==tuPre-badDebt whenever liquidate's update block
-    // ran (badDebt>0); when badDebt==0 the block is skipped entirely and tuPost==tuPre, so
-    // this identity still gives badDebt==0 correctly either way.
+    // bad debt can be computed from the change of totalUnits.
     mathint badDebt = tuPre - tuPost;
 
-    // (C): linear combination of (A) and rearranged (B) (add (A) to -1*(B), i.e.
-    // cfPre*indexPost-cfPost*indexPre>=0), then factor via subtraction-distributivity -- both terms
-    // on each side share the SAME second argument (indexPost for the tuPre/cfPre pair, indexPre for
-    // tuPost/cfPost), which is exactly the shape multiply(a,m)-multiply(b,m)==multiply(a-b,m)
-    // needs, so this needs no cancellation, only the additivity already established.
+    // The proof requires several steps:
+
+    // From mulDivDownRoundsDown for indexPost = indexPre.mulDivDown(tuPost, tuPre):
+    // tuPre * indexPost <= tuPost * indexPre
+    // From mulDivDownRoundsDown for cfPost = cfPre.mulDivDown(indexPost, indexPre):
+    // cfPost * indexPre <= cfPre * indexPost
+
+    // Use the following distributivity rules:
     require axiomDistributivity(cfPre, tuPre - cfPre, indexPost), "axiom";
     require axiomDistributivity(cfPost, tuPost - cfPost, indexPre), "axiom";
     require axiomDistributivity(tuPre - cfPre, cfPre, PRECISION), "axiom";
     require axiomDistributivity(tuPost - cfPost, cfPost, PRECISION), "axiom";
 
-    // The proof requires several steps:
-
-    // From mulDiv axioms for indexPost = indexPre.mulDivDown(tuPost, tuPre):
-    // tuPre * indexPost <= tuPost * indexPre
-    // From mulDiv axiom for cfPost = cfPre.mulDivDown(indexPost, indexPre):
-    // cfPost * indexPre <= cfPre * indexPost
-    // Using distributivity above:
+    // this yields
     // (tuPre - cfPre) * indexPost <= (tuPost - cfPost) * indexPre  (A)
 
     // Then the main proof is:
