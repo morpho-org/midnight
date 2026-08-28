@@ -46,6 +46,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint256 incentiveAtStart,
         uint256 incentiveAtEnd,
         uint256 minRollableAssets,
+        uint256 minRemainingDebt,
         bool enabled
     ) external override {
         require(msg.sender == user || IMidnight(MIDNIGHT).isAuthorized(user, msg.sender), Unauthorized());
@@ -53,8 +54,11 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         require(incentiveAtEnd <= WAD, IncentiveTooHigh());
         require(incentiveAtEnd >= incentiveAtStart, DecreasingIncentive());
 
-        bytes32 configId =
-            keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets));
+        bytes32 configId = keccak256(
+            abi.encode(
+                midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets, minRemainingDebt
+            )
+        );
         isConfig[user][configId] = enabled;
 
         emit SetConfig(
@@ -67,6 +71,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             incentiveAtStart,
             incentiveAtEnd,
             minRollableAssets,
+            minRemainingDebt,
             enabled
         );
     }
@@ -82,12 +87,16 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint256 incentiveAtStart,
         uint256 incentiveAtEnd,
         uint256 minRollableAssets,
+        uint256 minRemainingDebt,
         uint256 assets
     ) external override {
         bytes32 midnightId = IdLib.toId(midnightMarket);
         bytes32 blueId = Id.unwrap(blueMarketParams.id());
-        bytes32 configId =
-            keccak256(abi.encode(midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets));
+        bytes32 configId = keccak256(
+            abi.encode(
+                midnightId, blueId, start, end, incentiveAtStart, incentiveAtEnd, minRollableAssets, minRemainingDebt
+            )
+        );
         require(isConfig[user][configId], NotConfigured());
         require(block.timestamp >= start, NotStarted());
         require(block.timestamp <= end, Ended());
@@ -103,6 +112,7 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
 
         uint256 debtAssets = IMidnight(MIDNIGHT).debt(midnightId, user);
         require(assets >= minRollableAssets || assets == debtAssets, RolledAssetsTooLow());
+        require(assets == debtAssets || debtAssets - assets >= minRemainingDebt, RemainingDebtTooLow());
 
         // collateralAssets is rounded down, so the share of the collateral leaving the Midnight position can be less
         // than the share of debt being rolled, at the expense of the resulting Blue position. minRollableAssets

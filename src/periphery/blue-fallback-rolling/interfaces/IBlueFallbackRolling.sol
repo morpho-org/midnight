@@ -19,12 +19,13 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     error NotBlue();
     error NotConfigured();
     error NotStarted();
+    error RemainingDebtTooLow();
     error RolledAssetsTooLow();
     error Unauthorized();
 
     // forgefmt: disable-start
     /// EVENTS ///
-    event SetConfig(address caller, address indexed user, bytes32 indexed midnightId, bytes32 indexed blueId, uint256 start, uint256 end, uint256 incentiveAtStart, uint256 incentiveAtEnd, uint256 minRollableAssets, bool enabled);
+    event SetConfig(address caller, address indexed user, bytes32 indexed midnightId, bytes32 indexed blueId, uint256 start, uint256 end, uint256 incentiveAtStart, uint256 incentiveAtEnd, uint256 minRollableAssets, uint256 minRemainingDebt, bool enabled);
     event Roll(address caller, address indexed user, bytes32 indexed midnightId, bytes32 indexed blueId, bytes32 configId, uint256 debtAssets, uint256 collateralAssets, uint256 incentiveAssets);
 
     /// STORAGE GETTERS ///
@@ -33,7 +34,7 @@ interface IBlueFallbackRolling is IMorphoSupplyCollateralCallback {
     function isConfig(address user, bytes32 configId) external view returns (bool);
 
     /// FUNCTIONS ///
-    function setConfig(address user, bytes32 midnightId, bytes32 blueId, uint256 start, uint256 end, uint256 incentiveAtStart, uint256 incentiveAtEnd, uint256 minRollableAssets, bool enabled) external;
-    function roll(Market memory midnightMarket, MarketParams memory blueMarketParams, address user, uint256 start, uint256 end, uint256 incentiveAtStart, uint256 incentiveAtEnd, uint256 minRollableAssets, uint256 assets) external;
+    function setConfig(address user, bytes32 midnightId, bytes32 blueId, uint256 start, uint256 end, uint256 incentiveAtStart, uint256 incentiveAtEnd, uint256 minRollableAssets, uint256 minRemainingDebt, bool enabled) external;
+    function roll(Market memory midnightMarket, MarketParams memory blueMarketParams, address user, uint256 start, uint256 end, uint256 incentiveAtStart, uint256 incentiveAtEnd, uint256 minRollableAssets, uint256 minRemainingDebt, uint256 assets) external;
     // forgefmt: disable-end
 }
