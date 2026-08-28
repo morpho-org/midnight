@@ -895,8 +895,7 @@ contract Midnight is IMidnight {
         _position.credit = newCredit;
         _position.lastLossFactor = marketState[id].lossFactor;
         _position.pendingFee = newPendingFee;
-        // forge-lint: disable-next-item(unsafe-typecast) as there is no range check to elide here: block.timestamp
-        // cannot reach 2**128, so narrowing it to the uint128 lastAccrual field is unconditionally exact.
+        // forge-lint: disable-next-item(unsafe-typecast) block.timestamp < 2**128.
         _position.lastAccrual = uint128(block.timestamp);
         marketState[id].continuousFeeCredit += UtilsLib.toUint128(accruedFee);
 
