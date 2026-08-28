@@ -32,6 +32,44 @@ exclude_lints = [
     "cyclomatic-complexity",
 ]
 
+# Lint profile for test/: excludes every rule that currently fires there, so tests
+# stay linted. Starting point to be trimmed, the bug-class rules first.
+[profile.lint-test.lint]
+exclude_lints = [
+    "literal-instead-of-constant",
+    "unused-return",
+    "reentrancy-events",
+    "divide-before-multiply",
+    "calls-loop",
+    "multi-contract-file",
+    "missing-inheritance",
+    "reentrancy-no-eth",
+    "internal-function-used-once",
+    "low-level-calls",
+    "unsafe-typecast",
+    "function-init-state",
+    "missing-zero-check",
+    "uninitialized-state",
+    "missing-events-access-control",
+    "uninitialized-local",
+    "named-struct-fields",
+    "empty-block",
+    "arbitrary-send-erc20",
+    "boolean-cst",
+    "ecrecover",
+    "inline-assembly",
+    "unused-import",
+    "boolean-equal",
+    "encode-packed-collision",
+    "require-revert-in-loop",
+    # Excluded repo-wide by the base [lint] block; repeated here because a profile
+    # replaces that array rather than extending it.
+    "asm-keccak256",
+    "unsafe-cheatcode",
+    "incorrect-shift",
+    "block-timestamp",
+]
+
 [[profile.default.compilation_restrictions]]
 paths = "test/imports/MorphoImport.sol"
 optimizer_runs = 999999
