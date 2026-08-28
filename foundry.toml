@@ -69,7 +69,6 @@ exclude_lints = [
     "named-struct-fields",
     "empty-block",
     "ecrecover",
-    "unused-import",
     "boolean-equal",
     "encode-packed-collision",
 ]
