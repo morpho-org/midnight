@@ -689,10 +689,10 @@ contract Midnight is IMidnight {
                 ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
                 : _maxLif;
 
+            // forge-lint: disable-next-item(uninitialized-local) as liquidatedCollatPrice is left at 0 only when
+            // collateralIndex is not activated, which forces collateral[collateralIndex] == 0: the seize then
+            // underflows below and the repaidUnits branch divides by zero, so no completing execution reads the 0.
             if (seizedAssets > 0) {
-                // forge-lint: disable-next-item(uninitialized-local) as liquidatedCollatPrice is left at 0 only when
-                // collateralIndex is not activated, which forces collateral[collateralIndex] == 0: the seize then
-                // underflows below and the repaidUnits branch divides by zero, so no completing execution reads the 0.
                 repaidUnits = seizedAssets.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
             } else {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
