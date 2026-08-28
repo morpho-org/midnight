@@ -173,7 +173,10 @@ contract TakeTest is BaseTest {
         offer.group = group;
         offer.tick = tick;
 
-        stdstoreFinder.target(address(midnight)).sig("consumed(address,bytes32)").with_key(maker).with_key(group)
+        stdstoreFinder.target(address(midnight))
+            .sig("consumed(address,bytes32)")
+            .with_key(maker)
+            .with_key(group)
             .checked_write(existingConsumed);
 
         deal(address(loanToken), address(payerCallback), buyerAssets);
