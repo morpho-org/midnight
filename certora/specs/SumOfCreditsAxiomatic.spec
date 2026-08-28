@@ -9,6 +9,7 @@ methods {
     function totalUnits(bytes32 id) external returns (uint128) envfree;
     function continuousFeeCredit(bytes32 id) external returns (uint128) envfree;
     function lossFactor(bytes32) external returns (uint128) envfree;
+    function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
 
     /// SUMMARY OF updatePositionView -- see file header for soundness argument. ///
     function Midnight.updatePositionView(Midnight.Market memory obligation, bytes32 id, address user) internal returns (uint128, uint128, uint128) with(env e) => summaryUpdatePositionView(e, id, user);
@@ -110,13 +111,13 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 
 definition mapIndex(mathint index) returns mathint = 2 ^ 128 - 1 - index;
 
-definition cvlCreditOf(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].credit;
+definition cvlCredit(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].credit;
 
 definition cvlLastLossFactor(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].lastLossFactor;
 
-definition cvlPendingFeeOf(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].pendingFee;
+definition cvlPendingFee(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].pendingFee;
 
-definition cvlLastAccrualOf(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].lastAccrual;
+definition cvlLastAccrual(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].lastAccrual;
 
 // Body of the strong invariant. The aggregate product is routed through the
 // uninterpreted `multiply` (== sumPreciseCreditDivIndex[id] * mapIndex(...)).
@@ -147,7 +148,7 @@ function updateCreditDivIndex(bytes32 id, address owner, uint128 newCredit, uint
 }
 
 function checkCreditDivInvariant(bytes32 id, address owner) returns bool {
-    uint128 credit = cvlCreditOf(id, owner);
+    uint128 credit = cvlCredit(id, owner);
     uint128 userIndex = cvlLastLossFactor(id, owner);
     mathint mappedIndex = mapIndex(userIndex);
 
@@ -169,7 +170,7 @@ hook Sstore position[KEY bytes32 id][KEY address owner].credit uint128 newCredit
 }
 
 hook Sstore position[KEY bytes32 id][KEY address owner].lastLossFactor uint128 newIndex (uint128 oldIndex) {
-    updateCreditDivIndex(id, owner, cvlCreditOf(id, owner), newIndex);
+    updateCreditDivIndex(id, owner, cvlCredit(id, owner), newIndex);
 }
 
 hook Sstore marketState[KEY bytes32 id].totalUnits uint128 newTotal (uint128 oldTotal) {
@@ -186,9 +187,9 @@ hook Sstore marketState[KEY bytes32 id].totalUnits uint128 newTotal (uint128 old
 // inequalities proved in UpdatePositionView.spec
 // (rule `updatePositionViewReflectedByIndex`).
 function summaryUpdatePositionView(env e, bytes32 id, address user) returns (uint128, uint128, uint128) {
-    uint128 oldCredit = cvlCreditOf(id, user);
-    uint128 oldPendingFee = cvlPendingFeeOf(id, user);
-    uint128 oldLastAccrual = cvlLastAccrualOf(id, user);
+    uint128 oldCredit = cvlCredit(id, user);
+    uint128 oldPendingFee = cvlPendingFee(id, user);
+    uint128 oldLastAccrual = cvlLastAccrual(id, user);
 
     require to_mathint(e.block.timestamp) >= to_mathint(oldLastAccrual), "time is non-decreasing";
 
@@ -232,14 +233,6 @@ function summaryUpdatePositionView(env e, bytes32 id, address user) returns (uin
 strong invariant preciseCreditCorrect(bytes32 id, address owner)
     checkCreditDivInvariant(id, owner);
 
-strong invariant lossFactorLeqLastLossFactor(bytes32 id, address owner)
-    mapIndex(lossFactor(id)) <= mapIndex(cvlLastLossFactor(id, owner))
-    {
-        preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) with (env e) {
-            require forall mathint a. forall mathint b. forall mathint d. axiomMathMulDivDownArgumentLesserThanDenominatorB(a, b, d), "axiom";
-        }
-    }
-
 // Parametric coverage of the sum invariant for all methods EXCEPT withdraw and
 // take, which are handled by their dedicated rules (sumOfCreditsLeTotalUnits_withdraw
 // here, and the SumOfCreditsSummaryTake.spec split for take).
@@ -253,12 +246,12 @@ strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
     
         preserved updatePosition(Midnight.Market market, address user) with (env e) {
             requireInvariant preciseCreditCorrect(id, user);
-            requireInvariant lossFactorLeqLastLossFactor(id, user);
+            require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";
         }
     
         preserved withdraw(Midnight.Market market, uint256 units, address onBehalf, address receiver) with (env e) {
             requireInvariant preciseCreditCorrect(id, onBehalf);
-            requireInvariant lossFactorLeqLastLossFactor(id, onBehalf);
+            require lastLossFactor(id, onBehalf) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";
         }
     }
 
@@ -279,7 +272,7 @@ strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
 rule sumOfCreditsLeTotalUnitsPreservedByLiquidate(bytes32 id, env e, Midnight.Market obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     require sumOfCreditsBody(id);
     requireInvariant preciseCreditCorrect(id, borrower);
-    requireInvariant lossFactorLeqLastLossFactor(id, borrower);
+    require lastLossFactor(id, borrower) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";
 
     mathint sumPre = sumPreciseCreditDivIndex[id];
     mathint indexPre = mapIndex(lossFactor(id));
@@ -348,9 +341,9 @@ rule sumOfCreditsLeTotalUnitsPreservedByTake(bytes32 id, env e, uint256 units, a
     address seller = offer.buy ? taker : offer.maker;
 
     requireInvariant preciseCreditCorrect(id, taker);
-    requireInvariant lossFactorLeqLastLossFactor(id, taker);
+    require lastLossFactor(id, taker) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";
     requireInvariant preciseCreditCorrect(id, offer.maker);
-    requireInvariant lossFactorLeqLastLossFactor(id, offer.maker);
+    require lastLossFactor(id, offer.maker) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";
 
     mathint tuPre = totalUnits(id);
     mathint debtPre_b = currentContract.position[id][buyer].debt;

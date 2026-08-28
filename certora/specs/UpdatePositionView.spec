@@ -4,6 +4,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function lossFactor(bytes32) external returns (uint128) envfree;
+    function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
 
     /// PRICE / ORACLE ///
     function _.price() external => NONDET;
@@ -77,7 +78,7 @@ ghost mapping(bytes32 => mapping(address => mathint)) lastAccrualMirror {
 // Map factor to 1 - factor, for easier math.
 definition mapFactor(mathint factor) returns mathint = 2 ^ 128 - 1 - factor;
 
-definition cvlCreditOf(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].credit;
+definition cvlCredit(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].credit;
 
 definition cvlLastLossFactor(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].lastLossFactor;
 
@@ -90,7 +91,7 @@ function updateCreditDivFactor(bytes32 id, address owner, uint128 newCredit, uin
 }
 
 function checkCreditDivInvariant(bytes32 id, address owner) returns bool {
-    uint128 credit = cvlCreditOf(id, owner);
+    uint128 credit = cvlCredit(id, owner);
     uint128 userFactor = cvlLastLossFactor(id, owner);
     mathint mappedFactor = mapFactor(userFactor);
     return mappedFactor == 0 ? preciseCreditDivFactor[id][owner] == 0 : preciseCreditDivFactor[id][owner] * mappedFactor == PRECISION * credit;
@@ -101,7 +102,7 @@ hook Sstore position[KEY bytes32 id][KEY address owner].credit uint128 newCredit
 }
 
 hook Sstore position[KEY bytes32 id][KEY address owner].lastLossFactor uint128 newFactor (uint128 oldFactor) {
-    updateCreditDivFactor(id, owner, cvlCreditOf(id, owner), newFactor);
+    updateCreditDivFactor(id, owner, cvlCredit(id, owner), newFactor);
 }
 
 hook Sload uint128 value position[KEY bytes32 id][KEY address owner].pendingFee {
@@ -125,21 +126,17 @@ hook Sstore position[KEY bytes32 id][KEY address owner].lastAccrual uint128 newL
 strong invariant preciseCreditCorrect(bytes32 id, address owner)
     checkCreditDivInvariant(id, owner);
 
-// The obligation loss factor cannot be larger than the user loss factor.
-strong invariant lossFactorLeqLastLossFactor(bytes32 id, address owner)
-    mapFactor(lossFactor(id)) <= mapFactor(cvlLastLossFactor(id, owner));
-
 /// RULES ///
 
 rule updatePositionViewReflectedByFactor(env e, Midnight.Market obligation, bytes32 id, address owner) {
     requireInvariant preciseCreditCorrect(id, owner);
-    requireInvariant lossFactorLeqLastLossFactor(id, owner);
+    require lastLossFactor(id, owner) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";
 
     uint128 newCredit;
     uint128 newPending;
     uint128 fee;
 
-    uint128 creditBefore = cvlCreditOf(id, owner);
+    uint128 creditBefore = cvlCredit(id, owner);
     mathint preciseCreditBefore = preciseCreditDivFactor[id][owner] * mapFactor(lossFactor(id));
     mathint pendingBefore = pendingFeeMirror[id][owner];
     mathint lastAccrualBefore = lastAccrualMirror[id][owner];
