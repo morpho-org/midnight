@@ -116,6 +116,18 @@ contract EcrecoverAuthorizerTest is BaseTest {
         assertEq(ecrecoverAuthorizer.nonce(borrower), 0);
     }
 
+    function testEcrecoverAuthorizerEcrecoverReturnsZero() public {
+        Authorization memory auth = makeAuthorization(borrower, lender, true);
+        Signature memory sig = signAuthorization(auth, borrower);
+        sig.v = 0; // Invalid v (valid values are 27/28) -> ecrecover returns address(0).
+
+        vm.expectRevert(IEcrecoverAuthorizer.InvalidSignature.selector);
+        ecrecoverAuthorizer.setIsAuthorized(auth, sig);
+
+        assertEq(midnight.isAuthorized(borrower, lender), false);
+        assertEq(ecrecoverAuthorizer.nonce(borrower), 0);
+    }
+
     function testEcrecoverAuthorizerExpired() public {
         Authorization memory auth = makeAuthorization(borrower, lender, true);
         auth.deadline = vm.getBlockTimestamp() - 1;

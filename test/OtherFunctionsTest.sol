@@ -13,6 +13,7 @@ import {
 import {Midnight} from "../src/Midnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {EventsLib} from "../src/libraries/EventsLib.sol";
+import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 
 import {ERC20} from "./erc20s/ERC20.sol";
 import {Oracle} from "./helpers/Oracle.sol";
@@ -155,7 +156,7 @@ contract OtherFunctionsTest is BaseTest {
         vm.prank(borrower);
         midnight.setIsAuthorized(caller, true, borrower);
         vm.prank(address(callback));
-        loanToken.approve(address(midnight), repaid);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), repaid);
 
         vm.prank(caller);
         midnight.repay(market, repaid, borrower, address(callback), data);
@@ -166,6 +167,23 @@ contract OtherFunctionsTest is BaseTest {
         assertEq(callback.recordedOnBehalf(), borrower, "onBehalf");
         assertEq(callback.recordedUnits(), repaid, "units");
         assertEq(callback.recordedData(), data, "data");
+    }
+
+    function testRepayCallbackWrongReturnValue(uint256 units, uint256 repaid, bytes memory data) public {
+        units = bound(units, 1, MAX_UNITS);
+        repaid = bound(repaid, 1, units);
+        collateralize(market, borrower, units);
+        setupMarket(market, units);
+        skip(99);
+
+        address callback = address(new InvalidRepayCallback());
+        deal(address(loanToken), callback, repaid);
+        vm.prank(callback);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), repaid);
+
+        vm.expectRevert(IMidnight.WrongRepayCallbackReturnValue.selector);
+        vm.prank(borrower);
+        midnight.repay(market, repaid, borrower, callback, data);
     }
 
     function testWithdraw(uint256 units, uint256 withdraw) public {
@@ -811,7 +829,7 @@ contract RepayCallback {
     function repay(Midnight midnight, Market memory market, uint256 units, address onBehalf, bytes memory data)
         external
     {
-        ERC20(market.loanToken).approve(address(midnight), units);
+        ERC20Lib.safeApprove(market.loanToken, address(midnight), units);
         midnight.repay(market, units, onBehalf, address(this), data);
     }
 
@@ -830,5 +848,11 @@ contract RepayCallback {
 
     function recordedMarket() external view returns (Market memory) {
         return _recordedMarket;
+    }
+}
+
+contract InvalidRepayCallback is IRepayCallback {
+    function onRepay(bytes32, Market memory, uint256, address, bytes memory) external pure returns (bytes32) {
+        return bytes32(0);
     }
 }

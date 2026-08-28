@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
+import "MulDivAxioms.spec";
+
 using Utils as Utils;
 using TakeAmountsLibHarness as TakeAmountsLibHarness;
 
@@ -45,43 +47,29 @@ persistent ghost summaryTickToPrice(uint256) returns uint256 {
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-/// MULDIV GHOST SUMMARIES (mirrors AccrualRounding.spec) ///
+// MulDiv rounding axioms
+function mathMulDivAxioms() {
+    require forall mathint b. forall mathint d. axiomMathMulDivDownZeroA(b, d), "axiom";
+    require forall mathint a. forall mathint b. forall mathint d. axiomMathMulDivDownRoundsDown(a, b, d), "axiom";
+    require forall mathint a. forall mathint b. forall mathint d. axiomMathMulDivDownTightBound(a, b, d), "axiom";
 
-// MulDiv rounding axioms (each proved in MulDiv.spec); inlined on ghosts instead of requireMulDivAxioms().
-persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint {
-    // proved in mulDivUpRoundsUp
-    axiom forall uint256 b. forall uint256 d. d > 0 => ghostMulDivDown(0, b, d) == 0;
-
-    // proved in mulDivDownRoundsDown
-    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivDown(a, b, d) * d <= a * b;
-
-    // proved in mulDivDownTightBound
-    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => (ghostMulDivDown(a, b, d) + 1) * d > a * b;
-}
-
-persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint {
-    // proved in mulDivUpRoundsUp
-    axiom forall uint256 b. forall uint256 d. d > 0 => ghostMulDivUp(0, b, d) == 0;
-
-    // proved in mulDivUpRoundsUp
-    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivUp(a, b, d) * d >= a * b;
-
-    // proved in mulDivUpUpperBound
-    axiom forall mathint a. forall mathint b. forall mathint d. 0 <= a && 0 <= b && 0 < d => ghostMulDivUp(a, b, d) * d <= a * b + d - 1;
+    require forall mathint b. forall mathint d. axiomMathMulDivUpZeroA(b, d), "axiom";
+    require forall mathint a. forall mathint b. forall mathint d. axiomMathMulDivUpRoundsUp(a, b, d), "axiom";
+    require forall mathint a. forall mathint b. forall mathint d. axiomMathMulDivUpTightBound(a, b, d), "axiom";
 }
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
-    if (d == 0 || a * b > max_uint256) {
+    if (d == 0 || a * b >= 2 ^ 256) {
         revert();
     }
-    return assert_uint256(ghostMulDivDown(a, b, d));
+    return require_uint256(ghostMulDivDown(a, b, d));
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
-    if (d == 0 || a * b > max_uint256) {
+    if (d == 0 || a * b + d - 1 >= 2 ^ 256) {
         revert();
     }
-    return assert_uint256(ghostMulDivUp(a, b, d));
+    return require_uint256(ghostMulDivUp(a, b, d));
 }
 
 /// TAKE AMOUNTS LIB INVERTIBILITY ///
@@ -90,6 +78,8 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 //
 // If buyerAssetsToUnits(midnight, id, offer, T) returns u, then take(u, ...) produces buyerAssets == T.
 rule buyerAssetsReachable(env e, Midnight.Offer offer, uint256 targetBuyerAssets, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, bytes ratifierData) {
+    mathMulDivAxioms();
+
     bytes32 id = summaryToId(offer.market);
 
     uint256 units = TakeAmountsLibHarness.buyerAssetsToUnits(e, currentContract, id, offer, targetBuyerAssets);
@@ -105,6 +95,8 @@ rule buyerAssetsReachable(env e, Midnight.Offer offer, uint256 targetBuyerAssets
 //
 // If sellerAssetsToUnits(midnight, id, offer, T) returns u, then take(u, ...) produces sellerAssets == T.
 rule sellerAssetsReachable(env e, Midnight.Offer offer, uint256 targetSellerAssets, address taker, address takerCallback, bytes takerCallbackData, address receiverIfTakerIsSeller, bytes ratifierData) {
+    mathMulDivAxioms();
+
     bytes32 id = summaryToId(offer.market);
 
     uint256 units = TakeAmountsLibHarness.sellerAssetsToUnits(e, currentContract, id, offer, targetSellerAssets);
