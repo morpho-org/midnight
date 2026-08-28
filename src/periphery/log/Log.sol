@@ -4,8 +4,7 @@ pragma solidity 0.8.34;
 
 uint256 constant MAX_DATA_LENGTH = 1_000_000;
 
-// forge-lint: disable-next-item(locked-ether) as Log is a calldata sink that is never meant to receive value: the
-// fallback is payable purely to skip the callvalue check, and the contract tracks no balance to withdraw.
+// forge-lint: disable-next-item(locked-ether) the contract is not meant to receive value.
 contract Log {
     event Data(bytes data);
 
