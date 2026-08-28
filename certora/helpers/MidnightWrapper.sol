@@ -24,8 +24,6 @@ contract MidnightWrapper is Midnight {
                 i--;
                 CollateralParams memory collateralParam = market.collateralParams[i];
                 uint256 price = IOracle(collateralParam.oracle).price();
-                // forge-lint: disable-next-item(uninitialized-local) as maxDebt (line 20) has to start at the
-                // empty-sum zero for this bitmap-free mirror to total the same value as Midnight.isHealthy.
                 maxDebt += _position.collateral[i]
                     .mulDivDown(price, ORACLE_PRICE_SCALE)
                     .mulDivDown(collateralParam.lltv, WAD);

@@ -3,22 +3,17 @@
 pragma solidity ^0.8.0;
 
 import {Market} from "../../src/interfaces/IMidnight.sol";
-import {IFlashLoanCallback, ILiquidateCallback, IRepayCallback} from "../../src/interfaces/ICallbacks.sol";
 import {CALLBACK_SUCCESS} from "../../src/libraries/ConstantsLib.sol";
 
 interface IHavoc {
     function havoc() external;
 }
 
-contract FlashLiquidateCallback is IFlashLoanCallback, ILiquidateCallback, IRepayCallback {
-    // forge-lint: disable-next-item(empty-block) as the empty body is the point: Solvency.spec
-    // summarizes this function and inserts the flashloan accounting in its place.
+contract FlashLiquidateCallback {
     function startFlashloan(address token, uint256 amount) internal {
         // Dummy function to insert the flashloan logic in the spec.
     }
 
-    // forge-lint: disable-next-item(empty-block) as the empty body is the point: Solvency.spec
-    // summarizes this function and inserts the flashloan accounting in its place.
     function endFlashloan(address token, uint256 amount) internal {
         // Dummy function to insert the flashloan logic in the spec.
     }
