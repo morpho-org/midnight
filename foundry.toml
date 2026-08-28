@@ -63,14 +63,9 @@ exclude_lints = [
     "reentrancy-no-eth",
     "unsafe-typecast",
     "function-init-state",
-    "uninitialized-state",
     "missing-events-access-control",
-    "uninitialized-local",
     "named-struct-fields",
     "empty-block",
-    "ecrecover",
-    "boolean-equal",
-    "encode-packed-collision",
 ]
 
 [[profile.default.compilation_restrictions]]
