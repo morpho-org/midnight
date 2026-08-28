@@ -21,6 +21,7 @@
  */
 
 import "BitmapSummaries.spec";
+import "MulDivAxioms.spec";
 
 using Utils as Utils;
 
@@ -38,29 +39,19 @@ methods {
 /// MULDIV SUMMARIES ///
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
-    bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0 || a * b >= 2^256) {
         revert();
     }
-    return ghostMulDivDown(a, b, d);
+    require axiomMathMulDivDownZeroA(b,d), "axiom";
+    return require_uint256(ghostMulDivDown(a, b, d));
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
-    bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0 || a * b + d - 1 >= 2^256) {
         revert();
     }
-    return ghostMulDivUp(a, b, d);
+    return require_uint256(ghostMulDivUp(a, b, d));
 }
-
-/// MULDIV GHOSTS ///
-
-persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
-    // proved in mulDivZero in MulDiv.spec.
-    axiom forall uint256 b. forall uint256 d. ghostMulDivDown(0, b, d) == 0;
-}
-
-persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
 
 /// INVARIANT ///
 
@@ -69,13 +60,10 @@ strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
     {
         preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) with (env e) {
             // To derive repaidUnits >= debtAfterBadDebt when the last bitmap bit is cleared, the prover requires inverse axioms and mulDiv monotonicity (using lif <= maxLif).
-            require market.collateralParams.length <= 10, "assume less than 10 collaterals so that the loop can be bounded";
         
-            require forall uint256 a1. forall uint256 a2. forall uint256 b. forall uint256 d. a1 <= a2 && d > 0 => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "see mulDivMonotoneA";
-        
-            require forall uint256 a. forall uint256 b. forall uint256 d1. forall uint256 d2. d1 > 0 && d1 <= d2 => ghostMulDivUp(a, b, d1) >= ghostMulDivUp(a, b, d2), "see mulDivMonotoneD";
-        
-            require forall uint256 a. forall uint256 b. forall uint256 d. b > 0 && d > 0 => ghostMulDivUp(ghostMulDivDown(a, b, d), d, b) <= a, "see mulDivInverseUpDown";
+            require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivUpMonotoneA(a1, a2, b, d), "axiom";
+            require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomMathMulDivUpMonotoneD(a, b, d1, d2), "axiom";        
+            require forall mathint a. forall mathint b. forall mathint d. axiomMathMulDivInverseUpDown(a, b, d), "axiom";
         }
         preserved onTransactionBoundary with (env e) {
             requireInvariant liquidationLockClearedAtBoundary(id, user);
