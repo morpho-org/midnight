@@ -133,7 +133,7 @@ function updateCreditDivIndex(bytes32 id, address owner, uint128 newCredit, uint
     //    value * ownerLossIndex == newCredit * PRECISION.
     // This is sound because we can assume PRECISION to be large enough to
     // be divisible by ownerLossIndex.
-    require multiply(value, ownerLossIndex) == multiply(newCredit, PRECISION), "PRECISION is divisible by ownerLossIndex";
+    require ownerLossIndex > 0 => multiply(value, ownerLossIndex) == multiply(newCredit, PRECISION), "PRECISION is divisible by ownerLossIndex";
 
     mathint newCDI = (ownerLossIndex == 0 || newCredit == 0) ? 0 : value;
     preciseCreditDivIndex[id][owner] = newCDI;
