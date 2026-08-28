@@ -29,17 +29,10 @@ library TickLib {
                 // offset is chosen such that 2 * expR(-offset) == expR(ln2 - offset - 1), so wExp is non-decreasing.
                 int256 offset = 0.32261121498945987e18;
                 int256 q = (x + offset) / ln2;
-                // forge-lint: disable-next-item(divide-before-multiply) as the flagged multiply is
-                // q * ln2, where q is the quotient from the line above. q is deliberately
-                // floor((x + offset) / ln2) and r is the Taylor range-reduction remainder, so the
-                // truncation is the point rather than a precision loss.
+                // forge-lint: disable-next-item(divide-before-multiply) ack.
                 int256 r = x - q * ln2;
                 int256 secondTerm = r * r / (2 * 1e18);
-                // forge-lint: disable-next-item(divide-before-multiply) as the flagged multiply is
-                // secondTerm * r, where secondTerm is the quotient from the line above, not the
-                // division in this statement. Multiplying that scaled fixed-point quotient is how
-                // the nested Taylor term is built, and its error is bounded by |thirdTerm| <
-                // |secondTerm|.
+                // forge-lint: disable-next-item(divide-before-multiply) ack.
                 int256 thirdTerm = secondTerm * r / (3 * 1e18);
                 int256 expR = 1e18 + r + secondTerm + thirdTerm;
                 // forge-lint: disable-next-item(unsafe-typecast)
