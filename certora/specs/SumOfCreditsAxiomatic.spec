@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
 
+import "MulDivAxioms.spec";
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -80,35 +82,28 @@ definition axiomAssocComm(mathint a, mathint b, mathint c) returns bool = multip
 // Linear order axiom for multiplication with positive constants.
 definition axiomLeMulPos(mathint a, mathint b, mathint c) returns bool = c > 0 => ((a <= b) <=> (multiply(a, c) <= multiply(b, c)));
 
-/// MULDIV FUNCTION SUMMARIES — axiomatic: TODO rebase on mulDivAxiom pull request.
-persistent ghost mulDivDownGhost(mathint, mathint, mathint) returns mathint {
-    axiom forall mathint a. forall mathint b. forall mathint d. mulDivDownGhost(a, b, d) >= 0;
-    axiom forall mathint a. forall mathint d. d > 0 => mulDivDownGhost(a, 0, d) == 0;
-    axiom forall mathint b. forall mathint d. d > 0 => mulDivDownGhost(0, b, d) == 0;
+// The following is RoundsDown axiom stated using the `multiply` function.
+definition axiomMathMulDivDownRoundsDownMultiply(mathint a, mathint b, mathint d) returns bool = a >= 0 && b >= 0 => multiply(mathMulDivDown(a, b, d), d) <= multiply(a, b);
 
-    // The following is the mulDivBound axiom stated using the `multiply` function.
-    axiom forall mathint a. forall mathint b. forall mathint d. d > 0 => multiply(d, mulDivDownGhost(a, b, d)) <= multiply(b, a);
-    axiom forall mathint a. forall mathint b. forall mathint d. d > 0 => multiply(mulDivDownGhost(a, b, d), d) <= multiply(a, b);
-}
-
-persistent ghost mulDivUpGhost(mathint, mathint, mathint) returns mathint {
-    axiom forall mathint a. forall mathint b. forall mathint d. mulDivUpGhost(a, b, d) >= 0;
-}
+definition axiomMathMulDivDownRoundsDownMultiplySymm(mathint a, mathint b, mathint d) returns bool = a >= 0 && b >= 0 => multiply(d, mathMulDivDown(a, b, d)) <= multiply(b, a);
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
-    bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0 || a * b >= 2 ^ 256) {
         revert();
     }
-    return require_uint256(mulDivDownGhost(a, b, d));
+    require axiomMathMulDivDownZeroA(b, d), "axiom";
+    require axiomMathMulDivDownZeroB(a, d), "axiom";
+    require axiomMathMulDivDownRoundsDownMultiply(a, b, d), "axiom";
+    require axiomMathMulDivDownRoundsDownMultiplySymm(a, b, d), "axiom";
+    return require_uint256(ghostMulDivDown(a, b, d));
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0 || a * b + d - 1 >= 2 ^ 256) {
         revert();
     }
-    return require_uint256(mulDivUpGhost(a, b, d));
+    return require_uint256(ghostMulDivUp(a, b, d));
 }
 
 /// HELPER DEFINITIONS ///
@@ -241,7 +236,7 @@ strong invariant lossFactorLeqLastLossFactor(bytes32 id, address owner)
     mapIndex(lossFactor(id)) <= mapIndex(cvlLastLossFactor(id, owner))
     {
         preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) with (env e) {
-            require forall mathint a. forall mathint b. forall mathint d. b <= d => mulDivDownGhost(a, b, d) <= a, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
+            require forall mathint a. forall mathint b. forall mathint d. axiomMathMulDivDownArgumentLesserThanDenominatorB(a, b, d), "axiom";
         }
     }
 
@@ -252,8 +247,8 @@ strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
     sumOfCreditsBody(id)
     filtered { f -> f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
         preserved claimContinuousFee(Midnight.Market market, uint256 amount, address receiver) with (env e) {
-            require axiomDistributivity(continuousFeeCredit(id) - amount, amount, PRECISION);
-            require axiomDistributivity(totalUnits(id) - amount, amount, PRECISION);
+            require axiomDistributivity(continuousFeeCredit(id) - amount, amount, PRECISION), "axiom";
+            require axiomDistributivity(totalUnits(id) - amount, amount, PRECISION), "axiom";
         }
     
         preserved updatePosition(Midnight.Market market, address user) with (env e) {
@@ -278,7 +273,7 @@ strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
 // which additivity cannot express. So here we do the inverse of withdraw/take:
 // GROUND the aggregate back to a real product (pre and post). That re-exposes
 // sum*M_old and sum*M_new, but liquidate ALREADY discharges those via the
-// mulDivDownGhost rounds-down bound (it verifies in the parametric invariant),
+// ghostMulDivDown rounds-down bound (it verifies in the parametric invariant),
 // and `sum` is a single snapshot here (not the touched-user delta), so the
 // withdraw-style NIA divergence does not occur.
 rule sumOfCreditsLeTotalUnitsPreservedByLiquidate(bytes32 id, env e, Midnight.Market obligation, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
@@ -307,10 +302,10 @@ rule sumOfCreditsLeTotalUnitsPreservedByLiquidate(bytes32 id, env e, Midnight.Ma
     // on each side share the SAME second argument (indexPost for the tuPre/cfPre pair, indexPre for
     // tuPost/cfPost), which is exactly the shape multiply(a,m)-multiply(b,m)==multiply(a-b,m)
     // needs, so this needs no cancellation, only the additivity already established.
-    require axiomDistributivity(cfPre, tuPre - cfPre, indexPost);
-    require axiomDistributivity(cfPost, tuPost - cfPost, indexPre);
-    require axiomDistributivity(tuPre - cfPre, cfPre, PRECISION);
-    require axiomDistributivity(tuPost - cfPost, cfPost, PRECISION);
+    require axiomDistributivity(cfPre, tuPre - cfPre, indexPost), "axiom";
+    require axiomDistributivity(cfPost, tuPost - cfPost, indexPre), "axiom";
+    require axiomDistributivity(tuPre - cfPre, cfPre, PRECISION), "axiom";
+    require axiomDistributivity(tuPost - cfPost, cfPost, PRECISION), "axiom";
 
     // The proof requires several steps:
 
@@ -335,12 +330,12 @@ rule sumOfCreditsLeTotalUnitsPreservedByLiquidate(bytes32 id, env e, Midnight.Ma
     // sumPre * indexPost <= (tuPost - cfPost) * PRECISION  (sumOfCreditBody Post)
 
     // These are the axioms used in the proof above
-    require axiomLeMulPos(multiply(sumPre, indexPre), multiply(tuPre - cfPre, PRECISION), indexPost);
-    require axiomAssocComm(sumPre, indexPre, indexPost);
-    require axiomAssocComm(tuPre - cfPre, PRECISION, indexPost);
-    require axiomLeMulPos(multiply(tuPre - cfPre, indexPost), multiply(tuPost - cfPost, indexPre), PRECISION);
-    require axiomAssocComm(tuPost - cfPost, indexPre, PRECISION);
-    require axiomLeMulPos(multiply(sumPre, indexPost), multiply(tuPost - cfPost, PRECISION), indexPre);
+    require axiomLeMulPos(multiply(sumPre, indexPre), multiply(tuPre - cfPre, PRECISION), indexPost), "axiom";
+    require axiomAssocComm(sumPre, indexPre, indexPost), "axiom";
+    require axiomAssocComm(tuPre - cfPre, PRECISION, indexPost), "axiom";
+    require axiomLeMulPos(multiply(tuPre - cfPre, indexPost), multiply(tuPost - cfPost, indexPre), PRECISION), "axiom";
+    require axiomAssocComm(tuPost - cfPost, indexPre, PRECISION), "axiom";
+    require axiomLeMulPos(multiply(sumPre, indexPost), multiply(tuPost - cfPost, PRECISION), indexPre), "axiom";
 
     assert sumOfCreditsBody(id);
 }
