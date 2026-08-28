@@ -651,9 +651,7 @@ contract Midnight is IMidnight {
             uint256 price = IOracle(_collateralParam.oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
             uint256 _collateral = _position.collateral[i];
-            // forge-lint: disable-next-item(uninitialized-local) as maxDebt (line 640) starts at the empty-sum
-            // zero deliberately: with no collateral activated, the NotLiquidatable require below then reads the
-            // position as liquidatable, which is the intended outcome.
+            // forge-lint: disable-next-item(uninitialized-local) maxDebt is a sum.
             maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateralParam.lltv, WAD);
             badDebt = badDebt.zeroFloorSub(
                 _collateral.mulDivUp(price, ORACLE_PRICE_SCALE)
@@ -693,10 +691,9 @@ contract Midnight is IMidnight {
                 : _maxLif;
 
             if (seizedAssets > 0) {
-                // forge-lint: disable-next-item(uninitialized-local) as liquidatedCollatPrice (line 641) is left
-                // at 0 only when collateralIndex is not activated, which by nonZeroCollateralsAreActivated
-                // (CollateralBitmap.spec) forces collateral[collateralIndex] == 0: the seize then underflows below
-                // and the repaidUnits branch divides by zero, so no completing execution reads the 0.
+                // forge-lint: disable-next-item(uninitialized-local) as liquidatedCollatPrice is left at 0 only when
+                // collateralIndex is not activated, which forces collateral[collateralIndex] == 0: the seize then
+                // underflows below and the repaidUnits branch divides by zero, so no completing execution reads the 0.
                 repaidUnits = seizedAssets.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
             } else {
                 seizedAssets = repaidUnits.mulDivDown(lif, WAD).mulDivDown(ORACLE_PRICE_SCALE, liquidatedCollatPrice);
@@ -809,12 +806,9 @@ contract Midnight is IMidnight {
             require(market.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
             require(market.collateralParams.length > 0, NoCollateralParams());
             require(market.collateralParams.length <= MAX_COLLATERALS, TooManyCollateralParams());
-            address previousCollateralToken;
+            address previousCollateralToken = address(0);
             for (uint256 i = 0; i < market.collateralParams.length; i++) {
                 address collateralToken = market.collateralParams[i].token;
-                // forge-lint: disable-next-item(uninitialized-local) as the zero default of
-                // previousCollateralToken (line 802) is the intended sentinel: it opens the strictly-ascending
-                // ordering check, and therefore also rejects address(0) as a collateral token.
                 require(collateralToken > previousCollateralToken, CollateralParamsNotSorted());
                 uint256 lltv = market.collateralParams[i].lltv;
                 require(isLltvEnabled[lltv], LltvNotEnabled());
