@@ -30,6 +30,7 @@ exclude_lints = [
     "arbitrary-send-erc20",
     "unused-return",
     "cyclomatic-complexity",
+    "boolean-cst",
 ]
 
 # Lint profile for test/: the base list in full, plus the rules that only fire in
@@ -54,6 +55,7 @@ exclude_lints = [
     "arbitrary-send-erc20",
     "unused-return",
     "cyclomatic-complexity",
+    "boolean-cst",
     # Additionally firing under test/.
     "reentrancy-events",
     "divide-before-multiply",
@@ -66,7 +68,6 @@ exclude_lints = [
     "uninitialized-local",
     "named-struct-fields",
     "empty-block",
-    "boolean-cst",
     "ecrecover",
     "unused-import",
     "boolean-equal",
