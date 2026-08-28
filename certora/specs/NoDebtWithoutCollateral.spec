@@ -39,15 +39,15 @@ methods {
 /// MULDIV SUMMARIES ///
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
-    if (d == 0 || a * b >= 2^256) {
+    if (d == 0 || a * b >= 2 ^ 256) {
         revert();
     }
-    require axiomMathMulDivDownZeroA(b,d), "axiom";
+    require axiomMathMulDivDownZeroA(b, d), "axiom";
     return require_uint256(ghostMulDivDown(a, b, d));
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
-    if (d == 0 || a * b + d - 1 >= 2^256) {
+    if (d == 0 || a * b + d - 1 >= 2 ^ 256) {
         revert();
     }
     return require_uint256(ghostMulDivUp(a, b, d));
@@ -60,9 +60,8 @@ strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
     {
         preserved liquidate(Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) with (env e) {
             // To derive repaidUnits >= debtAfterBadDebt when the last bitmap bit is cleared, the prover requires inverse axioms and mulDiv monotonicity (using lif <= maxLif).
-        
             require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivUpMonotoneA(a1, a2, b, d), "axiom";
-            require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomMathMulDivUpMonotoneD(a, b, d1, d2), "axiom";        
+            require forall mathint a. forall mathint b. forall mathint d1. forall mathint d2. axiomMathMulDivUpMonotoneD(a, b, d1, d2), "axiom";
             require forall mathint a. forall mathint b. forall mathint d. axiomMathMulDivInverseUpDown(a, b, d), "axiom";
         }
         preserved onTransactionBoundary with (env e) {
