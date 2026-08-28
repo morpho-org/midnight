@@ -639,7 +639,7 @@ contract Midnight is IMidnight {
             LiquidatorGatedFromLiquidating()
         );
 
-        uint256 maxDebt;
+        uint256 maxDebt = 0;
         uint256 liquidatedCollatPrice;
         uint256 originalDebt = _position.debt;
         uint256 badDebt = originalDebt;
@@ -650,7 +650,6 @@ contract Midnight is IMidnight {
             uint256 price = IOracle(_collateralParam.oracle).price();
             if (i == collateralIndex) liquidatedCollatPrice = price;
             uint256 _collateral = _position.collateral[i];
-            // forge-lint: disable-next-item(uninitialized-local) maxDebt is a sum.
             maxDebt += _collateral.mulDivDown(price, ORACLE_PRICE_SCALE).mulDivDown(_collateralParam.lltv, WAD);
             badDebt = badDebt.zeroFloorSub(
                 _collateral.mulDivUp(price, ORACLE_PRICE_SCALE)
@@ -905,14 +904,13 @@ contract Midnight is IMidnight {
     function isHealthy(Market memory market, bytes32 id, address borrower) public view returns (bool) {
         Position storage _position = position[id][borrower];
         uint256 _debt = _position.debt;
-        uint256 maxDebt;
+        uint256 maxDebt = 0;
         if (_debt > 0) {
             uint128 _collateralBitmap = _position.collateralBitmap;
             while (_collateralBitmap != 0) {
                 uint256 i = UtilsLib.msb(_collateralBitmap);
                 CollateralParams memory collateralParam = market.collateralParams[i];
                 uint256 price = IOracle(collateralParam.oracle).price();
-                // forge-lint: disable-next-item(uninitialized-local) as maxDebt is a sum.
                 maxDebt += _position.collateral[i]
                     .mulDivDown(price, ORACLE_PRICE_SCALE)
                     .mulDivDown(collateralParam.lltv, WAD);
