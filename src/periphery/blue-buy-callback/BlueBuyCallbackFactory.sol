@@ -24,9 +24,7 @@ contract BlueBuyCallbackFactory is IBlueBuyCallbackFactory {
         callbackOf[owner][salt] = callback;
         isBlueBuyCallback[callback] = true;
 
-        // forge-lint: disable-next-item(reentrancy-events) as the ordering is already safe: both state writes
-        // precede the emit, and the only external call is the CREATE2 above, whose constructor calls the immutable
-        // BLUE; a reentrant call with the same salt reverts on the CREATE2 address collision.
+        // forge-lint: disable-next-item(reentrancy-events) ack.
         emit CreateBlueBuyCallback(msg.sender, owner, salt, callback);
         return callback;
     }
