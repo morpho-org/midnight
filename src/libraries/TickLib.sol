@@ -73,9 +73,7 @@ library TickLib {
                 else high = mid;
             }
         }
-        // forge-lint: disable-next-item(divide-before-multiply) as this one really does divide
-        // then multiply, within this expression: it is ceil(x / spacing) * spacing quantization,
-        // where multiplying first would defeat the rounding.
+        // forge-lint: disable-next-item(divide-before-multiply) the rounding is the goal here.
         return (low + spacing - 1) / spacing * spacing;
     }
 }
