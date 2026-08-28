@@ -131,7 +131,7 @@ definition sumOfCreditsBody(bytes32 id) returns bool = multiply(sumPreciseCredit
 
 function updateCreditDivIndex(bytes32 id, address owner, uint128 newCredit, uint128 newIndex) {
     mathint ownerLossIndex = mapIndex(newIndex);
-    mathint oldD = preciseCreditDivIndex[id][owner];
+    mathint oldCDI = preciseCreditDivIndex[id][owner];
     mathint value;
 
     // We require there is a value such that
@@ -140,15 +140,15 @@ function updateCreditDivIndex(bytes32 id, address owner, uint128 newCredit, uint
     // be divisible by ownerLossIndex.
     require multiply(value, ownerLossIndex) == multiply(newCredit, PRECISION), "PRECISION is divisible by ownerLossIndex";
 
-    mathint newD = (ownerLossIndex == 0 || newCredit == 0) ? 0 : value;
-    preciseCreditDivIndex[id][owner] = newD;
+    mathint newCDI = (ownerLossIndex == 0 || newCredit == 0) ? 0 : value;
+    preciseCreditDivIndex[id][owner] = newCDI;
     mathint oldSum = sumPreciseCreditDivIndex[id];
-    sumPreciseCreditDivIndex[id] = oldSum + newD - oldD;
+    sumPreciseCreditDivIndex[id] = oldSum + newCDI - oldCDI;
 
     // require distributivity axioms to help prover
     mathint lossIndex = mapIndex(lossFactor(id));
-    require axiomDistributivity(oldSum, newD, lossIndex), "axiom";
-    require axiomDistributivity(oldSum + newD - oldD, oldD, lossIndex), "axiom";
+    require axiomDistributivity(oldSum, newCDI, lossIndex), "axiom";
+    require axiomDistributivity(oldSum + newCDI - oldCDI, oldCDI, lossIndex), "axiom";
 }
 
 function checkCreditDivInvariant(bytes32 id, address owner) returns bool {
@@ -361,8 +361,6 @@ rule sumOfCreditsLeTotalUnitsPreservedByTake(bytes32 id, env e, uint256 units, a
     mathint debtPre_b = currentContract.position[id][buyer].debt;
 
     take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
-    mathint creditPost_b = currentContract.position[id][buyer].credit;
-    mathint creditPost_s = currentContract.position[id][seller].credit;
     mathint tuPost = totalUnits(id);
 
     // Compute the buyer credit increase. Note that updatePosition does
