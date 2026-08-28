@@ -530,9 +530,8 @@ contract Midnight is IMidnight {
         _marketState.withdrawable -= UtilsLib.toUint128(units);
         _marketState.totalUnits -= UtilsLib.toUint128(units);
 
-        // forge-lint: disable-next-item(uninitialized-local) as pendingFeeDecrease (line 524) stays 0 exactly
-        // when credit is 0, and credit is 0 only for a zero-unit withdraw (the credit subtraction above underflows
-        // otherwise), so there is no fee to prorate and 0 is the right value to report.
+        // forge-lint: disable-next-item(uninitialized-local) as pendingFeeDecrease is uninitialized only when credit is
+        // zero, in which case pendingFeeDecrease should be zero.
         emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, pendingFeeDecrease);
 
         SafeTransferLib.safeTransfer(market.loanToken, receiver, units);
