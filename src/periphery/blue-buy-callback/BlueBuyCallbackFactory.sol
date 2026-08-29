@@ -24,6 +24,7 @@ contract BlueBuyCallbackFactory is IBlueBuyCallbackFactory {
         callbackOf[owner][salt] = callback;
         isBlueBuyCallback[callback] = true;
 
+        // forge-lint: disable-next-item(reentrancy-events) ack.
         emit CreateBlueBuyCallback(msg.sender, owner, salt, callback);
         return callback;
     }
