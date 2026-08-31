@@ -31,7 +31,7 @@ contract OfferTree {
         bytes32 right;
         Leaf leaf;
         // Offer hash for leaves and hash of the children for internal nodes.
-        bytes32 hashNode;
+        bytes32 hash;
     }
 
     // Leaf ids are offer hashes. Internal node ids may be arbitrary.
@@ -41,7 +41,7 @@ contract OfferTree {
         bytes32 id = HashLib.hashOffer(offer);
         require(id != 0, "id is the zero bytes");
         Node storage n = tree[id];
-        require(_isEmpty(n), "leaf is not empty");
+        require(isEmpty(n), "leaf is not empty");
         Leaf storage l = n.leaf;
         l.marketHash = HashLib.hashMarket(offer.market);
         l.buy = offer.buy;
@@ -58,20 +58,22 @@ contract OfferTree {
         l.maxUnits = offer.maxUnits;
         l.maxAssets = offer.maxAssets;
         l.continuousFeeCap = offer.continuousFeeCap;
-        n.hashNode = id;
+        n.hash = id;
     }
 
     function newInternalNode(bytes32 id, bytes32 left, bytes32 right) public {
         require(id != 0, "zero id");
         Node storage n = tree[id];
-        require(_isEmpty(n), "node already populated");
-        bytes32 leftHash = tree[left].hashNode;
-        bytes32 rightHash = tree[right].hashNode;
+        require(isEmpty(n), "node already populated");
+        bytes32 leftHash = tree[left].hash;
+        bytes32 rightHash = tree[right].hash;
         require(leftHash != 0, "left empty");
         require(rightHash != 0, "right empty");
+        bytes32 hash = HashLib.hashNode(leftHash, rightHash);
+        require(hash != 0, "zero hash");
         n.left = left;
         n.right = right;
-        n.hashNode = HashLib.hashNode(leftHash, rightHash);
+        n.hash = hash;
     }
 
     // Build a perfect tree from a non-empty power-of-two list. Duplicate hashes share nodes.
@@ -81,7 +83,7 @@ contract OfferTree {
         bytes32[] memory level = new bytes32[](leaves.length);
         for (uint256 i = 0; i < leaves.length; i++) {
             bytes32 leafHash = HashLib.hashOffer(leaves[i]);
-            if (_isEmpty(tree[leafHash])) {
+            if (isEmpty(tree[leafHash])) {
                 newLeaf(leaves[i]);
             } else {
                 require(isLeafNode(leafHash), "leaf id collision");
@@ -89,53 +91,44 @@ contract OfferTree {
             level[i] = leafHash;
         }
 
-        while (level.length > 1) {
-            uint256 nextLength = level.length / 2;
-            bytes32[] memory next = new bytes32[](nextLength);
-
-            for (uint256 i = 0; i < nextLength; i++) {
+        uint256 levelLength = level.length;
+        while (levelLength > 1) {
+            levelLength /= 2;
+            for (uint256 i = 0; i < levelLength; i++) {
                 bytes32 left = level[2 * i];
                 bytes32 right = level[2 * i + 1];
                 bytes32 nodeHash = HashLib.hashNode(left, right);
                 Node storage n = tree[nodeHash];
-                if (_isEmpty(n)) {
+                if (isEmpty(n)) {
                     newInternalNode(nodeHash, left, right);
                 } else {
-                    require(
-                        n.left == left && n.right == right && n.hashNode == nodeHash, "internal node id collision"
-                    );
+                    require(n.left == left && n.right == right && n.hash == nodeHash, "internal node id collision");
                 }
-                next[i] = nodeHash;
+                level[i] = nodeHash;
             }
-
-            level = next;
         }
 
         return level[0];
     }
 
-    function _isEmpty(Node storage n) internal view returns (bool) {
-        return n.left == 0 && n.right == 0 && n.hashNode == 0;
+    function isEmpty(Node storage n) internal view returns (bool) {
+        return n.hash == 0;
     }
 
     function isEmpty(bytes32 id) public view returns (bool) {
-        return _isEmpty(tree[id]);
+        return isEmpty(tree[id]);
     }
 
     function getHash(bytes32 id) public view returns (bytes32) {
-        return tree[id].hashNode;
+        return tree[id].hash;
     }
 
     function isLeafNode(bytes32 id) public view returns (bool) {
-        return tree[id].left == 0 && tree[id].right == 0 && tree[id].hashNode != 0;
+        return tree[id].left == 0 && tree[id].right == 0 && tree[id].hash != 0;
     }
 
     function hashOffer(Offer memory offer) public pure returns (bytes32) {
         return HashLib.hashOffer(offer);
-    }
-
-    function hashNode(bytes32 left, bytes32 right) public pure returns (bytes32) {
-        return HashLib.hashNode(left, right);
     }
 
     function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
@@ -146,12 +139,8 @@ contract OfferTree {
         return HashLib.isLeaf(root, leafHash, leafIndex, proof);
     }
 
-    function _hashLeaf(bytes32 id) public view returns (bytes32) {
-        return _hashLeaf(tree[id].leaf);
-    }
-
     // Reconstruct HashLib.hashOffer from the stored pre-image.
-    function _hashLeaf(Leaf storage l) internal view returns (bytes32) {
+    function hashLeaf(Leaf storage l) internal view returns (bytes32) {
         return keccak256(
             abi.encode(
                 OFFER_TYPEHASH,
@@ -177,22 +166,22 @@ contract OfferTree {
     // A node is empty, a correctly hashed leaf, or a correctly hashed internal node with two children.
     function isWellFormed(bytes32 id) public view returns (bool) {
         Node storage n = tree[id];
-        if (_isEmpty(n)) return true;
+        if (isEmpty(n)) return true;
         if (n.left == 0 && n.right == 0) {
-            bytes32 expected = _hashLeaf(n.leaf);
-            return n.hashNode == expected && id == expected;
+            bytes32 expected = hashLeaf(n.leaf);
+            return n.hash == expected && id == expected;
         }
         if (n.left != 0 && n.right != 0) {
-            bytes32 leftHash = tree[n.left].hashNode;
-            bytes32 rightHash = tree[n.right].hashNode;
-            return leftHash != 0 && rightHash != 0 && n.hashNode == HashLib.hashNode(leftHash, rightHash);
+            bytes32 leftHash = tree[n.left].hash;
+            bytes32 rightHash = tree[n.right].hash;
+            return leftHash != 0 && rightHash != 0 && n.hash == HashLib.hashNode(leftHash, rightHash);
         }
         return false;
     }
 
     // Check the path selected by leafIndex.
-    function wellFormedPath(bytes32 id, uint256 leafIndex, bytes32[] memory proof) public view returns (bool) {
-        for (uint256 i = proof.length;;) {
+    function wellFormedPath(bytes32 id, uint256 leafIndex, uint256 depth) public view returns (bool) {
+        for (uint256 i = depth;;) {
             require(isWellFormed(id));
 
             if (i == 0) break;
