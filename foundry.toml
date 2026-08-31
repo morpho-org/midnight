@@ -31,6 +31,7 @@ exclude_lints = [
     "unused-return",
     "cyclomatic-complexity",
     "boolean-cst",
+    "uninitialized-local",
 ]
 
 # Lint profile for test/: the base list in full, plus the rules that only fire in
@@ -56,6 +57,7 @@ exclude_lints = [
     "unused-return",
     "cyclomatic-complexity",
     "boolean-cst",
+    "uninitialized-local",
     # Additionally firing under test/.
     "reentrancy-events",
     "divide-before-multiply",

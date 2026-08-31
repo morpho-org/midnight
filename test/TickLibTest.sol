@@ -118,10 +118,10 @@ contract TickLibTest is BaseTest {
 
     function testTickToPriceAccuracy() public view {
         uint256[] memory exactPrices = loadExactPrices();
-        uint256 maxAbsErrorWad = 0;
-        uint256 maxRelErrorWad = 0;
-        uint256 totalAbsErrorWad = 0;
-        uint256 totalRelErrorWad = 0;
+        uint256 maxAbsErrorWad;
+        uint256 maxRelErrorWad;
+        uint256 totalAbsErrorWad;
+        uint256 totalRelErrorWad;
 
         for (uint256 tick = 0; tick <= MAX_TICK; tick++) {
             uint256 solPrice = TickLib.tickToPrice(tick);

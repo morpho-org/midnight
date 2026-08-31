@@ -17,7 +17,7 @@ contract MidnightWrapper is Midnight {
     function isHealthyNoBitmap(Market memory market, bytes32 id, address borrower) public view returns (bool) {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
-        uint256 maxDebt = 0;
+        uint256 maxDebt;
         if (debt > 0) {
             uint256 len = market.collateralParams.length;
             for (uint256 i = len; i > 0;) {

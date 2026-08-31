@@ -13,7 +13,7 @@ contract UtilsLibTest is Test {
 
     function testFuzzCountBits(uint128 bitmap) public pure {
         uint256 actual = UtilsLib.countBits(bitmap);
-        uint256 expected = 0;
+        uint256 expected;
         uint128 temp = bitmap;
         while (temp != 0) {
             temp &= temp - 1;
