@@ -29,29 +29,25 @@ methods {
     function collateral(bytes32, address, uint256) external returns (uint128) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
-    // Per-callee constant price (no price update): this is the call-time price p that liquidate reads.
-    // The measurement price p' is decoupled from it, passed explicitly to realizableBadDebtAtPrice.
+    // Per-callee price is modelled by a ghost mappings from oracle to price.
+    // The change of the price in a rule can then be modelled by updating the mapping.
     function _.price() external => summaryPrice[calledContract] expect(uint256);
 
+    // Summarize toId (which uses abi.encodePacked()) by a simple hash that is easier to reason about.
+    // Ignore side effects of storeInCode.
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
 
+    // Abstract deterministic summaries for mathematical functions.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 
     // All external calls are assumed non-reentrant / non-reverting: we reason about the function bodies for safety properties.
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function _.isRatified(Midnight.Offer, bytes, address) external => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
-    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
-    function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
-    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => NONDET;
-    function _.onFlashLoan(address, address[], uint256[], bytes) external => NONDET;
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => HAVOC_ECF;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => HAVOC_ECF;
+    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => HAVOC_ECF;
 }
 
 /// SUMMARIES / GHOSTS ///
@@ -99,7 +95,7 @@ rule postDropRbdLiquidateNonIncrease(env e, Midnight.Market market, uint256 coll
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
 
-    uint256 price = summaryPrice[market.collateralParams[collateralIndex].oracle];
+    uint256 price;
     uint256 pDrop;
     require pDrop <= price, "the dropped price is less than the initial price";
 
