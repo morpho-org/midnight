@@ -12,11 +12,6 @@ fs_permissions = [
 [profile.default.fmt]
 wrap_comments = true
 
-[profile.checker]
-test = "certora/checker"
-match_contract = "Checker"
-fs_permissions = [{ access = "read", path = "./" }]
-
 [lint]
 exclude_lints = [
     "asm-keccak256",

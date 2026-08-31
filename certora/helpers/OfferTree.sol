@@ -50,7 +50,7 @@ contract OfferTree {
     // Leaves keep the fixed-size pre-image of hashOffer (see Leaf) so isWellFormed can recompute a leaf's hash
     // and pin its hashNode into the image of hashOffer. hashOffer and hashNode feed keccak distinct
     // input shapes, this gives domain separation between leaves and internal nodes. The tree is built only via newLeaf
-    // and newInternalNode, which preserve well-formedness by construction.
+    // and newInternalNode (directly or through generateRoot), which preserve well-formedness by construction.
     mapping(bytes32 => Node) internal tree;
 
     /* MAIN FUNCTIONS */
@@ -93,6 +93,47 @@ contract OfferTree {
         n.hashNode = HashLib.hashNode(leftHash, rightHash);
     }
 
+    // Build a perfect binary tree from a non-empty, power-of-two list of offers and return its root.
+    // Duplicate leaves and subtrees share the same node because their identifiers are their hashes.
+    function generateRoot(Offer[] memory leaves) public returns (bytes32) {
+        require(leaves.length > 0 && (leaves.length & (leaves.length - 1)) == 0, "invalid leaves length");
+
+        bytes32[] memory level = new bytes32[](leaves.length);
+        for (uint256 i = 0; i < leaves.length; i++) {
+            bytes32 leafHash = HashLib.hashOffer(leaves[i]);
+            if (_isEmpty(tree[leafHash])) {
+                newLeaf(leaves[i]);
+            } else {
+                require(isLeafNode(leafHash), "leaf id collision");
+            }
+            level[i] = leafHash;
+        }
+
+        while (level.length > 1) {
+            uint256 nextLength = level.length / 2;
+            bytes32[] memory next = new bytes32[](nextLength);
+
+            for (uint256 i = 0; i < nextLength; i++) {
+                bytes32 left = level[2 * i];
+                bytes32 right = level[2 * i + 1];
+                bytes32 nodeHash = HashLib.hashNode(left, right);
+                Node storage n = tree[nodeHash];
+                if (_isEmpty(n)) {
+                    newInternalNode(nodeHash, left, right);
+                } else {
+                    require(
+                        n.left == left && n.right == right && n.hashNode == nodeHash, "internal node id collision"
+                    );
+                }
+                next[i] = nodeHash;
+            }
+
+            level = next;
+        }
+
+        return level[0];
+    }
+
     /* PURE AND VIEW FUNCTIONS */
 
     function _isEmpty(Node storage n) internal view returns (bool) {
@@ -117,6 +158,14 @@ contract OfferTree {
 
     function hashNode(bytes32 left, bytes32 right) public pure returns (bytes32) {
         return HashLib.hashNode(left, right);
+    }
+
+    function isLeaf(bytes32 root, bytes32 leafHash, uint256 leafIndex, bytes32[] memory proof)
+        public
+        pure
+        returns (bool)
+    {
+        return HashLib.isLeaf(root, leafHash, leafIndex, proof);
     }
 
     function _hashLeaf(bytes32 id) public view returns (bytes32) {

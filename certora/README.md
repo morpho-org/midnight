@@ -56,39 +56,6 @@ How offers are consumed when taken.
 - [`SplitPreservesAccounting.spec`](specs/SplitPreservesAccounting.spec) checks that taking `A` units at once leaves the same credit, debt, total units, loss factors, accrual timestamps and continuous fee credit as taking `B` then `C`, with `A = B + C`.
 - [`SplitDoesNotPunishMakerOrFavorTaker.spec`](specs/SplitDoesNotPunishMakerOrFavorTaker.spec) checks the asset side of that split: splitting a take never makes the maker pay more or receive less, nor the taker pay less or receive more, up to one wei of rounding.
 
-## Offer trees
-
-Offers are authorized in batches: a ratifier signs a single Merkle root over an offer tree, and a `take` only succeeds if the offer's hash is proven to be a leaf under that root.
-Objective is to show that a successful `take` can only settle an offer that was genuinely committed in the signed tree.
-We reason about [`OfferTree`](helpers/OfferTree.sol), a model of the tree built only through the `newLeaf` and `newInternalNode` primitives. Leaves are keyed by `HashLib.hashOffer(offer)` and store a fixed-size pre-image of the offer, so `isWellFormed` re-hashes a leaf with a single bounded keccak instead of looping over the offer's dynamic members, which keeps the proofs bounded regardless of offer size.
-
-- [`OfferTreeWellFormed.spec`](specs/OfferTreeWellFormed.spec) checks that the primitives only ever build well-formed trees: every node is empty, a leaf carrying a genuine `hashOffer`, or an internal node correctly hashing its two children. In particular, there is no restriction for the left and right children of a parent node to be sorted.
-- [`OfferTreeMembership.spec`](specs/OfferTreeMembership.spec) checks the main soundness result: for any well-formed tree, if a Merkle proof verifies an offer's hash against the root, then the offer is registered as a leaf. Equivalently, no valid proof can be forged for an offer that is not in the tree.
-- [`Ratification.spec`](specs/Ratification.spec) connects this to the on-chain path: every successful `isRatified` (across all ratifier implementations) and every successful `take` actually invokes `HashLib.isLeaf` and it returns true.
-
-Combining the three: a successful `take` runs a Merkle membership check against the ratified root (`Ratification`), which for a well-formed root implies the offer is genuinely a leaf of that tree (`OfferTreeMembership`), and the root is well-formed because it is built only from the well-formedness-preserving primitives (`OfferTreeWellFormed`).
-
-### Checking a concrete root
-
-The membership result is stated for any well-formed root; the checker in [`checker`](checker) lets anyone confirm what a specific root commits to, by rebuilding the tree through the same verified primitives.
-
-1. Write a `proofs.json` listing the claimed `root` and the offers (`leaves`), padded to a power of two with empty offers.
-2. Generate the certificate, from the repository root:
-   ```
-   python certora/checker/create_certificate.py proofs.json
-   ```
-   This recomputes the tree bottom-up, asserts the computed root equals the claimed `root`, and writes `certificate.json`.
-3. Replay it through the verified primitives:
-   ```
-   FOUNDRY_PROFILE=checker forge test --match-test testVerifyCertificate
-   ```
-   [`Checker.sol`](checker/Checker.sol) reads `certificate.json`, rebuilds the tree via `OfferTree.newLeaf`/`newInternalNode`, and asserts the constructed root equals `root`.
-
-A passing run certifies that the root is the root of a well-formed tree built from exactly those offers, so the membership guarantee applies to it.
-This confirms what a root commits to, not that it was signed; verifying the ratifier's signature is a separate step.
-
-The verification setup and technique is inspired from the Merkle Tree Membership soundness spec in [Universal Rewards Distributor](https://github.com/morpho-org/universal-rewards-distributor/).
-
 ## Fees
 
 Continuous-fee accrual and settlement-fee rounding stay within their expected bounds.

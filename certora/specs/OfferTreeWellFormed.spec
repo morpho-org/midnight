@@ -8,6 +8,7 @@
 // properties (leaf/internal domain separation, hashNode injectivity) that OfferTreeMembership.spec relies on.
 
 methods {
+    function generateRoot(OfferTree.Offer[]) external returns (bytes32) envfree;
     function newLeaf(OfferTree.Offer) external envfree;
     function _hashLeaf(bytes32) external returns (bytes32) envfree;
     function hashOffer(OfferTree.Offer) external returns (bytes32) envfree;
