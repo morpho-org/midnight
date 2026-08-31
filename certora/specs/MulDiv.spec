@@ -212,14 +212,8 @@ rule mathMulDivAddDownUp(mathint a1, mathint a2, mathint b, mathint d) {
     assert a1 >= 0 && a2 >= 0 => mathMulDivDown(a1, b, d) + mathMulDivUp(a2, b, d) >= mathMulDivDown(a1 + a2, b, d);
 }
 
-// Rounding down the first scaling step cannot increase the result of a second scaling rounded up.
 rule mathMulDivDownUpComposition(mathint a, mathint b, mathint c, mathint d) {
     assert a >= 0 && b >= 0 && c >= 0 && d > 0 => mathMulDivUp(mathMulDivDown(a, b, d), c, d) <= mathMulDivUp(a, b * c, d * d);
-}
-
-// If the exact product is at most bound * d, then the ceiling is at most bound.
-rule mathMulDivCeilLeOfMulGe(mathint a, mathint b, mathint d, mathint bound) {
-    assert a >= 0 && b >= 0 && d > 0 && a * b <= bound * d => mathMulDivUp(a, b, d) <= bound;
 }
 
 rule mathMulDivInverseDownUp(mathint a, mathint b, mathint d) {
@@ -265,6 +259,10 @@ rule mathMulDivUpTightBound(mathint a, mathint b, mathint d) {
 
 rule mathMulDivUpUpperBound(mathint a, mathint b, mathint d) {
     assert a >= 0 && b >= 0 && d > 0 => mathMulDivUp(a, b, d) * d <= a * b + d - 1;
+}
+
+rule mathMulDivCeilLeOfMulGe(mathint a, mathint b, mathint d, mathint bound) {
+    assert a >= 0 && b >= 0 && d > 0 && a * b <= bound * d => mathMulDivUp(a, b, d) <= bound;
 }
 
 rule mathMulDivResidualBound(mathint a, mathint b, mathint d) {
