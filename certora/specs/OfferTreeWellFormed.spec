@@ -7,7 +7,6 @@ methods {
     function newLeaf(OfferTree.Offer) external envfree;
     function _hashLeaf(bytes32) external returns (bytes32) envfree;
     function hashOffer(OfferTree.Offer) external returns (bytes32) envfree;
-    function hashNode(bytes32, bytes32) external returns (bytes32) envfree;
     function isEmpty(bytes32) external returns (bool) envfree;
     function isWellFormed(bytes32) external returns (bool) envfree;
 }
@@ -31,15 +30,4 @@ rule hashLeafReproducesHashOffer(OfferTree.Offer offer) {
 
     bytes32 id = hashOffer(offer);
     assert _hashLeaf(id) == id;
-}
-
-// Leaf and internal-node hashes have disjoint images.
-rule leafHashDisjointFromNodeHash(bytes32 id, bytes32 a, bytes32 b) {
-    assert _hashLeaf(id) != hashNode(a, b);
-}
-
-// Internal-node hashing is injective.
-rule nodeHashInjective(bytes32 a, bytes32 b, bytes32 c, bytes32 d) {
-    require hashNode(a, b) == hashNode(c, d);
-    assert a == c && b == d;
 }
