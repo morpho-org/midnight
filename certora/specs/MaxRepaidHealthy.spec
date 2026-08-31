@@ -220,11 +220,18 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     mathint lifTimesLltv = lif * lltv;
     mathint maxDebtDropBound = ghostMulDivUp(repaidUnits, lifTimesLltv, WAD_SQUARED());
 
-    require axiomMathMulDivInverseUpDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price), "axiom L1";
-    require axiomMathMulDivAddDownUp(collatAfter, seizedOut, price, ORACLE_PRICE_SCALE()), "axiom L2";
-    require axiomMathMulDivDownMonotoneA(curCollatValue, newCollatValue + maxSeizedValue, lltv, WAD()), "axiom L3";
-    require axiomMathMulDivAddDownUp(newCollatValue, maxSeizedValue, lltv, WAD()), "axiom L3";
-    require axiomMathMulDivDownUpComposition(repaidUnits, lif, lltv, WAD()), "axiom L4";
+    // L1: seizedOut * price <= maxSeizedValue
+    require axiomMathMulDivInverseUpDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price), "axiom";
+
+    // L2: curCollatValue <= newCollatValue + seizedOut * price
+    require axiomMathMulDivAddDownUp(collatAfter, seizedOut, price, ORACLE_PRICE_SCALE()), "axiom";
+
+    // L3: curCollatValue <= newCollatValue + maxSeizedValue => curContrib <= newContrib + maxSeizedValue * lltv
+    require axiomMathMulDivDownMonotoneA(curCollatValue, newCollatValue + maxSeizedValue, lltv, WAD()), "axiom";
+    require axiomMathMulDivAddDownUp(newCollatValue, maxSeizedValue, lltv, WAD()), "axiom";
+
+    // L4: maxSeizedValue * lltv <= maxDebtDropBound
+    require axiomMathMulDivDownUpComposition(repaidUnits, lif, lltv, WAD()), "axiom";
 
     // L1-L2 bound the collateral-value decrease by maxSeizedValue. L3 transports that bound through the LLTV
     // contribution, and L4 bounds the composed rounding by maxDebtDropBound.
