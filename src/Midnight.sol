@@ -530,8 +530,6 @@ contract Midnight is IMidnight {
         _marketState.withdrawable -= UtilsLib.toUint128(units);
         _marketState.totalUnits -= UtilsLib.toUint128(units);
 
-        // forge-lint: disable-next-item(uninitialized-local) as pendingFeeDecrease is uninitialized only when credit is
-        // zero, in which case pendingFeeDecrease should be zero.
         emit EventsLib.Withdraw(msg.sender, id, units, onBehalf, receiver, pendingFeeDecrease);
 
         SafeTransferLib.safeTransfer(market.loanToken, receiver, units);
@@ -639,7 +637,7 @@ contract Midnight is IMidnight {
             LiquidatorGatedFromLiquidating()
         );
 
-        uint256 maxDebt = 0;
+        uint256 maxDebt;
         uint256 liquidatedCollatPrice;
         uint256 originalDebt = _position.debt;
         uint256 badDebt = originalDebt;
@@ -688,9 +686,6 @@ contract Midnight is IMidnight {
                 ? UtilsLib.min(_maxLif, WAD + (_maxLif - WAD) * (block.timestamp - market.maturity) / TIME_TO_MAX_LIF)
                 : _maxLif;
 
-            // forge-lint: disable-next-item(uninitialized-local) as liquidatedCollatPrice is left at 0 only when
-            // collateralIndex is not activated, which forces collateral[collateralIndex] == 0: the seize then
-            // underflows below and the repaidUnits branch divides by zero, so no completing execution reads the 0.
             if (seizedAssets > 0) {
                 repaidUnits = seizedAssets.mulDivUp(liquidatedCollatPrice, ORACLE_PRICE_SCALE).mulDivUp(WAD, lif);
             } else {
@@ -804,7 +799,7 @@ contract Midnight is IMidnight {
             require(market.maturity <= block.timestamp + 100 * 365 days, MaturityTooFar());
             require(market.collateralParams.length > 0, NoCollateralParams());
             require(market.collateralParams.length <= MAX_COLLATERALS, TooManyCollateralParams());
-            address previousCollateralToken = address(0);
+            address previousCollateralToken;
             for (uint256 i = 0; i < market.collateralParams.length; i++) {
                 address collateralToken = market.collateralParams[i].token;
                 require(collateralToken > previousCollateralToken, CollateralParamsNotSorted());
@@ -904,7 +899,7 @@ contract Midnight is IMidnight {
     function isHealthy(Market memory market, bytes32 id, address borrower) public view returns (bool) {
         Position storage _position = position[id][borrower];
         uint256 _debt = _position.debt;
-        uint256 maxDebt = 0;
+        uint256 maxDebt;
         if (_debt > 0) {
             uint128 _collateralBitmap = _position.collateralBitmap;
             while (_collateralBitmap != 0) {
