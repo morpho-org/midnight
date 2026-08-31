@@ -8,8 +8,7 @@ methods {
     function wellFormedPath(bytes32, uint256, bytes32[]) external returns (bool) envfree;
 }
 
-// Headline Correctness Rule:
-// If the root is setup according to a well-formed offer tree, then a successful Merkle verification of an offer against that root implies the offer is registered as a leaf in the tree.
+// A valid proof in a well-formed tree identifies a registered leaf.
 rule membershipSoundness(OfferTree.Offer offer, bytes32 root, uint256 leafIndex, bytes32[] proof) {
     bytes32 node;
 
