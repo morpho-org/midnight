@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 
 import "BitmapSummaries.spec";
+import "MulDivAxioms.spec";
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -52,24 +53,18 @@ definition WAD_SQUARED() returns uint256 = 10 ^ 36;
 
 persistent ghost summaryPrice(address) returns uint256;
 
-persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
-
-persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
-
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
-    bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0 || a * b >= 2 ^ 256) {
         revert();
     }
-    return ghostMulDivDown(a, b, d);
+    return require_uint256(ghostMulDivDown(a, b, d));
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
-    bool overflow;
-    if (overflow || d == 0) {
+    if (d == 0 || a * b + d - 1 >= 2 ^ 256) {
         revert();
     }
-    return ghostMulDivUp(a, b, d);
+    return require_uint256(ghostMulDivUp(a, b, d));
 }
 
 // Pin every field that contributes to the market id, making the toId summary deterministic and injective.
@@ -154,6 +149,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     seizedOut, repaidOut = liquidate(e, globalMarket, collateralIndex, 0, repaidUnits, borrower, false, receiver, callback, data);
 
     uint256 collatAfter = assert_uint256(collatBefore - seizedOut);
+    bool isHealthyAfter = isHealthyNoBitmap(globalMarket, globalId, borrower);
 
     /// MAX-DEBT DROP BOUND ///
     // Establish curContrib - newContrib <= maxDebtDropBound. When it seizes, liquidate computes
@@ -162,23 +158,24 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
 
     uint256 lltv = globalMarketCollateralLLTV[collateralIndex];
     uint256 lif = maxLifGhost(lltv, globalMarketCollateralLiquidationCursor[collateralIndex]);
-    uint256 maxSeizedValue = ghostMulDivDown(repaidUnits, lif, WAD());
+    mathint maxSeizedValue = ghostMulDivDown(repaidUnits, lif, WAD());
     uint256 price = summaryPrice(globalMarket.collateralParams[collateralIndex].oracle);
 
     // By that same computation, seizedOut == ghostMulDivDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price).
-    uint256 curCollatValue = ghostMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE());
-    uint256 newCollatValue = ghostMulDivDown(collatAfter, price, ORACLE_PRICE_SCALE());
+    mathint curCollatValue = ghostMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE());
+    mathint newCollatValue = ghostMulDivDown(collatAfter, price, ORACLE_PRICE_SCALE());
 
-    uint256 curContrib = ghostMulDivDown(curCollatValue, lltv, WAD());
-    uint256 newContrib = ghostMulDivDown(newCollatValue, lltv, WAD());
+    mathint curContrib = ghostMulDivDown(curCollatValue, lltv, WAD());
+    mathint newContrib = ghostMulDivDown(newCollatValue, lltv, WAD());
 
-    uint256 lifTimesLltv = assert_uint256(lif * lltv);
-    uint256 maxDebtDropBound = ghostMulDivUp(repaidUnits, lifTimesLltv, WAD_SQUARED());
+    mathint lifTimesLltv = lif * lltv;
+    mathint maxDebtDropBound = ghostMulDivUp(repaidUnits, lifTimesLltv, WAD_SQUARED());
 
-    require price > 0 => ghostMulDivUp(seizedOut, price, ORACLE_PRICE_SCALE()) <= maxSeizedValue, "L1: mulDivInverseUpDown with a=maxSeizedValue, b=ORACLE_PRICE_SCALE, d=price (MulDiv.spec)";
-    require curCollatValue <= newCollatValue + ghostMulDivUp(seizedOut, price, ORACLE_PRICE_SCALE()), "L2: mulDivAddDownUp with a1=collatAfter, a2=seizedOut, b=price, d=ORACLE_PRICE_SCALE (MulDiv.spec)";
-    require curCollatValue <= newCollatValue + maxSeizedValue => curContrib <= newContrib + ghostMulDivUp(maxSeizedValue, lltv, WAD()), "L3: mulDivMonotoneA then mulDivAddDownUp with a1=newCollatValue, a2=maxSeizedValue, b=lltv, d=WAD (MulDiv.spec)";
-    require ghostMulDivUp(maxSeizedValue, lltv, WAD()) <= maxDebtDropBound, "L4: mulDivDownUpComposition with a=repaidUnits, b=lif, c=lltv, d=WAD (MulDiv.spec)";
+    require axiomMathMulDivInverseUpDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price), "axiom L1";
+    require axiomMathMulDivAddDownUp(collatAfter, seizedOut, price, ORACLE_PRICE_SCALE()), "axiom L2";
+    require axiomMathMulDivDownMonotoneA(curCollatValue, newCollatValue + maxSeizedValue, lltv, WAD()), "axiom L3";
+    require axiomMathMulDivAddDownUp(newCollatValue, maxSeizedValue, lltv, WAD()), "axiom L3";
+    require axiomMathMulDivDownUpComposition(repaidUnits, lif, lltv, WAD()), "axiom L4";
 
     // L1-L2 bound the collateral-value decrease by maxSeizedValue. L3 transports that bound through the LLTV
     // contribution, and L4 bounds the composed rounding by maxDebtDropBound.
@@ -187,16 +184,15 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // repaidUnits is ceil(gap * WAD^2 / (WAD^2 - lif * lltv)). The two rounding facts below imply
     // maxDebtDropBound <= repaidUnits - gap. Therefore the new max debt falls by no more than the amount
     // repaid in excess of the old health gap.
-    uint256 otherCollatValue = ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE());
-    uint256 otherContrib = ghostMulDivDown(otherCollatValue, otherLltv, WAD());
-    uint256 maxDebtBefore = require_uint256(curContrib + otherContrib);
+    mathint otherCollatValue = ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE());
+    mathint otherContrib = ghostMulDivDown(otherCollatValue, otherLltv, WAD());
+    mathint maxDebtBefore = curContrib + otherContrib;
 
-    // Safe: maxRepaidFor's non-reverting subtraction establishes debtBefore >= maxDebtBefore.
-    uint256 gap = require_uint256(debtBefore - maxDebtBefore);
-    uint256 rcfDenominator = assert_uint256(WAD_SQUARED() - lifTimesLltv);
-    require rcfDenominator > 0 => gap * WAD_SQUARED() <= ghostMulDivUp(gap, WAD_SQUARED(), rcfDenominator) * rcfDenominator, "proved in mulDivUpRoundsUp";
-    uint256 repaidExcess = assert_uint256(repaidUnits - gap);
-    require repaidUnits * lifTimesLltv <= repaidExcess * WAD_SQUARED() => ghostMulDivUp(repaidUnits, lifTimesLltv, WAD_SQUARED()) <= repaidExcess, "proved in mulDivCeilLeOfMulGe";
+    mathint gap = debtBefore - maxDebtBefore;
+    mathint rcfDenominator = WAD_SQUARED() - lifTimesLltv;
+    require axiomMathMulDivUpRoundsUp(gap, WAD_SQUARED(), rcfDenominator), "axiom";
+    mathint repaidExcess = repaidUnits - gap;
+    require axiomMathMulDivCeilLeOfMulGe(repaidUnits, lifTimesLltv, WAD_SQUARED(), repaidExcess), "axiom";
 
-    assert isHealthyNoBitmap(globalMarket, globalId, borrower);
+    assert isHealthyAfter;
 }
