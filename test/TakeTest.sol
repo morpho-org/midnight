@@ -1389,7 +1389,7 @@ contract TakeTest is BaseTest {
         assertTrue(callback.reentered());
         assertFalse(callback.liquidateSucceeded());
         assertEq(callback.liquidateErrorSelector(), IMidnight.NotLiquidatable.selector);
-        assertTrue(midnight.liquidationLocked(id, borrower) == false);
+        assertFalse(midnight.liquidationLocked(id, borrower));
         assertEq(midnight.debt(id, borrower), 2 * units);
         assertEq(midnight.collateral(id, borrower, 0), 2 * collateral);
     }
