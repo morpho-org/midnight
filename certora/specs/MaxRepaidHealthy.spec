@@ -156,8 +156,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     uint256 collatBefore = collateral(globalId, borrower, collateralIndex);
     uint256 debtBefore = debt(globalId, borrower);
 
-    // This rule checks that using `repaidUnits == maxRepaid` is enough to put the account healthy. This means
-    // that the RCF doesn't prevent to put the position back to health.
+    // This rule checks that using `repaidUnits == maxRepaid` is enough to put the account healthy. This means that the RCF doesn't prevent to put the position back to health.
     uint256 repaidUnits = maxRepaidFor(globalMarket, globalId, collateralIndex, borrower);
 
     // maxRepaidFor's non-reverting collateral lookup establishes collateralIndex < globalMarketCollateralLength.
