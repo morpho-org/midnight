@@ -152,7 +152,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     bool isHealthyAfter = isHealthyNoBitmap(globalMarket, globalId, borrower);
 
     /// MAX-DEBT DROP BOUND ///
-    // Establish curContrib - newContrib <= maxDebtDropBound. When it seizes, liquidate computes
+    // Establish oldContrib - newContrib <= maxDebtDropBound. When it seizes, liquidate computes
     // seizedOut = floor(floor(repaidUnits * lif / WAD) * ORACLE_PRICE_SCALE / price), matching the ghost terms
     // below. Each require is one ground instance of a rule proved in MulDiv.spec.
 
@@ -162,10 +162,10 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     uint256 price = summaryPrice(globalMarket.collateralParams[collateralIndex].oracle);
 
     // By that same computation, seizedOut == ghostMulDivDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price).
-    mathint curCollatValue = ghostMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE());
+    mathint oldCollatValue = ghostMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE());
     mathint newCollatValue = ghostMulDivDown(collatAfter, price, ORACLE_PRICE_SCALE());
 
-    mathint curContrib = ghostMulDivDown(curCollatValue, lltv, WAD());
+    mathint oldContrib = ghostMulDivDown(oldCollatValue, lltv, WAD());
     mathint newContrib = ghostMulDivDown(newCollatValue, lltv, WAD());
 
     mathint lifTimesLltv = lif * lltv;
@@ -173,10 +173,10 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
 
     // L1: seizedOut * price <= maxSeizedValue
     require axiomMathMulDivInverseUpDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price), "axiom";
-    // L2: curCollatValue <= newCollatValue + seizedOut * price
+    // L2: oldCollatValue <= newCollatValue + seizedOut * price
     require axiomMathMulDivAddDownUp(collatAfter, seizedOut, price, ORACLE_PRICE_SCALE()), "axiom";
-    // L3: curCollatValue <= newCollatValue + maxSeizedValue => curContrib <= newContrib + maxSeizedValue * lltv
-    require axiomMathMulDivDownMonotoneA(curCollatValue, newCollatValue + maxSeizedValue, lltv, WAD()), "axiom";
+    // L3: oldCollatValue <= newCollatValue + maxSeizedValue => oldContrib <= newContrib + maxSeizedValue * lltv
+    require axiomMathMulDivDownMonotoneA(oldCollatValue, newCollatValue + maxSeizedValue, lltv, WAD()), "axiom";
     require axiomMathMulDivAddDownUp(newCollatValue, maxSeizedValue, lltv, WAD()), "axiom";
     // L4: maxSeizedValue * lltv <= maxDebtDropBound
     require axiomMathMulDivDownUpComposition(repaidUnits, lif, lltv, WAD()), "axiom";
@@ -190,7 +190,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // repaid in excess of the old health gap.
     mathint otherCollatValue = ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE());
     mathint otherContrib = ghostMulDivDown(otherCollatValue, otherLltv, WAD());
-    mathint maxDebtBefore = curContrib + otherContrib;
+    mathint maxDebtBefore = oldContrib + otherContrib;
 
     mathint gap = debtBefore - maxDebtBefore;
     mathint rcfDenominator = WAD_SQUARED() - lifTimesLltv;
