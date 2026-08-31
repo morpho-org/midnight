@@ -21,11 +21,6 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function realizableBadDebt(Midnight.Market, bytes32, address) external returns (uint256) envfree;
-    function debt(bytes32, address) external returns (uint128) envfree;
-    function totalUnits(bytes32) external returns (uint128) envfree;
-    function lossFactor(bytes32) external returns (uint128) envfree;
-    function liquidationLocked(bytes32, address) external returns (bool) envfree;
-    function tickSpacing(bytes32) external returns (uint8) envfree;
     function collateral(bytes32, address, uint256) external returns (uint128) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
@@ -45,8 +40,8 @@ methods {
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 
     // All external calls are assumed non-reentrant / non-reverting: we reason about the function bodies for safety properties.
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => HAVOC_ECF;
-    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => HAVOC_ECF;
+    function _.transfer(address, uint256) external => HAVOC_ECF;
+    function _.transferFrom(address, address, uint256) external => HAVOC_ECF;
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => HAVOC_ECF;
 }
 
@@ -80,10 +75,6 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
 }
 
-function marketIsCreated(Midnight.Market market) returns (bool) {
-    return tickSpacing(summaryToId(market)) > 0;
-}
-
 /// RULES ///
 
 // Realizable bad debt cannot increase from liquidating before a price drop.
@@ -93,7 +84,7 @@ rule postDropRbdLiquidateNonIncrease(env e, Midnight.Market market, uint256 coll
     bytes32 id = summaryToId(market);
 
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
-    require maxLif >= to_mathint(WAD()), "maxLif at least 1x (market-creation invariant)";
+    require maxLif >= to_mathint(WAD()), "see maxLifIsAtLeastWad in ExactMath.spec";
 
     uint256 price;
     uint256 pDrop;
