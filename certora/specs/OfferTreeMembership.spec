@@ -8,7 +8,7 @@ methods {
     function wellFormedPath(bytes32, uint256, bytes32[]) external returns (bool) envfree;
 }
 
-// A valid proof in a well-formed tree identifies a registered leaf.
+// Soundness: if a Merkle proof verifies along a well-formed path, hashOffer(offer) must be a leaf node.
 rule membershipSoundness(OfferTree.Offer offer, bytes32 root, uint256 leafIndex, bytes32[] proof) {
     bytes32 node;
     require getHash(node) == root, "root is the hash of node";
