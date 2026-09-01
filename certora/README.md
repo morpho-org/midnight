@@ -37,10 +37,8 @@ Global invariants on positions, markets and accounting.
 Healthy positions stay healthy, and liquidations only touch liquidatable positions within the incentive bound.
 
 - [`Healthiness.spec`](specs/Healthiness.spec) checks that after any action (except oracle update) a healthy borrower is still healthy, or is liquidation-locked: a transient state that cannot be liquidated and that is always cleared by the end of the transaction.
-- [`MaxRepaidHealthy.spec`](specs/MaxRepaidHealthy.spec) checks the restoration counterpart of that preservation property: an unhealthy borrower liquidated in normal mode is healthy again once the liquidator has repaid `maxRepaid`, the recovery close factor cap.
-  `liquidate` runs no health check after the fact, so this rests on the cap formula alone: `maxRepaid` is rounded up so that repaying up to it always suffices, the roundings of the seized collateral and of the resulting max debt included.
-  A second rule checks the matching liveness property: liquidating at that cap does not revert, so the restoration is not vacuous.
-  The rules cover markets with one or two collaterals, and the case where the recovery close factor is active.
+- [`MaxRepaidHealthy.spec`](specs/MaxRepaidHealthy.spec) checks that an unhealthy borrower liquidated in normal mode is healthy again once the liquidator has repaid `maxRepaid`, the recovery close factor cap.
+  `maxRepaid` is rounded up so that repaying up to it always suffices, the roundings of the seized collateral and of the resulting max debt included.
 - [`Liquidate.spec`](specs/Liquidate.spec) checks that `liquidate` can only act on a liquidatable position, leaves credit unchanged, and can only decrease the borrower's debt and the seized collateral.
 - [`LiquidationProfitability.spec`](specs/LiquidationProfitability.spec) shows that the liquidation is profitable.
 - [`LiquidationBoundedByLIF.spec`](specs/LiquidationBoundedByLIF.spec) checks the upper side: liquidation profit is bounded by `maxLif`.
