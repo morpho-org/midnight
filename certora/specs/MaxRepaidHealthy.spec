@@ -173,11 +173,14 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
 
     // L1: seizedOut * price <= maxSeizedValue
     require axiomMathMulDivInverseUpDown(maxSeizedValue, ORACLE_PRICE_SCALE(), price), "axiom";
+
     // L2: oldCollatValue <= newCollatValue + seizedOut * price
     require axiomMathMulDivAddDownUp(collatAfter, seizedOut, price, ORACLE_PRICE_SCALE()), "axiom";
+
     // L3: oldCollatValue <= newCollatValue + maxSeizedValue => oldContrib <= newContrib + maxSeizedValue * lltv
     require axiomMathMulDivDownMonotoneA(oldCollatValue, newCollatValue + maxSeizedValue, lltv, WAD()), "axiom";
     require axiomMathMulDivAddDownUp(newCollatValue, maxSeizedValue, lltv, WAD()), "axiom";
+
     // L4: maxSeizedValue * lltv <= maxDebtDropBound
     require axiomMathMulDivDownUpComposition(repaidUnits, lif, lltv, WAD()), "axiom";
 
