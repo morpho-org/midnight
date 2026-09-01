@@ -59,6 +59,23 @@ contract MidnightWrapper is Midnight {
         return (debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv);
     }
 
+    // badDebtFor recomputes the badDebt of Midnight.liquidate through a bitmap-free, array-based code path.
+    function badDebtFor(Market memory market, bytes32 id, address borrower) public view returns (uint256) {
+        Position storage _position = position[id][borrower];
+        uint256 badDebt = _position.debt;
+        uint256 len = market.collateralParams.length;
+        for (uint256 i = len; i > 0;) {
+            i--;
+            CollateralParams memory collateralParam = market.collateralParams[i];
+            uint256 price = IOracle(collateralParam.oracle).price();
+            badDebt = badDebt.zeroFloorSub(
+                _position.collateral[i].mulDivUp(price, ORACLE_PRICE_SCALE)
+                    .mulDivUp(WAD, maxLif(collateralParam.lltv, collateralParam.liquidationCursor))
+            );
+        }
+        return badDebt;
+    }
+
     // This realizableBadDebt function recomputes, verbatim, the badDebt local that
     // liquidate() computes at src/Midnight.sol:643-657, so that the prover can equate this
     // getter's result with liquidate's inlined bad-debt computation.

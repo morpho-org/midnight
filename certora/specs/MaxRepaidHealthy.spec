@@ -11,6 +11,7 @@ methods {
     function debt(bytes32 id, address user) external returns (uint128) envfree;
     function isHealthyNoBitmap(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function maxRepaidFor(Midnight.Market, bytes32, uint256, address) external returns (uint256) envfree;
+    function badDebtFor(Midnight.Market, bytes32, address) external returns (uint256) envfree;
 
     // Assumption: price does not change during the rule (same value in maxRepaidFor, in liquidate and in the
     // post-state isHealthyNoBitmap). Deterministic per oracle address, as in Healthiness.spec.
@@ -131,6 +132,9 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 // globalMarketCollateralLength axiom for why two collaterals is general enough.
 rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrower, address receiver, address callback, bytes data) {
     Midnight.Market globalMarket = getGlobalMarket();
+
+    // No bad debt is realized, so liquidate does not reduce the position debt before computing the RCF cap.
+    require badDebtFor(globalMarket, globalId, borrower) == 0, "no bad debt realized";
 
     uint256 collatBefore = collateral(globalId, borrower, collateralIndex);
     uint256 debtBefore = debt(globalId, borrower);
