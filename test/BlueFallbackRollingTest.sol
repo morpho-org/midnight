@@ -8,11 +8,12 @@ import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.
 import {Market, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
 import {IMidnight} from "../src/interfaces/IMidnight.sol";
 import {ISellCallback} from "../src/interfaces/ICallbacks.sol";
-import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {WAD, ORACLE_PRICE_SCALE, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {BlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/BlueFallbackRolling.sol";
 import {IBlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/interfaces/IBlueFallbackRolling.sol";
 import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
+import {Oracle} from "./helpers/Oracle.sol";
 
 contract BlueFallbackRollingTest is BaseTest {
     using MarketParamsLib for MarketParams;
