@@ -74,14 +74,7 @@ persistent ghost address globalMarketLoanToken;
 
 persistent ghost uint256 globalMarketChainId;
 
-// Exactly two collaterals is not a restriction on the result. Liquidating touches a single collateral, so the
-// whole contribution of every other collateral to maxDebt enters the reasoning as one arbitrary non-negative
-// value, and one extra collateral with an arbitrary amount, price and LLTV already realizes every such value.
-// The second collateral therefore plays the role of the arbitrary otherCollatContribution of the Rocq proof,
-// and a market with more collaterals is covered by the same argument.
-persistent ghost uint256 globalMarketCollateralLength {
-    axiom globalMarketCollateralLength == 2;
-}
+persistent ghost uint256 globalMarketCollateralLength;
 
 persistent ghost mapping(uint256 => address) globalMarketCollateralOracle;
 
@@ -106,7 +99,7 @@ persistent ghost bytes32 globalId;
 definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < globalMarketCollateralLength => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].liquidationCursor == globalMarketCollateralLiquidationCursor[index]);
 
 function equalsGlobalMarket(Midnight.Market market) returns (bool) {
-    return market.chainId == globalMarketChainId && market.midnight == currentContract && market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
+    return market.chainId == globalMarketChainId && market.midnight == currentContract && market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && globalMarketCollateralLength <= 3 && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
 }
 
 function getGlobalMarket() returns (Midnight.Market) {
@@ -127,9 +120,8 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 
 /// RULE ///
 
-// In a two-collateral market, liquidating at the amount computed by maxRepaidFor leaves the position healthy.
-// The call uses normal mode and covers the strictly unhealthy and health-boundary cases. See the
-// globalMarketCollateralLength axiom for why two collaterals is general enough.
+// In a market, liquidating at the amount computed by maxRepaidFor leaves the position healthy.
+// The call uses normal mode and covers the strictly unhealthy and health-boundary cases.
 rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrower, address receiver, address callback, bytes data) {
     Midnight.Market globalMarket = getGlobalMarket();
 
