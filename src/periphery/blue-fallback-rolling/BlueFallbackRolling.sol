@@ -22,7 +22,7 @@ import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 /// which case the destination position debt and collateral can be difficult to predict.
 /// @dev Contrary to Midnight, Blue positions can be liquidated because of interest accrual, which should be taken into
 /// account when deciding/approving the rolling configuration.
-/// @dev Partial rolls of unhealthy Midnight positions fail, except if rounding makes the remaining position healthy.
+/// @dev Partial rolls leaving the Midnight position unhealthy fail.
 /// @dev Nothing prevents rollers from leaving a small amount of debt on Midnight that would be unprofitable to roll.
 /// @dev Inherits the token safety requirements of Midnight and Blue.
 contract BlueFallbackRolling is IBlueFallbackRolling {
