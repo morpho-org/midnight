@@ -163,7 +163,7 @@ contract BlueFallbackRollingTest is BaseTest {
     }
 
     function testAnyoneCanFullyRollAnUnhealthyMidnightPosition() public {
-        Oracle(midnightMarket.collateralParams[blueCollateralIndex].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
+        Oracle(midnightMarket.collateralParams[blueCollateralIndex].oracle).setPrice(ORACLE_PRICE_SCALE * 95 / 100);
         assertFalse(midnight.isHealthy(midnightMarket, toId(midnightMarket), borrower));
 
         vm.prank(keeper);
@@ -185,6 +185,11 @@ contract BlueFallbackRollingTest is BaseTest {
 
     function testPartialRollRevertsWhenRoundingMakesAHealthyMidnightPositionUnhealthy() public {
         uint256 debtAssets = DEBT - 1;
+        uint256 extraCollateral = 1e18;
+        deal(address(collateralToken1), borrower, extraCollateral);
+        vm.prank(borrower);
+        midnight.supplyCollateral(midnightMarket, blueCollateralIndex, extraCollateral, borrower);
+
         Oracle oracle = Oracle(midnightMarket.collateralParams[blueCollateralIndex].oracle);
         oracle.setPrice(ORACLE_PRICE_SCALE - 200);
         assertTrue(midnight.isHealthy(midnightMarket, toId(midnightMarket), borrower));
