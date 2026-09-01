@@ -11,6 +11,7 @@ methods {
     function debt(bytes32 id, address user) external returns (uint128) envfree;
     function isHealthyNoBitmap(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function maxRepaidFor(Midnight.Market, bytes32, uint256, address) external returns (uint256) envfree;
+    function maxDebtFor(Midnight.Market, bytes32, address) external returns (uint256) envfree;
 
     // Assumption: price does not change during the rule (same value in maxRepaidFor, in liquidate and in the
     // post-state isHealthyNoBitmap). Deterministic per oracle address, as in Healthiness.spec.
@@ -137,12 +138,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
 
     // This rule checks that using `repaidUnits == maxRepaid` is enough to put the account healthy. This means that the RCF doesn't prevent to put the position back to health.
     uint256 repaidUnits = maxRepaidFor(globalMarket, globalId, collateralIndex, borrower);
-
-    // maxRepaidFor's non-reverting collateral lookup establishes collateralIndex < 2.
-    uint256 otherIndex = assert_uint256(1 - collateralIndex);
-    uint256 otherCollatBefore = collateral(globalId, borrower, otherIndex);
-    uint256 otherLltv = globalMarketCollateralLLTV[otherIndex];
-    uint256 otherPrice = summaryPrice(globalMarket.collateralParams[otherIndex].oracle);
+    uint256 maxDebtBefore = maxDebtFor(globalMarket, globalId, borrower);
 
     uint256 seizedOut;
     uint256 repaidOut;
@@ -191,9 +187,6 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // repaidUnits is ceil(gap * WAD^2 / (WAD^2 - lif * lltv)). The two rounding facts below imply
     // maxDebtDropBound <= repaidUnits - gap. Therefore the new max debt falls by no more than the amount
     // repaid in excess of the old health gap.
-    mathint otherCollatValue = ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE());
-    mathint otherContrib = ghostMulDivDown(otherCollatValue, otherLltv, WAD());
-    mathint maxDebtBefore = oldContrib + otherContrib;
 
     mathint gap = debtBefore - maxDebtBefore;
     mathint rcfDenominator = WAD_SQUARED() - lifTimesLltv;
