@@ -13,6 +13,7 @@ methods {
     function isHealthyNoBitmap(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function maxRepaidFor(Midnight.Market, bytes32, uint256, address) external returns (uint256) envfree;
     function badDebtFor(Midnight.Market, bytes32, address) external returns (uint256) envfree;
+    function liquidationLocked(bytes32, address) external returns (bool) envfree;
 
     // Assumption: price does not change during the rule (same value in maxRepaidFor, in liquidate and in the
     // post-state isHealthyNoBitmap). Deterministic per oracle address, as in Healthiness.spec.
@@ -42,7 +43,13 @@ methods {
     // maxLif is deterministic for each (lltv, liquidationCursor) pair.
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 
-    // Unresolved callbacks and token calls use AUTO/HAVOC_ECF, which models non-reentrant callees.
+    // Token transfers move external ERC20 balances only, never the borrower's position storage, so summarizing
+    // them as non-reverting no-ops is sound here. liquidateAtCapDoesNotRevert additionally constrains
+    // liquidatorGate == 0 and callback == 0, so canLiquidate / onLiquidate are never reached there.
+    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+    function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
+    function _.transferFrom(address from, address to, uint256 amount) external => NONDET;
+    function _.transfer(address to, uint256 amount) external => NONDET;
 }
 
 /// SUMMARY ///
@@ -224,4 +231,78 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     require axiomMathMulDivCeilLeOfMulGe(repaidUnits, lifTimesLltv, WAD_SQUARED(), repaidExcess), "axiom";
 
     assert isHealthyAfter;
+}
+
+// LIVENESS. In the same single- or two-collateral, RCF-active, no-bad-debt regime, liquidating at maxRepaidFor
+// does not revert. Mirrors LossFactor.spec's liquidateLossFactorDoesNotRevert.
+rule liquidateAtCapDoesNotRevert(env e, uint256 collateralIndex, address borrower, address receiver, address callback, bytes data) {
+    Midnight.Market globalMarket = getGlobalMarket();
+
+    require globalMarketCollateralLength == 1 || globalMarketCollateralLength == 2, "single- or two-collateral market";
+
+    // No bad debt is realized, so the bad-debt socialization block of liquidate is skipped.
+    require badDebtFor(globalMarket, globalId, borrower) == 0, "no bad debt realized";
+
+    uint256 collatBefore = collateral(globalId, borrower, collateralIndex);
+    uint256 repaidUnits = maxRepaidFor(globalMarket, globalId, collateralIndex, borrower);
+
+    uint256 lltv = globalMarketCollateralLLTV[collateralIndex];
+    uint256 lif = maxLifGhost(lltv, globalMarketCollateralLiquidationCursor[collateralIndex]);
+    uint256 price = summaryPrice(globalMarket.collateralParams[collateralIndex].oracle);
+
+    // liquidate's own require guards + RCF-active regime.
+    require e.msg.value == 0, "Midnight is not payable (liquidate is non-payable)";
+    require currentContract.marketState[globalId].tickSpacing != 0, "market already created (touchMarket is a no-op)";
+    require globalMarketLiquidatorGate == 0, "no liquidator gate";
+    require callback == 0, "no liquidate callback";
+    require !liquidationLocked(globalId, borrower), "borrower not liquidation-locked";
+    require !isHealthyNoBitmap(globalMarket, globalId, borrower), "strictly unhealthy: debt > maxDebt";
+    require lltv < WAD(), "RCF is active only for lltv < WAD";
+    require lif * lltv <= 999 * 10 ^ 15 * WAD(), "maxLif * lltv <= 0.999 * WAD^2: RCF denominator positive";
+    require price > 0, "positive liquidated-collateral price";
+
+    // No-overflow regime (the checked mulDiv reverts on 256-bit overflow). Every checked product in liquidate's
+    // maxDebt / badDebt / seize / RCF computations stays within 256 bits, and every maxLif denominator is
+    // positive, so no summarized mulDiv takes its overflow / d == 0 revert branch.
+    require lif > 0, "positive maxLif for the liquidated collateral (created-market invariant)";
+    require lif <= 2 * WAD(), "maxLif <= 2 * WAD";
+    require collatBefore * price + ORACLE_PRICE_SCALE() <= max_uint256, "collateral value (index) fits 256 bits";
+    require ghostMulDivDown(collatBefore, price, ORACLE_PRICE_SCALE()) * lltv <= max_uint256, "maxDebt term (index) fits 256 bits";
+    require ghostMulDivUp(collatBefore, price, ORACLE_PRICE_SCALE()) * WAD() + lif <= max_uint256, "badDebt term (index) fits 256 bits";
+    require repaidUnits * lif <= max_uint256, "maxSeizedValue product fits 256 bits";
+    require ghostMulDivDown(repaidUnits, lif, WAD()) * ORACLE_PRICE_SCALE() <= max_uint256, "seized value fits 256 bits";
+
+    // The other collateral's no-overflow bounds are needed only when liquidate's loop visits that collateral.
+    if (globalMarketCollateralLength == 2) {
+        uint256 otherIndex = assert_uint256(1 - collateralIndex);
+        uint256 otherCollatBefore = collateral(globalId, borrower, otherIndex);
+        uint256 otherLltv = globalMarketCollateralLLTV[otherIndex];
+        uint256 otherPrice = summaryPrice(globalMarket.collateralParams[otherIndex].oracle);
+        uint256 maxLifOther = maxLifGhost(otherLltv, globalMarketCollateralLiquidationCursor[otherIndex]);
+        require maxLifOther > 0, "positive maxLif for the other collateral (created-market invariant)";
+        require otherCollatBefore * otherPrice + ORACLE_PRICE_SCALE() <= max_uint256, "collateral value (other) fits 256 bits";
+        require ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()) * otherLltv <= max_uint256, "maxDebt term (other) fits 256 bits";
+        require ghostMulDivUp(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE()) * WAD() + maxLifOther <= max_uint256, "badDebt term (other) fits 256 bits";
+    }
+
+    // The activated collaterals are exactly [0, globalMarketCollateralLength), as in liquidateAtCapRestoresHealth.
+    uint128 bitmap = collateralBitmap(globalId, borrower);
+    require summaryGetBit(bitmap, 0), "collateral 0 is activated";
+    if (globalMarketCollateralLength == 2) {
+        require summaryGetBit(bitmap, 1), "collateral 1 is activated (two-collateral market)";
+        require forall uint256 otherBit. otherBit != 0 && otherBit != 1 => !summaryGetBit(bitmap, otherBit), "only the two collaterals are activated";
+    } else {
+        require forall uint256 otherBit. otherBit != 0 => !summaryGetBit(bitmap, otherBit), "single-collateral: only collateral 0 is activated";
+    }
+
+    // Assumption, left explicit pending review: the seized collateral does not exceed the position collateral, so
+    // liquidate's collateral subtraction does not underflow.
+    require collatBefore >= ghostMulDivDown(ghostMulDivDown(repaidUnits, lif, WAD()), ORACLE_PRICE_SCALE(), price), "seized <= collateral";
+
+    // No overflow of the market's withdrawable when the repaid units are credited.
+    require currentContract.marketState[globalId].withdrawable + repaidUnits <= max_uint128, "withdrawable credit does not overflow";
+
+    liquidate@withrevert(e, globalMarket, collateralIndex, 0, repaidUnits, borrower, false, receiver, callback, data);
+
+    assert !lastReverted, "liquidating at the RCF cap does not revert";
 }
