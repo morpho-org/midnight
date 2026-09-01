@@ -188,8 +188,11 @@ contract BlueFallbackRollingTest is BaseTest {
         uint256 debtAssets = DEBT - 1;
         uint256 extraCollateral = 1e18;
         deal(address(collateralToken1), borrower, extraCollateral);
-        vm.prank(borrower);
-        midnight.supplyCollateral(midnightMarket, blueCollateralIndex, extraCollateral, borrower);
+    vm.startPrank(borrower);
+    ERC20Lib.safeApprove(address(collateralToken1), address(midnight), 0);
+    ERC20Lib.safeApprove(address(collateralToken1), address(midnight), extraCollateral);
+ midnight.supplyCollateral(midnightMarket, blueCollateralIndex, extraCollateral, borrower);
+    vm.stopPrank();
 
         Oracle oracle = Oracle(midnightMarket.collateralParams[blueCollateralIndex].oracle);
         oracle.setPrice(ORACLE_PRICE_SCALE - 200);
