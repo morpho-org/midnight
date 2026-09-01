@@ -6,6 +6,7 @@ import {stdError} from "../lib/forge-std/src/Test.sol";
 import {IMorpho, Id, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
 import {Market, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
+import {IMidnight} from "../src/interfaces/IMidnight.sol";
 import {ISellCallback} from "../src/interfaces/ICallbacks.sol";
 import {WAD, CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {BlueFallbackRolling} from "../src/periphery/blue-fallback-rolling/BlueFallbackRolling.sol";
@@ -159,6 +160,48 @@ contract BlueFallbackRollingTest is BaseTest {
         assertGt(blue.position(blueMarketParams.id(), borrower).borrowShares, 0);
         assertEq(loanToken.balanceOf(keeper), incentiveAssets);
         assertEq(loanToken.balanceOf(address(fallbackContract)), 0);
+    }
+
+    function testAnyoneCanFullyRollAnUnhealthyMidnightPosition() public {
+        Oracle(midnightMarket.collateralParams[blueCollateralIndex].oracle).setPrice(ORACLE_PRICE_SCALE / 2);
+        assertFalse(midnight.isHealthy(midnightMarket, toId(midnightMarket), borrower));
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
+        assertEq(midnight.collateral(toId(midnightMarket), borrower, blueCollateralIndex), 0);
+    }
+
+    function testPartialRollRevertsWhenRoundingMakesAHealthyMidnightPositionUnhealthy() public {
+        uint256 debtAssets = DEBT - 1;
+        Oracle oracle = Oracle(midnightMarket.collateralParams[blueCollateralIndex].oracle);
+        oracle.setPrice(ORACLE_PRICE_SCALE - 200);
+        assertTrue(midnight.isHealthy(midnightMarket, toId(midnightMarket), borrower));
+
+        vm.expectRevert(IMidnight.UnhealthyBorrower.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            debtAssets
+        );
     }
 
     function testRollPaysTheFlatIncentiveWhenBothBoundsAreEqual(uint256 elapsed) public {
