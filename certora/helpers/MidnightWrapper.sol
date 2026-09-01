@@ -24,7 +24,8 @@ contract MidnightWrapper is Midnight {
                 i--;
                 CollateralParams memory collateralParam = market.collateralParams[i];
                 uint256 price = IOracle(collateralParam.oracle).price();
-                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                maxDebt += _position.collateral[i]
+                    .mulDivDown(price, ORACLE_PRICE_SCALE)
                     .mulDivDown(collateralParam.lltv, WAD);
             }
         }
@@ -48,7 +49,8 @@ contract MidnightWrapper is Midnight {
             i--;
             CollateralParams memory collateralParam = market.collateralParams[i];
             uint256 price = IOracle(collateralParam.oracle).price();
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+            maxDebt += _position.collateral[i]
+                .mulDivDown(price, ORACLE_PRICE_SCALE)
                 .mulDivDown(collateralParam.lltv, WAD);
         }
         CollateralParams memory liquidatedParam = market.collateralParams[collateralIndex];
@@ -68,7 +70,8 @@ contract MidnightWrapper is Midnight {
             i--;
             CollateralParams memory collateralParam = market.collateralParams[i];
             uint256 price = IOracle(collateralParam.oracle).price();
-            maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+            maxDebt += _position.collateral[i]
+                .mulDivDown(price, ORACLE_PRICE_SCALE)
                 .mulDivDown(collateralParam.lltv, WAD);
         }
         return maxDebt;
