@@ -17,7 +17,7 @@ jobs:
           submodules: recursive
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
 
       - name: Check formatting
         run: forge fmt src test script certora --check
@@ -30,10 +30,13 @@ jobs:
           submodules: recursive
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
 
       - name: Run forge lint
-        run: forge lint src test script certora --deny notes
+        run: forge lint src script certora --deny notes
+
+      - name: Run forge lint on tests
+        run: FOUNDRY_PROFILE=lint-test forge lint test --deny notes
 
   sizes:
     runs-on: ubuntu-latest
@@ -43,7 +46,7 @@ jobs:
           submodules: recursive
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
 
       - name: Run forge build
         run: forge build --force --sizes
@@ -70,7 +73,7 @@ jobs:
         with:
           submodules: recursive
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
       - name: Run Forge tests (${{ matrix.name }})
         run: forge test --deny warnings
         env:

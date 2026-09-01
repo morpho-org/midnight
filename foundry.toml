@@ -18,6 +18,60 @@ exclude_lints = [
     "unsafe-cheatcode",
     "incorrect-shift",
     "block-timestamp",
+    "internal-function-used-once",
+    "pragma-inconsistent",
+    "missing-zero-check",
+    "low-level-calls",
+    "inline-assembly",
+    "literal-instead-of-constant",
+    "require-revert-in-loop",
+    "multi-contract-file",
+    "calls-loop",
+    "arbitrary-send-erc20",
+    "unused-return",
+    "cyclomatic-complexity",
+    "boolean-cst",
+    "missing-events-access-control",
+    "costly-loop",
+    "uninitialized-local",
+    "reentrancy-events",
+]
+
+# Lint profile for test/: the base list in full, plus the rules that only fire in
+# test/. A profile replaces exclude_lints rather than extending it, hence the repeat.
+# Starting point to be trimmed, the bug-class rules first.
+[profile.lint-test.lint]
+exclude_lints = [
+    # Base [lint] list, repeated in full.
+    "asm-keccak256",
+    "unsafe-cheatcode",
+    "incorrect-shift",
+    "block-timestamp",
+    "internal-function-used-once",
+    "pragma-inconsistent",
+    "missing-zero-check",
+    "low-level-calls",
+    "inline-assembly",
+    "literal-instead-of-constant",
+    "require-revert-in-loop",
+    "multi-contract-file",
+    "calls-loop",
+    "arbitrary-send-erc20",
+    "unused-return",
+    "cyclomatic-complexity",
+    "boolean-cst",
+    "missing-events-access-control",
+    "costly-loop",
+    "uninitialized-local",
+    "reentrancy-events",
+    # Additionally firing under test/.
+    "divide-before-multiply",
+    "missing-inheritance",
+    "reentrancy-no-eth",
+    "unsafe-typecast",
+    "function-init-state",
+    "named-struct-fields",
+    "empty-block",
 ]
 
 [[profile.default.compilation_restrictions]]

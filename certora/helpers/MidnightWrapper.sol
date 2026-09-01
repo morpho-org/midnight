@@ -17,18 +17,46 @@ contract MidnightWrapper is Midnight {
     function isHealthyNoBitmap(Market memory market, bytes32 id, address borrower) public view returns (bool) {
         Position storage _position = position[id][borrower];
         uint256 debt = _position.debt;
-        uint256 maxDebt;
+        uint256 maxDebt = 0;
         if (debt > 0) {
             uint256 len = market.collateralParams.length;
             for (uint256 i = len; i > 0;) {
                 i--;
                 CollateralParams memory collateralParam = market.collateralParams[i];
                 uint256 price = IOracle(collateralParam.oracle).price();
-                maxDebt += _position.collateral[i].mulDivDown(price, ORACLE_PRICE_SCALE)
+                maxDebt += _position.collateral[i]
+                    .mulDivDown(price, ORACLE_PRICE_SCALE)
                     .mulDivDown(collateralParam.lltv, WAD);
             }
         }
         return maxDebt >= debt;
+    }
+
+    /* maxRepaidFor recomputes the repay-cap-factor cap of Midnight.liquidate through a bitmap-free,
+     * array-based code path. maxDebt is summed exactly as in isHealthyNoBitmap and the liquidate bad-debt
+     * loop, then the cap's mulDivUp is applied with lif = maxLif (normal mode).
+     * Expects the position to be unhealthy (debt > maxDebt) so that debt - maxDebt does not underflow. */
+    function maxRepaidFor(Market memory market, bytes32 id, uint256 collateralIndex, address borrower)
+        public
+        view
+        returns (uint256)
+    {
+        Position storage _position = position[id][borrower];
+        uint256 debt = _position.debt;
+        uint256 maxDebt;
+        uint256 len = market.collateralParams.length;
+        for (uint256 i = len; i > 0;) {
+            i--;
+            CollateralParams memory collateralParam = market.collateralParams[i];
+            uint256 price = IOracle(collateralParam.oracle).price();
+            maxDebt += _position.collateral[i]
+                .mulDivDown(price, ORACLE_PRICE_SCALE)
+                .mulDivDown(collateralParam.lltv, WAD);
+        }
+        CollateralParams memory liquidatedParam = market.collateralParams[collateralIndex];
+        uint256 lltv = liquidatedParam.lltv;
+        uint256 lif = maxLif(lltv, liquidatedParam.liquidationCursor);
+        return (debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv);
     }
 
     // This realizableBadDebt function recomputes, verbatim, the badDebt local that
