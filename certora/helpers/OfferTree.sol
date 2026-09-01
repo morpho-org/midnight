@@ -76,41 +76,6 @@ contract OfferTree {
         n.hash = hash;
     }
 
-    // Build a perfect tree from a non-empty power-of-two list. Duplicate hashes share nodes.
-    function generateRoot(Offer[] memory leaves) public returns (bytes32) {
-        require(leaves.length > 0 && (leaves.length & (leaves.length - 1)) == 0, "invalid leaves length");
-
-        bytes32[] memory level = new bytes32[](leaves.length);
-        for (uint256 i = 0; i < leaves.length; i++) {
-            bytes32 leafHash = HashLib.hashOffer(leaves[i]);
-            if (isEmpty(tree[leafHash])) {
-                newLeaf(leaves[i]);
-            } else {
-                require(isLeafNode(leafHash), "leaf id collision");
-            }
-            level[i] = leafHash;
-        }
-
-        uint256 levelLength = level.length;
-        while (levelLength > 1) {
-            levelLength /= 2;
-            for (uint256 i = 0; i < levelLength; i++) {
-                bytes32 left = level[2 * i];
-                bytes32 right = level[2 * i + 1];
-                bytes32 nodeHash = HashLib.hashNode(left, right);
-                Node storage n = tree[nodeHash];
-                if (isEmpty(n)) {
-                    newInternalNode(nodeHash, left, right);
-                } else {
-                    require(n.left == left && n.right == right && n.hash == nodeHash, "internal node id collision");
-                }
-                level[i] = nodeHash;
-            }
-        }
-
-        return level[0];
-    }
-
     function isEmpty(Node storage n) internal view returns (bool) {
         return n.hash == 0;
     }
@@ -166,7 +131,7 @@ contract OfferTree {
     // A node is empty, a correctly hashed leaf, or a correctly hashed internal node with two children.
     function isWellFormed(bytes32 id) public view returns (bool) {
         Node storage n = tree[id];
-        if (isEmpty(n)) return true;
+        if (isEmpty(n)) return n.left == 0 && n.right == 0;
         if (n.left == 0 && n.right == 0) {
             bytes32 expected = hashLeaf(n.leaf);
             return n.hash == expected && id == expected;

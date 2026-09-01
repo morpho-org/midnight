@@ -3,7 +3,6 @@
 // Leaves store a fixed-size pre-image so isWellFormed can re-hash them without dynamic loops.
 
 methods {
-    function generateRoot(OfferTree.Offer[]) external returns (bytes32) envfree;
     function isEmpty(bytes32) external returns (bool) envfree;
     function isWellFormed(bytes32) external returns (bool) envfree;
 }
