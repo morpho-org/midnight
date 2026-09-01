@@ -34,6 +34,7 @@ abstract contract PermitExt {
         require(block.timestamp <= deadline, "permit expired");
         bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonces[owner]++, deadline));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
+        // forge-lint: disable-next-line(ecrecover)
         require(ecrecover(digest, v, r, s) == owner, "invalid permit");
         require(owner != address(0), "bad signature");
         _setAllowance(owner, spender, value);

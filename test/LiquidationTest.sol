@@ -453,7 +453,8 @@ contract LiquidationTest is BaseTest {
         uint256 maxRepaid = _maxRepaid(units, debtAfterBadDebt, liquidationOraclePrice);
         uint256 lif0 = maxLif(market.collateralParams[0]);
         uint256 maxRepaidFromCollat = midnight.collateral(id, borrower, 0)
-            .mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE).mulDivDown(WAD, lif0);
+            .mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
+            .mulDivDown(WAD, lif0);
         repaid = bound(repaid, 0, UtilsLib.min(UtilsLib.min(maxRepaid, debtAfterBadDebt), maxRepaidFromCollat));
 
         midnight.liquidate(market, 0, 0, repaid, borrower, false, address(this), address(0), "");
@@ -614,7 +615,8 @@ contract LiquidationTest is BaseTest {
         uint256 maxRepaid = _maxRepaid(units, units, liquidationOraclePrice);
         uint256 lif0 = maxLif(market.collateralParams[0]);
         uint256 remainingRepayable = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
-            .mulDivDown(WAD, lif0).zeroFloorSub(maxRepaid);
+            .mulDivDown(WAD, lif0)
+            .zeroFloorSub(maxRepaid);
         market.rcfThreshold = bound(rcfThreshold, remainingRepayable + 1, type(uint256).max);
 
         collateralize(market, borrower, units);
@@ -641,7 +643,8 @@ contract LiquidationTest is BaseTest {
         uint256 maxRepaid = _maxRepaid(units, units, liquidationOraclePrice);
         vm.assume(maxRepaid < units); // needed because of the round up.
         uint256 remainingRepayable = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
-            .mulDivDown(WAD, maxLif(market.collateralParams[0])).zeroFloorSub(maxRepaid);
+            .mulDivDown(WAD, maxLif(market.collateralParams[0]))
+            .zeroFloorSub(maxRepaid);
         market.rcfThreshold = bound(rcfThreshold, 0, remainingRepayable);
 
         collateralize(market, borrower, units);
@@ -941,7 +944,8 @@ contract LiquidationTest is BaseTest {
             CollateralParams memory _collateral = market.collateralParams[i];
             uint256 price = IOracle(_collateral.oracle).price();
             badDebt = badDebt.zeroFloorSub(
-                midnight.collateral(id, borrower, i).mulDivUp(price, ORACLE_PRICE_SCALE)
+                midnight.collateral(id, borrower, i)
+                    .mulDivUp(price, ORACLE_PRICE_SCALE)
                     .mulDivUp(WAD, maxLif(_collateral))
             );
             require(i < 128, "i is too large");

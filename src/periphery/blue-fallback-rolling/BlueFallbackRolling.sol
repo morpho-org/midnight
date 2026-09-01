@@ -24,6 +24,7 @@ import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 /// account when deciding/approving the rolling configuration.
 /// @dev Nothing prevents rollers from leaving a small amount of debt on Midnight that would be unprofitable to roll
 /// though incentiveAtEnd can mitigate the size of the remaining debt.
+/// @dev Inherits the token safety requirements of Midnight and Blue.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
     using UtilsLib for uint128;
