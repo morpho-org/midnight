@@ -33,6 +33,7 @@ Healthy positions stay healthy, and liquidations only touch liquidatable positio
 - [`Liquidate.spec`](specs/Liquidate.spec) checks that `liquidate` can only act on a liquidatable position, leaves credit unchanged, and can only decrease the borrower's debt and the seized collateral.
 - [`LiquidationProfitability.spec`](specs/LiquidationProfitability.spec) shows that the liquidation is profitable.
 - [`LiquidationBoundedByLIF.spec`](specs/LiquidationBoundedByLIF.spec) checks the upper side: liquidation profit is bounded by `maxLif`.
+- [`PostDropRealizableBadDebt.spec`](specs/PostDropRealizableBadDebt.spec) checks that liquidating a position at the current price cannot increase the realizable bad debt measured after an oracle price drop, for both of `liquidate`'s input branches (seized and repaid).
 
 ## Offers and consumption
 

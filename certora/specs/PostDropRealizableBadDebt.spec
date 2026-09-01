@@ -28,8 +28,10 @@ methods {
     // The change of the price in a rule can then be modelled by updating the mapping.
     function _.price() external => summaryPrice[calledContract] expect(uint256);
 
-    // Summarize toId (which uses abi.encodePacked()) by a simple hash that is easier to reason about.
-    // Ignore side effects of storeInCode.
+    // toId only keys position[id]/marketState[id], so the proof just needs a deterministic injective
+    // market -> id map. Its abi.encodePacked is not injective in CVL, so we summarize by
+    // keccak256(abi.encode(market)) (hashMarket), which is injective and applied uniformly.
+    // storeInCode's returned address and code write never feed the accounting or price the rule reads.
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => NONDET;
