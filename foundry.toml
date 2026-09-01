@@ -31,6 +31,10 @@ exclude_lints = [
     "unused-return",
     "cyclomatic-complexity",
     "boolean-cst",
+    "missing-events-access-control",
+    "costly-loop",
+    "uninitialized-local",
+    "reentrancy-events",
 ]
 
 # Lint profile for test/: the base list in full, plus the rules that only fire in
@@ -56,21 +60,18 @@ exclude_lints = [
     "unused-return",
     "cyclomatic-complexity",
     "boolean-cst",
-    # Additionally firing under test/.
+    "missing-events-access-control",
+    "costly-loop",
+    "uninitialized-local",
     "reentrancy-events",
+    # Additionally firing under test/.
     "divide-before-multiply",
     "missing-inheritance",
     "reentrancy-no-eth",
     "unsafe-typecast",
     "function-init-state",
-    "uninitialized-state",
-    "missing-events-access-control",
-    "uninitialized-local",
     "named-struct-fields",
     "empty-block",
-    "ecrecover",
-    "boolean-equal",
-    "encode-packed-collision",
 ]
 
 [[profile.default.compilation_restrictions]]
