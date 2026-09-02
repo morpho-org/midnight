@@ -181,6 +181,7 @@ contract BlueFallbackRollingTest is BaseTest {
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
             MIN_ROLLABLE_ASSETS,
+            MIN_REMAINING_DEBT,
             DEBT
         );
 
@@ -213,6 +214,7 @@ contract BlueFallbackRollingTest is BaseTest {
             INCENTIVE_AT_START,
             INCENTIVE_AT_END,
             MIN_ROLLABLE_ASSETS,
+            MIN_REMAINING_DEBT,
             debtAssets
         );
     }
