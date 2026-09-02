@@ -15,7 +15,7 @@ import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
 /// @dev Users must make sure that the oracle and the LLTV of the Blue market are appropriate; otherwise, their
 /// position on Blue could be left close to liquidation.
-/// @dev The rolling incentive corresponds to the percentage of the debt repaid on Midnight that is given as incentive
+/// @dev The rolling incentive corresponds to the share of the debt repaid on Midnight that is given as incentive
 /// equivalent to added interest on Blue.
 /// @dev The rolling incentive cap at 100% is arbitrary from a technical POV.
 /// @dev The source position can move before it is rolled, notably if the borrower has outstanding sell offers, in
@@ -113,9 +113,9 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint256 collateralAssets =
             IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex).mulDivDown(assets, debtAssets);
         // Round against the roller.
-        uint256 incentiveFactor = incentiveAtStart
+        uint256 incentive = incentiveAtStart
             + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, end - start);
-        uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentiveFactor, WAD);
+        uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentive, WAD);
 
         emit Roll(msg.sender, user, midnightId, blueId, configId, assets, collateralAssets, incentiveAssets);
 
