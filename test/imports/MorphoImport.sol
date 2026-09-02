@@ -2,5 +2,5 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.19;
 
-// Force Foundry to compile Morpho Blue for deployCode in tests.
+// forge-lint: disable-next-item(unused-import) the import is what forces Morpho Blue to be compiled for deployCode.
 import {Morpho} from "../../lib/morpho-blue/src/Morpho.sol";
