@@ -114,8 +114,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         require(blueMarketParams.loanToken == midnightMarket.loanToken, InconsistentLoanToken());
 
         uint256 debtAssets = IMidnight(MIDNIGHT).debt(midnightId, user);
-        require(assets >= minRollableAssets || assets == debtAssets, RolledAssetsTooLow());
-        require(assets == debtAssets || debtAssets - assets >= minRemainingDebt, RemainingDebtTooLow());
+require(assets >= minRollableAssets || assets == debtAssets, RolledAssetsTooLow());
+        require(debtAssets - assets >= minRemainingDebt || assets == debtAssets, RemainingDebtTooLow());
 
         // collateralAssets is rounded down, so the share of the collateral leaving the Midnight position can be less
         // than the share of debt being rolled, at the expense of the resulting Blue position. minRollableAssets
