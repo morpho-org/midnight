@@ -2,11 +2,11 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {IManualEnterGate, SET_IS_LISTED_TYPEHASH, EIP712_DOMAIN_TYPEHASH} from "./interfaces/IManualEnterGate.sol";
+import {IManualEnterGate, SET_IS_WHITELISTED_TYPEHASH, EIP712_DOMAIN_TYPEHASH} from "./interfaces/IManualEnterGate.sol";
 
 /// @dev Using this gate allows to restrict who can increase their credit or debt in a market.
-/// @dev Each side (credit, debt) has its own whitelist, stored in a single mapping keyed by side. Only listed accounts
-/// can enter on that side.
+/// @dev Each side (credit, debt) has its own whitelist, stored in a single mapping keyed by side. Only whitelisted
+/// accounts can enter on that side.
 /// @dev The role setter can abdicate a side, which permanently freezes its list.
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
@@ -15,7 +15,7 @@ contract ManualEnterGate is IManualEnterGate {
     address public roleSetter;
     mapping(address account => bool) public isWhitelister;
     mapping(address whitelister => mapping(address account => uint256)) public nonces;
-    mapping(bool creditSide => mapping(address account => bool)) public isListed;
+    mapping(bool creditSide => mapping(address account => bool)) public isWhitelisted;
     mapping(bool creditSide => bool) public abdicated;
 
     constructor(address _roleSetter) {
@@ -38,11 +38,11 @@ contract ManualEnterGate is IManualEnterGate {
     }
 
     function canIncreaseCredit(address account) external view returns (bool) {
-        return isListed[true][account];
+        return isWhitelisted[true][account];
     }
 
     function canIncreaseDebt(address account) external view returns (bool) {
-        return isListed[false][account];
+        return isWhitelisted[false][account];
     }
 
     function setRoleSetter(address newRoleSetter) external {
@@ -57,19 +57,19 @@ contract ManualEnterGate is IManualEnterGate {
         emit SetIsWhitelister(account, newIsWhitelister);
     }
 
-    function setIsListed(bool creditSide, address account, bool newIsListed) external {
+    function setIsWhitelisted(bool creditSide, address account, bool newIsWhitelisted) external {
         require(isWhitelister[msg.sender], NotWhitelister());
         require(!abdicated[creditSide], Abdicated());
-        isListed[creditSide][account] = newIsListed;
-        emit SetIsListed(msg.sender, creditSide, account, newIsListed);
+        isWhitelisted[creditSide][account] = newIsWhitelisted;
+        emit SetIsWhitelisted(msg.sender, creditSide, account, newIsWhitelisted);
     }
 
-    /// @dev Allows to batch setIsListed with the take, without requiring a transaction from the whitelister.
-    function setIsListedWithSig(
+    /// @dev Allows to batch setIsWhitelisted with the take, without requiring a transaction from the whitelister.
+    function setIsWhitelistedWithSig(
         address whitelister,
         bool creditSide,
         address account,
-        bool newIsListed,
+        bool newIsWhitelisted,
         uint256 deadline,
         uint8 v,
         bytes32 r,
@@ -79,11 +79,11 @@ contract ManualEnterGate is IManualEnterGate {
         require(!abdicated[creditSide], Abdicated());
         bytes32 hashStruct = keccak256(
             abi.encode(
-                SET_IS_LISTED_TYPEHASH,
+                SET_IS_WHITELISTED_TYPEHASH,
                 whitelister,
                 creditSide,
                 account,
-                newIsListed,
+                newIsWhitelisted,
                 nonces[whitelister][account]++,
                 deadline
             )
@@ -92,8 +92,8 @@ contract ManualEnterGate is IManualEnterGate {
         // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
         address recovered = ecrecover(digest, v, r, s);
         require(recovered != address(0) && recovered == whitelister && isWhitelister[recovered], InvalidSigner());
-        isListed[creditSide][account] = newIsListed;
-        emit SetIsListedWithSig(recovered, creditSide, account, newIsListed);
+        isWhitelisted[creditSide][account] = newIsWhitelisted;
+        emit SetIsWhitelistedWithSig(recovered, creditSide, account, newIsWhitelisted);
     }
 
     /// @dev Permanently freezes the list of the given side.
