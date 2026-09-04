@@ -46,7 +46,7 @@ An onchain mempool for Midnight.
 Its fallback publishes calldata in a `Data` event.
 Calldata is limited to 1,000,000 bytes.
 
-### `VanillaEnterGate`
+### `ManualEnterGate`
 
 An enter gate that restricts which accounts can increase their credit or debt in a Midnight market.
 

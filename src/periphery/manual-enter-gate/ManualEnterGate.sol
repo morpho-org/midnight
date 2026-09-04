@@ -3,11 +3,11 @@
 pragma solidity 0.8.34;
 
 import {
-    IVanillaEnterGate,
+    IManualEnterGate,
     Mode,
     SET_IS_LISTED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
-} from "./interfaces/IVanillaEnterGate.sol";
+} from "./interfaces/IManualEnterGate.sol";
 
 /// @dev Using this gate allows to restrict who can increase their credit or debt in a market.
 /// @dev Each side (credit, debt) has its own list, stored in a single mapping keyed by side, and its own mode, fixed at
@@ -16,7 +16,7 @@ import {
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
 /// no longer valid.
-contract VanillaEnterGate is IVanillaEnterGate {
+contract ManualEnterGate is IManualEnterGate {
     Mode public immutable CREDIT_MODE;
     Mode public immutable DEBT_MODE;
 
@@ -76,7 +76,6 @@ contract VanillaEnterGate is IVanillaEnterGate {
         emit SetIsListed(msg.sender, creditSide, account, newIsListed);
     }
 
-    /// @dev Signature malleability is not explicitly prevented but it is not a problem thanks to the nonce.
     /// @dev Allows to batch setIsListed with the take, without requiring a transaction from the whitelister.
     function setIsListedWithSig(
         address whitelister,

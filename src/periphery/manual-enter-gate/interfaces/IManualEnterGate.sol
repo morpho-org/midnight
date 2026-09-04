@@ -17,7 +17,7 @@ bytes32 constant SET_IS_LISTED_TYPEHASH = 0xaac22fdd76cd855cfe3fa355b662b8549bda
 /// @dev keccak256("EIP712Domain(uint256 chainId,address verifyingContract)").
 bytes32 constant EIP712_DOMAIN_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
 
-interface IVanillaEnterGate is IEnterGate {
+interface IManualEnterGate is IEnterGate {
     /// ERRORS ///
     error DeadlineExpired();
     error InvalidSigner();
