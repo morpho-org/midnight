@@ -52,7 +52,7 @@ An enter gate that restricts which accounts can increase their credit or debt in
 
 Each side (credit, debt) has its own list of accounts and its own mode, fixed at deployment: whitelist (only listed accounts can enter), blacklist (only unlisted accounts can enter), or open (any account can enter).
 The role setter grants or revokes the whitelister role.
-Whitelisters list or unlist accounts on a side directly with `setIsListed` or by EIP-712 signature with `setIsListedWithSig`, which tracks one nonce per whitelister and account and rejects expired, replayed, invalid, or unauthorized signatures.
+Whitelisters list or unlist accounts on the credit and debt lists directly with `setIsCreditListed` and `setIsDebtListed`, or by EIP-712 signature with `setIsCreditListedWithSig` and `setIsDebtListedWithSig`, which track one nonce per whitelister and account, shared by both lists, and reject expired, replayed, invalid, or unauthorized signatures.
 
 ## Libraries
 

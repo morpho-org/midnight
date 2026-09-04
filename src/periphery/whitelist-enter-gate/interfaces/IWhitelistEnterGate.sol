@@ -4,20 +4,19 @@ pragma solidity >=0.5.0;
 
 import {IEnterGate} from "../../../interfaces/IGate.sol";
 
-enum Side {
-    Credit,
-    Debt
-}
-
 enum Mode {
     Whitelist,
     Blacklist,
     Open
 }
 
-/// @dev keccak256("SetIsListed(address whitelister,uint8 side,address account,bool newIsListed,uint256 nonce,uint256
+/// @dev keccak256("SetIsCreditListed(address whitelister,address account,bool newIsCreditListed,uint256 nonce,uint256
 /// deadline)").
-bytes32 constant SET_IS_LISTED_TYPEHASH = 0x761697b4bb3c847ca7ed6903857940d476bbe86e62ebdf82d2c8e867e65150ad;
+bytes32 constant SET_IS_CREDIT_LISTED_TYPEHASH = 0x9114d3606ad37255c43341c3824b562ebba2d2480fa55e46bbbd04401047d9f2;
+
+/// @dev keccak256("SetIsDebtListed(address whitelister,address account,bool newIsDebtListed,uint256 nonce,uint256
+/// deadline)").
+bytes32 constant SET_IS_DEBT_LISTED_TYPEHASH = 0x8aaf134724517237f0ae092efda154d7d065b0a74593ac13f38d5a7b70c1ad33;
 
 /// @dev keccak256("EIP712Domain(uint256 chainId,address verifyingContract)").
 bytes32 constant EIP712_DOMAIN_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
@@ -33,8 +32,10 @@ interface IWhitelistEnterGate is IEnterGate {
     event Constructor(address indexed roleSetter, Mode creditMode, Mode debtMode);
     event SetRoleSetter(address indexed newRoleSetter);
     event SetIsWhitelister(address indexed account, bool newIsWhitelister);
-    event SetIsListed(address indexed whitelister, Side indexed side, address indexed account, bool newIsListed);
-    event SetIsListedWithSig(address indexed whitelister, Side indexed side, address indexed account, bool newIsListed);
+    event SetIsCreditListed(address indexed whitelister, address indexed account, bool newIsCreditListed);
+    event SetIsDebtListed(address indexed whitelister, address indexed account, bool newIsDebtListed);
+    event SetIsCreditListedWithSig(address indexed whitelister, address indexed account, bool newIsCreditListed);
+    event SetIsDebtListedWithSig(address indexed whitelister, address indexed account, bool newIsDebtListed);
 
     /// STORAGE GETTERS ///
     function CREDIT_MODE() external view returns (Mode);
@@ -42,18 +43,28 @@ interface IWhitelistEnterGate is IEnterGate {
     function roleSetter() external view returns (address);
     function isWhitelister(address account) external view returns (bool);
     function nonces(address whitelister, address account) external view returns (uint256);
-    function isListed(Side side, address account) external view returns (bool);
+    function isCreditListed(address account) external view returns (bool);
+    function isDebtListed(address account) external view returns (bool);
 
     /// FUNCTIONS ///
     function multicall(bytes[] calldata data) external;
     function setRoleSetter(address newRoleSetter) external;
     function setIsWhitelister(address account, bool newIsWhitelister) external;
-    function setIsListed(Side side, address account, bool newIsListed) external;
-    function setIsListedWithSig(
+    function setIsCreditListed(address account, bool newIsCreditListed) external;
+    function setIsDebtListed(address account, bool newIsDebtListed) external;
+    function setIsCreditListedWithSig(
         address whitelister,
-        Side side,
         address account,
-        bool newIsListed,
+        bool newIsCreditListed,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
+    function setIsDebtListedWithSig(
+        address whitelister,
+        address account,
+        bool newIsDebtListed,
         uint256 deadline,
         uint8 v,
         bytes32 r,
