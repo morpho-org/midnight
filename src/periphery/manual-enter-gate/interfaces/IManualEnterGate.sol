@@ -20,10 +20,9 @@ interface IManualEnterGate is IEnterGate {
     error NotWhitelister();
 
     /// EVENTS ///
-    event Constructor(address indexed roleSetter);
+    event Constructor(address indexed roleSetter, bool creditOpen, bool debtOpen);
     event SetRoleSetter(address indexed newRoleSetter);
     event SetIsWhitelister(address indexed account, bool newIsWhitelister);
-    event SetIsOpen(bool indexed creditSide, bool newIsOpen);
     event SetIsWhitelisted(
         address indexed whitelister, bool creditSide, address indexed account, bool newIsWhitelisted
     );
@@ -33,18 +32,18 @@ interface IManualEnterGate is IEnterGate {
     event Abdicate(bool indexed creditSide);
 
     /// STORAGE GETTERS ///
+    function CREDIT_OPEN() external view returns (bool);
+    function DEBT_OPEN() external view returns (bool);
     function roleSetter() external view returns (address);
     function isWhitelister(address account) external view returns (bool);
     function nonces(address whitelister, address account) external view returns (uint256);
     function isWhitelisted(bool creditSide, address account) external view returns (bool);
-    function isOpen(bool creditSide) external view returns (bool);
     function abdicated(bool creditSide) external view returns (bool);
 
     /// FUNCTIONS ///
     function multicall(bytes[] calldata data) external;
     function setRoleSetter(address newRoleSetter) external;
     function setIsWhitelister(address account, bool newIsWhitelister) external;
-    function setIsOpen(bool creditSide, bool newIsOpen) external;
     function setIsWhitelisted(bool creditSide, address account, bool newIsWhitelisted) external;
     function setIsWhitelistedWithSig(
         address whitelister,

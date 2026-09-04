@@ -7,22 +7,26 @@ import {IManualEnterGate, SET_IS_WHITELISTED_TYPEHASH, EIP712_DOMAIN_TYPEHASH} f
 /// @dev Using this gate allows to restrict who can increase their credit or debt in a market.
 /// @dev Each side (credit, debt) has its own whitelist, stored in a single mapping keyed by side. Only whitelisted
 /// accounts can enter on that side.
-/// @dev The role setter can open a side, letting any account enter on that side.
-/// @dev The role setter can abdicate a side, which permanently freezes its list and its open status.
+/// @dev A side can be made open at deployment, letting any account enter on that side.
+/// @dev The role setter can abdicate a side, which permanently freezes its list.
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
 /// no longer valid.
 contract ManualEnterGate is IManualEnterGate {
+    bool public immutable CREDIT_OPEN;
+    bool public immutable DEBT_OPEN;
+
     address public roleSetter;
     mapping(address account => bool) public isWhitelister;
     mapping(address whitelister => mapping(address account => uint256)) public nonces;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelisted;
-    mapping(bool creditSide => bool) public isOpen;
     mapping(bool creditSide => bool) public abdicated;
 
-    constructor(address _roleSetter) {
+    constructor(address _roleSetter, bool _creditOpen, bool _debtOpen) {
+        CREDIT_OPEN = _creditOpen;
+        DEBT_OPEN = _debtOpen;
         roleSetter = _roleSetter;
-        emit Constructor(_roleSetter);
+        emit Constructor(_roleSetter, _creditOpen, _debtOpen);
     }
 
     /// @dev Useful for EOAs to batch privileged calls.
@@ -40,11 +44,11 @@ contract ManualEnterGate is IManualEnterGate {
     }
 
     function canIncreaseCredit(address account) external view returns (bool) {
-        return isOpen[true] || isWhitelisted[true][account];
+        return CREDIT_OPEN || isWhitelisted[true][account];
     }
 
     function canIncreaseDebt(address account) external view returns (bool) {
-        return isOpen[false] || isWhitelisted[false][account];
+        return DEBT_OPEN || isWhitelisted[false][account];
     }
 
     function setRoleSetter(address newRoleSetter) external {
@@ -57,13 +61,6 @@ contract ManualEnterGate is IManualEnterGate {
         require(msg.sender == roleSetter, NotRoleSetter());
         isWhitelister[account] = newIsWhitelister;
         emit SetIsWhitelister(account, newIsWhitelister);
-    }
-
-    function setIsOpen(bool creditSide, bool newIsOpen) external {
-        require(msg.sender == roleSetter, NotRoleSetter());
-        require(!abdicated[creditSide], Abdicated());
-        isOpen[creditSide] = newIsOpen;
-        emit SetIsOpen(creditSide, newIsOpen);
     }
 
     function setIsWhitelisted(bool creditSide, address account, bool newIsWhitelisted) external {
@@ -105,7 +102,7 @@ contract ManualEnterGate is IManualEnterGate {
         emit SetIsWhitelistedWithSig(recovered, creditSide, account, newIsWhitelisted);
     }
 
-    /// @dev Permanently freezes the list and the open status of the given side.
+    /// @dev Permanently freezes the list of the given side.
     function abdicate(bool creditSide) external {
         require(msg.sender == roleSetter, NotRoleSetter());
         abdicated[creditSide] = true;

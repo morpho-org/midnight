@@ -29,11 +29,11 @@ contract ManualEnterGateTest is Test {
         whitelister2Pk = 0xB0B;
         whitelister = vm.addr(whitelisterPk);
         whitelister2 = vm.addr(whitelister2Pk);
-        gate = _deploy();
+        gate = _deploy(false, false);
     }
 
-    function _deploy() internal returns (ManualEnterGate g) {
-        g = new ManualEnterGate(roleSetter);
+    function _deploy(bool creditOpen, bool debtOpen) internal returns (ManualEnterGate g) {
+        g = new ManualEnterGate(roleSetter, creditOpen, debtOpen);
         vm.prank(roleSetter);
         g.setIsWhitelister(whitelister, true);
     }
@@ -71,16 +71,16 @@ contract ManualEnterGateTest is Test {
         assertEq(gate.DOMAIN_SEPARATOR(), expected);
     }
 
-    function testConstructor(address _roleSetter) public {
+    function testConstructor(address _roleSetter, bool creditOpen, bool debtOpen) public {
         vm.expectEmit();
-        emit IManualEnterGate.Constructor(_roleSetter);
-        ManualEnterGate g = new ManualEnterGate(_roleSetter);
+        emit IManualEnterGate.Constructor(_roleSetter, creditOpen, debtOpen);
+        ManualEnterGate g = new ManualEnterGate(_roleSetter, creditOpen, debtOpen);
         assertEq(g.roleSetter(), _roleSetter);
+        assertEq(g.CREDIT_OPEN(), creditOpen);
+        assertEq(g.DEBT_OPEN(), debtOpen);
         assertFalse(g.isWhitelister(_roleSetter));
         assertFalse(g.abdicated(true));
         assertFalse(g.abdicated(false));
-        assertFalse(g.isOpen(true));
-        assertFalse(g.isOpen(false));
     }
 
     function testSetRoleSetter(address newRoleSetter) public {
@@ -198,89 +198,47 @@ contract ManualEnterGateTest is Test {
         assertEq(gate.canIncreaseDebt(account), debtListed);
     }
 
-    function testSetIsOpen(bool creditSide, bool open) public {
-        vm.expectEmit();
-        emit IManualEnterGate.SetIsOpen(creditSide, open);
-        vm.prank(roleSetter);
-        gate.setIsOpen(creditSide, open);
-        assertEq(gate.isOpen(creditSide), open);
-        assertFalse(gate.isOpen(!creditSide));
-    }
-
-    function testSetIsOpenNotRoleSetter(address caller, bool creditSide, bool open) public {
-        vm.assume(caller != roleSetter);
-        vm.expectRevert(IManualEnterGate.NotRoleSetter.selector);
-        vm.prank(caller);
-        gate.setIsOpen(creditSide, open);
-    }
-
-    function testWhitelisterCannotSetIsOpen(bool creditSide, bool open) public {
-        vm.expectRevert(IManualEnterGate.NotRoleSetter.selector);
-        vm.prank(whitelister);
-        gate.setIsOpen(creditSide, open);
-    }
-
-    function testOpenSideLetsAnyoneIn(address account, address other) public {
+    function testOpenCreditSideLetsAnyoneIn(address account, address other) public {
         vm.assume(account != other);
+        gate = _deploy(true, false);
         vm.prank(whitelister);
-        gate.setIsWhitelisted(true, account, true);
+        gate.setIsWhitelisted(false, account, true);
 
-        vm.prank(roleSetter);
-        gate.setIsOpen(true, true);
         assertTrue(gate.canIncreaseCredit(account));
         assertTrue(gate.canIncreaseCredit(other));
-        // The debt side is unaffected.
-        assertFalse(gate.canIncreaseDebt(account));
+        // The debt side still honours its whitelist.
+        assertTrue(gate.canIncreaseDebt(account));
         assertFalse(gate.canIncreaseDebt(other));
-
-        // Closing the side again honours the whitelist.
-        vm.prank(roleSetter);
-        gate.setIsOpen(true, false);
-        assertTrue(gate.canIncreaseCredit(account));
-        assertFalse(gate.canIncreaseCredit(other));
     }
 
     function testOpenDebtSideLetsAnyoneIn(address account, address other) public {
         vm.assume(account != other);
+        gate = _deploy(false, true);
         vm.prank(whitelister);
-        gate.setIsWhitelisted(false, account, true);
+        gate.setIsWhitelisted(true, account, true);
 
-        vm.prank(roleSetter);
-        gate.setIsOpen(false, true);
         assertTrue(gate.canIncreaseDebt(account));
         assertTrue(gate.canIncreaseDebt(other));
-        // The credit side is unaffected.
-        assertFalse(gate.canIncreaseCredit(account));
+        // The credit side still honours its whitelist.
+        assertTrue(gate.canIncreaseCredit(account));
         assertFalse(gate.canIncreaseCredit(other));
+    }
 
+    function testOpenSideIgnoresWhitelist(bool creditSide, address account, bool whitelisted) public {
+        gate = _deploy(creditSide, !creditSide);
+        vm.prank(whitelister);
+        gate.setIsWhitelisted(creditSide, account, whitelisted);
+        assertTrue(creditSide ? gate.canIncreaseCredit(account) : gate.canIncreaseDebt(account));
+    }
+
+    function testAbdicateOpenSideFreezesList(bool creditSide, address account, bool whitelisted) public {
+        gate = _deploy(creditSide, !creditSide);
         vm.prank(roleSetter);
-        gate.setIsOpen(false, false);
-        assertTrue(gate.canIncreaseDebt(account));
-        assertFalse(gate.canIncreaseDebt(other));
-    }
-
-    function testAbdicateFreezesSetIsOpen(bool creditSide, bool open) public {
-        vm.startPrank(roleSetter);
         gate.abdicate(creditSide);
 
         vm.expectRevert(IManualEnterGate.Abdicated.selector);
-        gate.setIsOpen(creditSide, open);
-
-        // The other side is still configurable.
-        gate.setIsOpen(!creditSide, open);
-        vm.stopPrank();
-        assertEq(gate.isOpen(!creditSide), open);
-    }
-
-    function testOpenForever(bool creditSide, address account) public {
-        vm.startPrank(roleSetter);
-        gate.setIsOpen(creditSide, true);
-        gate.abdicate(creditSide);
-        vm.expectRevert(IManualEnterGate.Abdicated.selector);
-        gate.setIsOpen(creditSide, false);
-        vm.stopPrank();
-
-        assertTrue(gate.isOpen(creditSide));
+        vm.prank(whitelister);
+        gate.setIsWhitelisted(creditSide, account, whitelisted);
         assertTrue(creditSide ? gate.canIncreaseCredit(account) : gate.canIncreaseDebt(account));
     }
 
@@ -505,7 +463,7 @@ contract ManualEnterGateTest is Test {
 
         // wrong domain separator
         (v, r, s) = _sign(true, bob, true, deadline, whitelisterPk);
-        ManualEnterGate otherGate = _deploy();
+        ManualEnterGate otherGate = _deploy(false, false);
         vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
         otherGate.setIsWhitelistedWithSig(whitelister, true, bob, true, deadline, v, r, s);
     }
