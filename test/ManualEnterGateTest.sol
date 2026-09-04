@@ -6,7 +6,6 @@ import {Test} from "../lib/forge-std/src/Test.sol";
 import {ManualEnterGate} from "../src/periphery/manual-enter-gate/ManualEnterGate.sol";
 import {
     IManualEnterGate,
-    Mode,
     SET_IS_LISTED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
 } from "../src/periphery/manual-enter-gate/interfaces/IManualEnterGate.sol";
@@ -30,17 +29,13 @@ contract ManualEnterGateTest is Test {
         whitelister2Pk = 0xB0B;
         whitelister = vm.addr(whitelisterPk);
         whitelister2 = vm.addr(whitelister2Pk);
-        gate = _deploy(Mode.Whitelist, Mode.Whitelist);
+        gate = _deploy();
     }
 
-    function _deploy(Mode creditMode, Mode debtMode) internal returns (ManualEnterGate g) {
-        g = new ManualEnterGate(roleSetter, creditMode, debtMode);
+    function _deploy() internal returns (ManualEnterGate g) {
+        g = new ManualEnterGate(roleSetter);
         vm.prank(roleSetter);
         g.setIsWhitelister(whitelister, true);
-    }
-
-    function _mode(uint8 raw) internal pure returns (Mode) {
-        return Mode(bound(raw, 0, 2));
     }
 
     function _sign(bool creditSide, address account, bool listed, uint256 deadline, uint256 pk)
@@ -76,16 +71,14 @@ contract ManualEnterGateTest is Test {
         assertEq(gate.DOMAIN_SEPARATOR(), expected);
     }
 
-    function testConstructor(address _roleSetter, uint8 rawCreditMode, uint8 rawDebtMode) public {
-        Mode creditMode = _mode(rawCreditMode);
-        Mode debtMode = _mode(rawDebtMode);
+    function testConstructor(address _roleSetter) public {
         vm.expectEmit();
-        emit IManualEnterGate.Constructor(_roleSetter, creditMode, debtMode);
-        ManualEnterGate g = new ManualEnterGate(_roleSetter, creditMode, debtMode);
+        emit IManualEnterGate.Constructor(_roleSetter);
+        ManualEnterGate g = new ManualEnterGate(_roleSetter);
         assertEq(g.roleSetter(), _roleSetter);
         assertFalse(g.isWhitelister(_roleSetter));
-        assertEq(uint256(g.CREDIT_MODE()), uint256(creditMode));
-        assertEq(uint256(g.DEBT_MODE()), uint256(debtMode));
+        assertFalse(g.abdicated(true));
+        assertFalse(g.abdicated(false));
     }
 
     function testSetRoleSetter(address newRoleSetter) public {
@@ -164,65 +157,29 @@ contract ManualEnterGateTest is Test {
         assertTrue(gate.isListed(creditSide, account2));
     }
 
-    function testCanIncreaseCreditWhitelistMode(address account, address other, uint8 rawDebtMode) public {
+    function testCanIncreaseCredit(address account, address other) public {
         vm.assume(account != other);
-        gate = _deploy(Mode.Whitelist, _mode(rawDebtMode));
         vm.prank(whitelister);
         gate.setIsListed(true, account, true);
         assertTrue(gate.canIncreaseCredit(account));
         assertFalse(gate.canIncreaseCredit(other));
     }
 
-    function testCanIncreaseCreditBlacklistMode(address account, address other, uint8 rawDebtMode) public {
-        vm.assume(account != other);
-        gate = _deploy(Mode.Blacklist, _mode(rawDebtMode));
-        vm.prank(whitelister);
-        gate.setIsListed(true, account, true);
-        assertFalse(gate.canIncreaseCredit(account));
-        assertTrue(gate.canIncreaseCredit(other));
-    }
-
-    function testCanIncreaseCreditOpenMode(address account, bool listed, uint8 rawDebtMode) public {
-        gate = _deploy(Mode.Open, _mode(rawDebtMode));
-        vm.prank(whitelister);
-        gate.setIsListed(true, account, listed);
-        assertTrue(gate.canIncreaseCredit(account));
-    }
-
-    function testCanIncreaseCreditIgnoresDebtList(address account, bool listed, uint8 rawDebtMode) public {
-        gate = _deploy(Mode.Whitelist, _mode(rawDebtMode));
+    function testCanIncreaseCreditIgnoresDebtList(address account, bool listed) public {
         vm.prank(whitelister);
         gate.setIsListed(false, account, listed);
         assertFalse(gate.canIncreaseCredit(account));
     }
 
-    function testCanIncreaseDebtWhitelistMode(address account, address other, uint8 rawCreditMode) public {
+    function testCanIncreaseDebt(address account, address other) public {
         vm.assume(account != other);
-        gate = _deploy(_mode(rawCreditMode), Mode.Whitelist);
         vm.prank(whitelister);
         gate.setIsListed(false, account, true);
         assertTrue(gate.canIncreaseDebt(account));
         assertFalse(gate.canIncreaseDebt(other));
     }
 
-    function testCanIncreaseDebtBlacklistMode(address account, address other, uint8 rawCreditMode) public {
-        vm.assume(account != other);
-        gate = _deploy(_mode(rawCreditMode), Mode.Blacklist);
-        vm.prank(whitelister);
-        gate.setIsListed(false, account, true);
-        assertFalse(gate.canIncreaseDebt(account));
-        assertTrue(gate.canIncreaseDebt(other));
-    }
-
-    function testCanIncreaseDebtOpenMode(address account, bool listed, uint8 rawCreditMode) public {
-        gate = _deploy(_mode(rawCreditMode), Mode.Open);
-        vm.prank(whitelister);
-        gate.setIsListed(false, account, listed);
-        assertTrue(gate.canIncreaseDebt(account));
-    }
-
-    function testCanIncreaseDebtIgnoresCreditList(address account, bool listed, uint8 rawCreditMode) public {
-        gate = _deploy(_mode(rawCreditMode), Mode.Whitelist);
+    function testCanIncreaseDebtIgnoresCreditList(address account, bool listed) public {
         vm.prank(whitelister);
         gate.setIsListed(true, account, listed);
         assertFalse(gate.canIncreaseDebt(account));
@@ -237,6 +194,92 @@ contract ManualEnterGateTest is Test {
         assertEq(gate.isListed(false, account), debtListed);
         assertEq(gate.canIncreaseCredit(account), creditListed);
         assertEq(gate.canIncreaseDebt(account), debtListed);
+    }
+
+    function testAbdicate(bool creditSide) public {
+        vm.expectEmit();
+        emit IManualEnterGate.Abdicate(creditSide);
+        vm.prank(roleSetter);
+        gate.abdicate(creditSide);
+        assertTrue(gate.abdicated(creditSide));
+        assertFalse(gate.abdicated(!creditSide));
+    }
+
+    function testAbdicateNotRoleSetter(address caller, bool creditSide) public {
+        vm.assume(caller != roleSetter);
+        vm.expectRevert(IManualEnterGate.NotRoleSetter.selector);
+        vm.prank(caller);
+        gate.abdicate(creditSide);
+    }
+
+    function testAbdicateIsIdempotent(bool creditSide) public {
+        vm.startPrank(roleSetter);
+        gate.abdicate(creditSide);
+        vm.expectEmit();
+        emit IManualEnterGate.Abdicate(creditSide);
+        gate.abdicate(creditSide);
+        vm.stopPrank();
+        assertTrue(gate.abdicated(creditSide));
+    }
+
+    function testAbdicateBothSides() public {
+        vm.startPrank(roleSetter);
+        gate.abdicate(true);
+        gate.abdicate(false);
+        vm.stopPrank();
+        assertTrue(gate.abdicated(true));
+        assertTrue(gate.abdicated(false));
+    }
+
+    function testAbdicateFreezesSetIsListed(bool creditSide, address account, bool listed) public {
+        vm.prank(roleSetter);
+        gate.abdicate(creditSide);
+
+        vm.expectRevert(IManualEnterGate.Abdicated.selector);
+        vm.prank(whitelister);
+        gate.setIsListed(creditSide, account, listed);
+
+        // The other side is still editable.
+        vm.prank(whitelister);
+        gate.setIsListed(!creditSide, account, listed);
+        assertEq(gate.isListed(!creditSide, account), listed);
+    }
+
+    function testAbdicateFreezesSetIsListedWithSig(bool creditSide, address account, bool listed, uint256 deadline)
+        public
+    {
+        deadline = bound(deadline, block.timestamp, type(uint256).max);
+        vm.prank(roleSetter);
+        gate.abdicate(creditSide);
+
+        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
+        vm.expectRevert(IManualEnterGate.Abdicated.selector);
+        gate.setIsListedWithSig(whitelister, creditSide, account, listed, deadline, v, r, s);
+        assertEq(gate.nonces(whitelister, account), 0);
+
+        // The other side is still editable.
+        (v, r, s) = _sign(!creditSide, account, listed, deadline, whitelisterPk);
+        gate.setIsListedWithSig(whitelister, !creditSide, account, listed, deadline, v, r, s);
+        assertEq(gate.isListed(!creditSide, account), listed);
+    }
+
+    function testAbdicateKeepsFrozenList(bool creditSide, address account, address other) public {
+        vm.assume(account != other);
+        vm.prank(whitelister);
+        gate.setIsListed(creditSide, account, true);
+
+        vm.prank(roleSetter);
+        gate.abdicate(creditSide);
+
+        assertTrue(gate.isListed(creditSide, account));
+        assertFalse(gate.isListed(creditSide, other));
+        if (creditSide) {
+            assertTrue(gate.canIncreaseCredit(account));
+            assertFalse(gate.canIncreaseCredit(other));
+        } else {
+            assertTrue(gate.canIncreaseDebt(account));
+            assertFalse(gate.canIncreaseDebt(other));
+        }
     }
 
     function testSetIsListedWithSig(bool creditSide, address account, bool listed, uint256 deadline, address relayer)
@@ -365,7 +408,7 @@ contract ManualEnterGateTest is Test {
 
         // wrong domain separator
         (v, r, s) = _sign(true, bob, true, deadline, whitelisterPk);
-        ManualEnterGate otherGate = _deploy(Mode.Whitelist, Mode.Whitelist);
+        ManualEnterGate otherGate = _deploy();
         vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
         otherGate.setIsListedWithSig(whitelister, true, bob, true, deadline, v, r, s);
     }

@@ -4,12 +4,6 @@ pragma solidity >=0.5.0;
 
 import {IEnterGate} from "../../../interfaces/IGate.sol";
 
-enum Mode {
-    Whitelist,
-    Blacklist,
-    Open
-}
-
 /// @dev keccak256("SetIsListed(address whitelister,bool creditSide,address account,bool newIsListed,uint256
 /// nonce,uint256 deadline)").
 bytes32 constant SET_IS_LISTED_TYPEHASH = 0xaac22fdd76cd855cfe3fa355b662b8549bdabbbdecefa623d35f34d97aa5d1d4;
@@ -19,25 +13,26 @@ bytes32 constant EIP712_DOMAIN_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea
 
 interface IManualEnterGate is IEnterGate {
     /// ERRORS ///
+    error Abdicated();
     error DeadlineExpired();
     error InvalidSigner();
     error NotRoleSetter();
     error NotWhitelister();
 
     /// EVENTS ///
-    event Constructor(address indexed roleSetter, Mode creditMode, Mode debtMode);
+    event Constructor(address indexed roleSetter);
     event SetRoleSetter(address indexed newRoleSetter);
     event SetIsWhitelister(address indexed account, bool newIsWhitelister);
     event SetIsListed(address indexed whitelister, bool creditSide, address indexed account, bool newIsListed);
     event SetIsListedWithSig(address indexed whitelister, bool creditSide, address indexed account, bool newIsListed);
+    event Abdicate(bool indexed creditSide);
 
     /// STORAGE GETTERS ///
-    function CREDIT_MODE() external view returns (Mode);
-    function DEBT_MODE() external view returns (Mode);
     function roleSetter() external view returns (address);
     function isWhitelister(address account) external view returns (bool);
     function nonces(address whitelister, address account) external view returns (uint256);
     function isListed(bool creditSide, address account) external view returns (bool);
+    function abdicated(bool creditSide) external view returns (bool);
 
     /// FUNCTIONS ///
     function multicall(bytes[] calldata data) external;
@@ -54,5 +49,6 @@ interface IManualEnterGate is IEnterGate {
         bytes32 r,
         bytes32 s
     ) external;
+    function abdicate(bool creditSide) external;
     function DOMAIN_SEPARATOR() external view returns (bytes32);
 }

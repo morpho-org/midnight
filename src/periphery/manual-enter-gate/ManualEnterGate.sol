@@ -2,34 +2,25 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {
-    IManualEnterGate,
-    Mode,
-    SET_IS_LISTED_TYPEHASH,
-    EIP712_DOMAIN_TYPEHASH
-} from "./interfaces/IManualEnterGate.sol";
+import {IManualEnterGate, SET_IS_LISTED_TYPEHASH, EIP712_DOMAIN_TYPEHASH} from "./interfaces/IManualEnterGate.sol";
 
 /// @dev Using this gate allows to restrict who can increase their credit or debt in a market.
-/// @dev Each side (credit, debt) has its own list, stored in a single mapping keyed by side, and its own mode, fixed at
-/// deployment, which says how its list is read: whitelist (only listed accounts can enter), blacklist (only non-listed
-/// accounts can enter) or open (the list is ignored, any account can enter).
+/// @dev Each side (credit, debt) has its own whitelist, stored in a single mapping keyed by side. Only listed accounts
+/// can enter on that side.
+/// @dev The role setter can abdicate a side, which permanently freezes its list.
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
 /// no longer valid.
 contract ManualEnterGate is IManualEnterGate {
-    Mode public immutable CREDIT_MODE;
-    Mode public immutable DEBT_MODE;
-
     address public roleSetter;
     mapping(address account => bool) public isWhitelister;
     mapping(address whitelister => mapping(address account => uint256)) public nonces;
     mapping(bool creditSide => mapping(address account => bool)) public isListed;
+    mapping(bool creditSide => bool) public abdicated;
 
-    constructor(address _roleSetter, Mode _creditMode, Mode _debtMode) {
-        CREDIT_MODE = _creditMode;
-        DEBT_MODE = _debtMode;
+    constructor(address _roleSetter) {
         roleSetter = _roleSetter;
-        emit Constructor(_roleSetter, _creditMode, _debtMode);
+        emit Constructor(_roleSetter);
     }
 
     /// @dev Useful for EOAs to batch privileged calls.
@@ -47,15 +38,11 @@ contract ManualEnterGate is IManualEnterGate {
     }
 
     function canIncreaseCredit(address account) external view returns (bool) {
-        if (CREDIT_MODE == Mode.Open) return true;
-        if (CREDIT_MODE == Mode.Whitelist) return isListed[true][account];
-        else return !isListed[true][account];
+        return isListed[true][account];
     }
 
     function canIncreaseDebt(address account) external view returns (bool) {
-        if (DEBT_MODE == Mode.Open) return true;
-        if (DEBT_MODE == Mode.Whitelist) return isListed[false][account];
-        else return !isListed[false][account];
+        return isListed[false][account];
     }
 
     function setRoleSetter(address newRoleSetter) external {
@@ -72,6 +59,7 @@ contract ManualEnterGate is IManualEnterGate {
 
     function setIsListed(bool creditSide, address account, bool newIsListed) external {
         require(isWhitelister[msg.sender], NotWhitelister());
+        require(!abdicated[creditSide], Abdicated());
         isListed[creditSide][account] = newIsListed;
         emit SetIsListed(msg.sender, creditSide, account, newIsListed);
     }
@@ -88,6 +76,7 @@ contract ManualEnterGate is IManualEnterGate {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, DeadlineExpired());
+        require(!abdicated[creditSide], Abdicated());
         bytes32 hashStruct = keccak256(
             abi.encode(
                 SET_IS_LISTED_TYPEHASH,
@@ -105,6 +94,13 @@ contract ManualEnterGate is IManualEnterGate {
         require(recovered != address(0) && recovered == whitelister && isWhitelister[recovered], InvalidSigner());
         isListed[creditSide][account] = newIsListed;
         emit SetIsListedWithSig(recovered, creditSide, account, newIsListed);
+    }
+
+    /// @dev Permanently freezes the list of the given side.
+    function abdicate(bool creditSide) external {
+        require(msg.sender == roleSetter, NotRoleSetter());
+        abdicated[creditSide] = true;
+        emit Abdicate(creditSide);
     }
 
     /// forge-lint: disable-next-item(mixed-case-function)
