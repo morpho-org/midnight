@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {IManualEnterGate, SET_IS_WHITELISTED_TYPEHASH, EIP712_DOMAIN_TYPEHASH} from "./interfaces/IManualEnterGate.sol";
+import {IWhitelistEnterGate, SET_IS_WHITELISTED_TYPEHASH, EIP712_DOMAIN_TYPEHASH} from "./interfaces/IWhitelistEnterGate.sol";
 
 /// @dev Using this gate allows to restrict who can increase their credit or debt in a market.
 /// @dev Each side (credit, debt) has its own whitelist, stored in a single mapping keyed by side. Only whitelisted
@@ -11,7 +11,7 @@ import {IManualEnterGate, SET_IS_WHITELISTED_TYPEHASH, EIP712_DOMAIN_TYPEHASH} f
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
 /// no longer valid.
-contract ManualEnterGate is IManualEnterGate {
+contract WhitelistEnterGate is IWhitelistEnterGate {
     bool public immutable CREDIT_OPEN;
     bool public immutable DEBT_OPEN;
 

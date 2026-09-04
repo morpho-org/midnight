@@ -3,19 +3,19 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {ManualEnterGate} from "../src/periphery/manual-enter-gate/ManualEnterGate.sol";
+import {WhitelistEnterGate} from "../src/periphery/whitelist-enter-gate/WhitelistEnterGate.sol";
 import {
-    IManualEnterGate,
+    IWhitelistEnterGate,
     SET_IS_WHITELISTED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
-} from "../src/periphery/manual-enter-gate/interfaces/IManualEnterGate.sol";
+} from "../src/periphery/whitelist-enter-gate/interfaces/IWhitelistEnterGate.sol";
 
 bytes constant SET_IS_WHITELISTED_TYPE =
     "SetIsWhitelisted(address whitelister,bool creditSide,address account,bool newIsWhitelisted,uint256 nonce,uint256 deadline)";
 bytes constant EIP712_DOMAIN_TYPE = "EIP712Domain(uint256 chainId,address verifyingContract)";
 
-contract ManualEnterGateTest is Test {
-    ManualEnterGate internal gate;
+contract WhitelistEnterGateTest is Test {
+    WhitelistEnterGate internal gate;
     uint256 internal whitelisterPk;
     uint256 internal whitelister2Pk;
     address internal roleSetter = makeAddr("roleSetter");
@@ -32,8 +32,8 @@ contract ManualEnterGateTest is Test {
         gate = _deploy(false, false);
     }
 
-    function _deploy(bool creditOpen, bool debtOpen) internal returns (ManualEnterGate g) {
-        g = new ManualEnterGate(roleSetter, creditOpen, debtOpen);
+    function _deploy(bool creditOpen, bool debtOpen) internal returns (WhitelistEnterGate g) {
+        g = new WhitelistEnterGate(roleSetter, creditOpen, debtOpen);
         vm.prank(roleSetter);
         g.setIsWhitelister(whitelister, true);
     }
@@ -73,8 +73,8 @@ contract ManualEnterGateTest is Test {
 
     function testConstructor(address _roleSetter, bool creditOpen, bool debtOpen) public {
         vm.expectEmit();
-        emit IManualEnterGate.Constructor(_roleSetter, creditOpen, debtOpen);
-        ManualEnterGate g = new ManualEnterGate(_roleSetter, creditOpen, debtOpen);
+        emit IWhitelistEnterGate.Constructor(_roleSetter, creditOpen, debtOpen);
+        WhitelistEnterGate g = new WhitelistEnterGate(_roleSetter, creditOpen, debtOpen);
         assertEq(g.roleSetter(), _roleSetter);
         assertEq(g.CREDIT_OPEN(), creditOpen);
         assertEq(g.DEBT_OPEN(), debtOpen);
@@ -83,7 +83,7 @@ contract ManualEnterGateTest is Test {
 
     function testSetRoleSetter(address newRoleSetter) public {
         vm.expectEmit();
-        emit IManualEnterGate.SetRoleSetter(newRoleSetter);
+        emit IWhitelistEnterGate.SetRoleSetter(newRoleSetter);
         vm.prank(roleSetter);
         gate.setRoleSetter(newRoleSetter);
         assertEq(gate.roleSetter(), newRoleSetter);
@@ -91,14 +91,14 @@ contract ManualEnterGateTest is Test {
 
     function testSetRoleSetterNotRoleSetter(address caller, address newRoleSetter) public {
         vm.assume(caller != roleSetter);
-        vm.expectRevert(IManualEnterGate.NotRoleSetter.selector);
+        vm.expectRevert(IWhitelistEnterGate.NotRoleSetter.selector);
         vm.prank(caller);
         gate.setRoleSetter(newRoleSetter);
     }
 
     function testSetIsWhitelister(address account, bool isWhitelister_) public {
         vm.expectEmit();
-        emit IManualEnterGate.SetIsWhitelister(account, isWhitelister_);
+        emit IWhitelistEnterGate.SetIsWhitelister(account, isWhitelister_);
         vm.prank(roleSetter);
         gate.setIsWhitelister(account, isWhitelister_);
         assertEq(gate.isWhitelister(account), isWhitelister_);
@@ -106,20 +106,20 @@ contract ManualEnterGateTest is Test {
 
     function testSetIsWhitelisterNotRoleSetter(address caller, address account, bool isWhitelister_) public {
         vm.assume(caller != roleSetter);
-        vm.expectRevert(IManualEnterGate.NotRoleSetter.selector);
+        vm.expectRevert(IWhitelistEnterGate.NotRoleSetter.selector);
         vm.prank(caller);
         gate.setIsWhitelister(account, isWhitelister_);
     }
 
     function testWhitelisterCannotSetIsWhitelister(address account, bool isWhitelister_) public {
-        vm.expectRevert(IManualEnterGate.NotRoleSetter.selector);
+        vm.expectRevert(IWhitelistEnterGate.NotRoleSetter.selector);
         vm.prank(whitelister);
         gate.setIsWhitelister(account, isWhitelister_);
     }
 
     function testSetIsWhitelisted(bool creditSide, address account, bool listed) public {
         vm.expectEmit();
-        emit IManualEnterGate.SetIsWhitelisted(whitelister, creditSide, account, listed);
+        emit IWhitelistEnterGate.SetIsWhitelisted(whitelister, creditSide, account, listed);
         vm.prank(whitelister);
         gate.setIsWhitelisted(creditSide, account, listed);
         assertEq(gate.isWhitelisted(creditSide, account), listed);
@@ -128,7 +128,7 @@ contract ManualEnterGateTest is Test {
 
     function testSetIsWhitelistedNotWhitelister(address caller, bool creditSide, address account, bool listed) public {
         vm.assume(caller != whitelister);
-        vm.expectRevert(IManualEnterGate.NotWhitelister.selector);
+        vm.expectRevert(IWhitelistEnterGate.NotWhitelister.selector);
         vm.prank(caller);
         gate.setIsWhitelisted(creditSide, account, listed);
     }
@@ -137,7 +137,7 @@ contract ManualEnterGateTest is Test {
         vm.prank(roleSetter);
         gate.setIsWhitelister(whitelister, false);
 
-        vm.expectRevert(IManualEnterGate.NotWhitelister.selector);
+        vm.expectRevert(IWhitelistEnterGate.NotWhitelister.selector);
         vm.prank(whitelister);
         gate.setIsWhitelisted(creditSide, account, true);
     }
@@ -240,7 +240,7 @@ contract ManualEnterGateTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
 
         vm.expectEmit();
-        emit IManualEnterGate.SetIsWhitelistedWithSig(whitelister, creditSide, account, listed);
+        emit IWhitelistEnterGate.SetIsWhitelistedWithSig(whitelister, creditSide, account, listed);
         // Relayed by an arbitrary account.
         vm.prank(relayer);
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, deadline, v, r, s);
@@ -259,7 +259,7 @@ contract ManualEnterGateTest is Test {
         deadline = bound(deadline, block.timestamp, type(uint256).max);
         (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
 
-        vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         gate.setIsWhitelistedWithSig(whitelister, !creditSide, account, listed, deadline, v, r, s);
     }
 
@@ -276,7 +276,7 @@ contract ManualEnterGateTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelister2Pk);
 
         vm.expectEmit();
-        emit IManualEnterGate.SetIsWhitelistedWithSig(whitelister2, creditSide, account, listed);
+        emit IWhitelistEnterGate.SetIsWhitelistedWithSig(whitelister2, creditSide, account, listed);
         // Relayed by an arbitrary account.
         vm.prank(relayer);
         gate.setIsWhitelistedWithSig(whitelister2, creditSide, account, listed, deadline, v, r, s);
@@ -323,7 +323,7 @@ contract ManualEnterGateTest is Test {
         vm.prank(roleSetter);
         gate.setIsWhitelister(whitelister, false);
 
-        vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, deadline, v, r, s);
     }
 
@@ -334,38 +334,38 @@ contract ManualEnterGateTest is Test {
         gate.setIsWhitelistedWithSig(whitelister, true, alice, true, deadline, v, r, s);
 
         // replay
-        vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         gate.setIsWhitelistedWithSig(whitelister, true, alice, true, deadline, v, r, s);
 
         // wrong side
         (v, r, s) = _sign(true, alice, false, deadline, whitelisterPk);
-        vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         gate.setIsWhitelistedWithSig(whitelister, false, alice, false, deadline, v, r, s);
 
         // wrong account
         (v, r, s) = _sign(true, alice, false, deadline, whitelisterPk);
-        vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         gate.setIsWhitelistedWithSig(whitelister, true, bob, false, deadline, v, r, s);
 
         // wrong value
         (v, r, s) = _sign(true, alice, false, deadline, whitelisterPk);
-        vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         gate.setIsWhitelistedWithSig(whitelister, true, alice, true, deadline, v, r, s);
 
         // wrong deadline
         (v, r, s) = _sign(true, alice, false, deadline, whitelisterPk);
-        vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         gate.setIsWhitelistedWithSig(whitelister, true, alice, false, deadline + 1, v, r, s);
 
         // wrong whitelister
         (v, r, s) = _sign(true, alice, false, deadline, whitelisterPk);
-        vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         gate.setIsWhitelistedWithSig(whitelister2, true, alice, false, deadline, v, r, s);
 
         // wrong domain separator
         (v, r, s) = _sign(true, bob, true, deadline, whitelisterPk);
-        ManualEnterGate otherGate = _deploy(false, false);
-        vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
+        WhitelistEnterGate otherGate = _deploy(false, false);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         otherGate.setIsWhitelistedWithSig(whitelister, true, bob, true, deadline, v, r, s);
     }
 
@@ -381,7 +381,7 @@ contract ManualEnterGateTest is Test {
         vm.warp(currentTime);
         (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
 
-        vm.expectRevert(IManualEnterGate.DeadlineExpired.selector);
+        vm.expectRevert(IWhitelistEnterGate.DeadlineExpired.selector);
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, deadline, v, r, s);
     }
 
@@ -397,7 +397,7 @@ contract ManualEnterGateTest is Test {
         deadline = bound(deadline, block.timestamp, type(uint256).max);
         (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, wrongPk);
 
-        vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         gate.setIsWhitelistedWithSig(vm.addr(wrongPk), creditSide, account, listed, deadline, v, r, s);
     }
 
@@ -411,14 +411,14 @@ contract ManualEnterGateTest is Test {
         (, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
 
         // Invalid v (valid values are 27/28) -> ecrecover returns address(0).
-        vm.expectRevert(IManualEnterGate.InvalidSigner.selector);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, deadline, 0, r, s);
     }
 
     function testMulticall(address account, bool creditListed, address account2, bool debtListed) public {
         bytes[] memory data = new bytes[](2);
-        data[0] = abi.encodeCall(IManualEnterGate.setIsWhitelisted, (true, account, creditListed));
-        data[1] = abi.encodeCall(IManualEnterGate.setIsWhitelisted, (false, account2, debtListed));
+        data[0] = abi.encodeCall(IWhitelistEnterGate.setIsWhitelisted, (true, account, creditListed));
+        data[1] = abi.encodeCall(IWhitelistEnterGate.setIsWhitelisted, (false, account2, debtListed));
 
         vm.prank(whitelister);
         gate.multicall(data);
@@ -430,10 +430,10 @@ contract ManualEnterGateTest is Test {
     function testMulticallBubblesRevert(address caller, bool creditSide, address account, bool listed) public {
         vm.assume(caller != whitelister);
         bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(IManualEnterGate.setIsWhitelisted, (creditSide, account, listed));
+        data[0] = abi.encodeCall(IWhitelistEnterGate.setIsWhitelisted, (creditSide, account, listed));
 
         // Called by a non-whitelister: the inner call reverts and the multicall must bubble it up.
-        vm.expectRevert(IManualEnterGate.NotWhitelister.selector);
+        vm.expectRevert(IWhitelistEnterGate.NotWhitelister.selector);
         vm.prank(caller);
         gate.multicall(data);
     }
