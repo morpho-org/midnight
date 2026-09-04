@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
+import {EcrecoverRateRatifier} from "../src/ratifiers/EcrecoverRateRatifier.sol";
 import {Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
@@ -70,6 +71,62 @@ contract FrontendSignatureTest is Test {
 
         bytes memory ratifierData = abi.encode(Signature({v: SIG_V, r: SIG_R, s: SIG_S}), _root, 0, proof0);
         bytes32 result = EcrecoverRatifier(RATIFIER).isRatified(offers[0], ratifierData, address(0));
+        assertEq(result, CALLBACK_SUCCESS);
+    }
+
+    // Trick to ensure isRatified checks that the signer is the maker, without having the offers depend on the maker.
+    function isAuthorized(address, address signer) external pure returns (bool) {
+        return signer == ACCOUNT;
+    }
+}
+
+// Paste from frontend output (sign-rate-root.ts).
+uint256 constant RATE = 3170979198; // 0.1e18 / 365 days
+uint8 constant RATE_SIG_V = 28;
+bytes32 constant RATE_SIG_R = 0x7ebdc647a0b0a6fae4935023b9908839e9f7eea39dbcc0ca0d4755b3624ddc06;
+bytes32 constant RATE_SIG_S = 0x031551f84fedd4789c50ec7bc62305d048e33c233ba352b842496d074d0cb46c;
+
+contract FrontendRateSignatureTest is Test {
+    function setUp() public {
+        vm.chainId(1);
+        EcrecoverRateRatifier impl = new EcrecoverRateRatifier(address(this));
+        vm.etch(RATIFIER, address(impl).code);
+    }
+
+    function defaultRateOffer(uint8 number) internal pure returns (Offer memory offer) {
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        offer.market.chainId = 1;
+        offer.market.midnight = address(0);
+        offer.market.loanToken = address(uint160(0x1111111111111111111111111111111111111111) * uint160(number));
+        offer.market.collateralParams = collateralParams;
+        offer.expiry = 2 ** 32;
+        offer.buy = true;
+        offer.ratifier = RATIFIER;
+    }
+
+    function testFrontendRateSignatureVerification() public view {
+        Offer[4] memory offers;
+        offers[0] = defaultRateOffer(1);
+        offers[1] = defaultRateOffer(2);
+        offers[2] = defaultRateOffer(3);
+        offers[3] = defaultRateOffer(4);
+
+        bytes32 h0 = HashLib.hashRateOffer(offers[0], RATE, RATE);
+        bytes32 h1 = HashLib.hashRateOffer(offers[1], RATE, RATE);
+        bytes32 h2 = HashLib.hashRateOffer(offers[2], RATE, RATE);
+        bytes32 h3 = HashLib.hashRateOffer(offers[3], RATE, RATE);
+        bytes32 left = HashLib.hashNode(h0, h1);
+        bytes32 right = HashLib.hashNode(h2, h3);
+        bytes32 _root = HashLib.hashNode(left, right);
+
+        bytes32[] memory proof0 = new bytes32[](2);
+        proof0[0] = h1;
+        proof0[1] = right;
+        assertTrue(HashLib.isLeaf(_root, h0, 0, proof0));
+
+        bytes memory ratifierData =
+            abi.encode(Signature({v: RATE_SIG_V, r: RATE_SIG_R, s: RATE_SIG_S}), _root, uint256(0), proof0, RATE, RATE);
+        bytes32 result = EcrecoverRateRatifier(RATIFIER).isRatified(offers[0], ratifierData, address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
