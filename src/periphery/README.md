@@ -50,7 +50,8 @@ Calldata is limited to 1,000,000 bytes.
 
 An enter gate that restricts which accounts can increase their credit or debt in a Midnight market.
 
-Each side (credit, debt) has its own list, stored in one mapping keyed by side, and a mode fixed at deployment that says how its list is read: whitelist (only listed accounts can enter), blacklist (only non-listed accounts can enter), or open (the list is ignored, any account can enter).
+Each side (credit, debt) can be either open (no restriction), whitelist (only listed accounts can enter) or blacklist (only non-listed accounts can enter).
+The mode (open/whitelist/blacklist) is immutable after the deployment.
 The role setter grants or revokes the whitelister role.
 Whitelisters edit the lists directly with `setIsListed` or by EIP-712 signature with `setIsListedWithSig`, which tracks one nonce per whitelister and account, shared by both lists, and rejects expired, replayed, invalid, or unauthorized signatures.
 
