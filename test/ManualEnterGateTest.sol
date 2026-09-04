@@ -79,8 +79,6 @@ contract ManualEnterGateTest is Test {
         assertEq(g.CREDIT_OPEN(), creditOpen);
         assertEq(g.DEBT_OPEN(), debtOpen);
         assertFalse(g.isWhitelister(_roleSetter));
-        assertFalse(g.abdicated(true));
-        assertFalse(g.abdicated(false));
     }
 
     function testSetRoleSetter(address newRoleSetter) public {
@@ -229,103 +227,6 @@ contract ManualEnterGateTest is Test {
         vm.prank(whitelister);
         gate.setIsWhitelisted(creditSide, account, whitelisted);
         assertTrue(creditSide ? gate.canIncreaseCredit(account) : gate.canIncreaseDebt(account));
-    }
-
-    function testAbdicateOpenSideFreezesList(bool creditSide, address account, bool whitelisted) public {
-        gate = _deploy(creditSide, !creditSide);
-        vm.prank(roleSetter);
-        gate.abdicate(creditSide);
-
-        vm.expectRevert(IManualEnterGate.Abdicated.selector);
-        vm.prank(whitelister);
-        gate.setIsWhitelisted(creditSide, account, whitelisted);
-        assertTrue(creditSide ? gate.canIncreaseCredit(account) : gate.canIncreaseDebt(account));
-    }
-
-    function testAbdicate(bool creditSide) public {
-        vm.expectEmit();
-        emit IManualEnterGate.Abdicate(creditSide);
-        vm.prank(roleSetter);
-        gate.abdicate(creditSide);
-        assertTrue(gate.abdicated(creditSide));
-        assertFalse(gate.abdicated(!creditSide));
-    }
-
-    function testAbdicateNotRoleSetter(address caller, bool creditSide) public {
-        vm.assume(caller != roleSetter);
-        vm.expectRevert(IManualEnterGate.NotRoleSetter.selector);
-        vm.prank(caller);
-        gate.abdicate(creditSide);
-    }
-
-    function testAbdicateIsIdempotent(bool creditSide) public {
-        vm.startPrank(roleSetter);
-        gate.abdicate(creditSide);
-        vm.expectEmit();
-        emit IManualEnterGate.Abdicate(creditSide);
-        gate.abdicate(creditSide);
-        vm.stopPrank();
-        assertTrue(gate.abdicated(creditSide));
-    }
-
-    function testAbdicateBothSides() public {
-        vm.startPrank(roleSetter);
-        gate.abdicate(true);
-        gate.abdicate(false);
-        vm.stopPrank();
-        assertTrue(gate.abdicated(true));
-        assertTrue(gate.abdicated(false));
-    }
-
-    function testAbdicateFreezesSetIsWhitelisted(bool creditSide, address account, bool listed) public {
-        vm.prank(roleSetter);
-        gate.abdicate(creditSide);
-
-        vm.expectRevert(IManualEnterGate.Abdicated.selector);
-        vm.prank(whitelister);
-        gate.setIsWhitelisted(creditSide, account, listed);
-
-        // The other side is still editable.
-        vm.prank(whitelister);
-        gate.setIsWhitelisted(!creditSide, account, listed);
-        assertEq(gate.isWhitelisted(!creditSide, account), listed);
-    }
-
-    function testAbdicateFreezesSetIsWhitelistedWithSig(bool creditSide, address account, bool listed, uint256 deadline)
-        public
-    {
-        deadline = bound(deadline, block.timestamp, type(uint256).max);
-        vm.prank(roleSetter);
-        gate.abdicate(creditSide);
-
-        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
-        vm.expectRevert(IManualEnterGate.Abdicated.selector);
-        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, deadline, v, r, s);
-        assertEq(gate.nonces(whitelister, account), 0);
-
-        // The other side is still editable.
-        (v, r, s) = _sign(!creditSide, account, listed, deadline, whitelisterPk);
-        gate.setIsWhitelistedWithSig(whitelister, !creditSide, account, listed, deadline, v, r, s);
-        assertEq(gate.isWhitelisted(!creditSide, account), listed);
-    }
-
-    function testAbdicateKeepsFrozenList(bool creditSide, address account, address other) public {
-        vm.assume(account != other);
-        vm.prank(whitelister);
-        gate.setIsWhitelisted(creditSide, account, true);
-
-        vm.prank(roleSetter);
-        gate.abdicate(creditSide);
-
-        assertTrue(gate.isWhitelisted(creditSide, account));
-        assertFalse(gate.isWhitelisted(creditSide, other));
-        if (creditSide) {
-            assertTrue(gate.canIncreaseCredit(account));
-            assertFalse(gate.canIncreaseCredit(other));
-        } else {
-            assertTrue(gate.canIncreaseDebt(account));
-            assertFalse(gate.canIncreaseDebt(other));
-        }
     }
 
     function testSetIsWhitelistedWithSig(

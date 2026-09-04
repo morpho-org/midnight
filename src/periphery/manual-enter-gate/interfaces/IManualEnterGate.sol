@@ -13,7 +13,6 @@ bytes32 constant EIP712_DOMAIN_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea
 
 interface IManualEnterGate is IEnterGate {
     /// ERRORS ///
-    error Abdicated();
     error DeadlineExpired();
     error InvalidSigner();
     error NotRoleSetter();
@@ -29,7 +28,6 @@ interface IManualEnterGate is IEnterGate {
     event SetIsWhitelistedWithSig(
         address indexed whitelister, bool creditSide, address indexed account, bool newIsWhitelisted
     );
-    event Abdicate(bool indexed creditSide);
 
     /// STORAGE GETTERS ///
     function CREDIT_OPEN() external view returns (bool);
@@ -38,7 +36,6 @@ interface IManualEnterGate is IEnterGate {
     function isWhitelister(address account) external view returns (bool);
     function nonces(address whitelister, address account) external view returns (uint256);
     function isWhitelisted(bool creditSide, address account) external view returns (bool);
-    function abdicated(bool creditSide) external view returns (bool);
 
     /// FUNCTIONS ///
     function multicall(bytes[] calldata data) external;
@@ -55,6 +52,5 @@ interface IManualEnterGate is IEnterGate {
         bytes32 r,
         bytes32 s
     ) external;
-    function abdicate(bool creditSide) external;
     function DOMAIN_SEPARATOR() external view returns (bytes32);
 }

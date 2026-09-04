@@ -8,7 +8,6 @@ import {IManualEnterGate, SET_IS_WHITELISTED_TYPEHASH, EIP712_DOMAIN_TYPEHASH} f
 /// @dev Each side (credit, debt) has its own whitelist, stored in a single mapping keyed by side. Only whitelisted
 /// accounts can enter on that side.
 /// @dev A side can be made open at deployment, letting any account enter on that side.
-/// @dev The role setter can abdicate a side, which permanently freezes its list.
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
 /// no longer valid.
@@ -20,7 +19,6 @@ contract ManualEnterGate is IManualEnterGate {
     mapping(address account => bool) public isWhitelister;
     mapping(address whitelister => mapping(address account => uint256)) public nonces;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelisted;
-    mapping(bool creditSide => bool) public abdicated;
 
     constructor(address _roleSetter, bool _creditOpen, bool _debtOpen) {
         CREDIT_OPEN = _creditOpen;
@@ -65,7 +63,6 @@ contract ManualEnterGate is IManualEnterGate {
 
     function setIsWhitelisted(bool creditSide, address account, bool newIsWhitelisted) external {
         require(isWhitelister[msg.sender], NotWhitelister());
-        require(!abdicated[creditSide], Abdicated());
         isWhitelisted[creditSide][account] = newIsWhitelisted;
         emit SetIsWhitelisted(msg.sender, creditSide, account, newIsWhitelisted);
     }
@@ -82,7 +79,6 @@ contract ManualEnterGate is IManualEnterGate {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, DeadlineExpired());
-        require(!abdicated[creditSide], Abdicated());
         bytes32 hashStruct = keccak256(
             abi.encode(
                 SET_IS_WHITELISTED_TYPEHASH,
@@ -100,13 +96,6 @@ contract ManualEnterGate is IManualEnterGate {
         require(recovered != address(0) && recovered == whitelister && isWhitelister[recovered], InvalidSigner());
         isWhitelisted[creditSide][account] = newIsWhitelisted;
         emit SetIsWhitelistedWithSig(recovered, creditSide, account, newIsWhitelisted);
-    }
-
-    /// @dev Permanently freezes the list of the given side.
-    function abdicate(bool creditSide) external {
-        require(msg.sender == roleSetter, NotRoleSetter());
-        abdicated[creditSide] = true;
-        emit Abdicate(creditSide);
     }
 
     /// forge-lint: disable-next-item(mixed-case-function)

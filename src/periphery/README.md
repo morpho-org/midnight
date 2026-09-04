@@ -54,7 +54,6 @@ Each side (credit, debt) has its own whitelist: only whitelisted accounts can en
 The role setter grants or revokes the whitelister role.
 Whitelisters edit the lists directly with `setIsWhitelisted` or by EIP-712 signatures with `setIsWhitelistedWithSig`.
 A side can be made open at deployment, letting any account enter on that side.
-The role setter can abdicate a side with `abdicate`, which permanently freezes its list.
 
 ## Libraries
 
