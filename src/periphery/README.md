@@ -53,7 +53,8 @@ An enter gate that restricts which accounts can increase their credit or debt in
 Each side (credit, debt) has its own whitelist: only whitelisted accounts can enter on that side.
 The role setter grants or revokes the whitelister role.
 Whitelisters edit the lists directly with `setIsWhitelisted` or by EIP-712 signatures with `setIsWhitelistedWithSig`.
-The role setter can abdicate a side with `abdicate`, which permanently freezes its list.
+The role setter can open a side with `setIsOpen`, letting any account enter on that side.
+The role setter can abdicate a side with `abdicate`, which permanently freezes its list and its open status.
 
 ## Libraries
 

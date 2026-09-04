@@ -79,6 +79,8 @@ contract ManualEnterGateTest is Test {
         assertFalse(g.isWhitelister(_roleSetter));
         assertFalse(g.abdicated(true));
         assertFalse(g.abdicated(false));
+        assertFalse(g.isOpen(true));
+        assertFalse(g.isOpen(false));
     }
 
     function testSetRoleSetter(address newRoleSetter) public {
@@ -194,6 +196,92 @@ contract ManualEnterGateTest is Test {
         assertEq(gate.isWhitelisted(false, account), debtListed);
         assertEq(gate.canIncreaseCredit(account), creditListed);
         assertEq(gate.canIncreaseDebt(account), debtListed);
+    }
+
+    function testSetIsOpen(bool creditSide, bool open) public {
+        vm.expectEmit();
+        emit IManualEnterGate.SetIsOpen(creditSide, open);
+        vm.prank(roleSetter);
+        gate.setIsOpen(creditSide, open);
+        assertEq(gate.isOpen(creditSide), open);
+        assertFalse(gate.isOpen(!creditSide));
+    }
+
+    function testSetIsOpenNotRoleSetter(address caller, bool creditSide, bool open) public {
+        vm.assume(caller != roleSetter);
+        vm.expectRevert(IManualEnterGate.NotRoleSetter.selector);
+        vm.prank(caller);
+        gate.setIsOpen(creditSide, open);
+    }
+
+    function testWhitelisterCannotSetIsOpen(bool creditSide, bool open) public {
+        vm.expectRevert(IManualEnterGate.NotRoleSetter.selector);
+        vm.prank(whitelister);
+        gate.setIsOpen(creditSide, open);
+    }
+
+    function testOpenSideLetsAnyoneIn(address account, address other) public {
+        vm.assume(account != other);
+        vm.prank(whitelister);
+        gate.setIsWhitelisted(true, account, true);
+
+        vm.prank(roleSetter);
+        gate.setIsOpen(true, true);
+        assertTrue(gate.canIncreaseCredit(account));
+        assertTrue(gate.canIncreaseCredit(other));
+        // The debt side is unaffected.
+        assertFalse(gate.canIncreaseDebt(account));
+        assertFalse(gate.canIncreaseDebt(other));
+
+        // Closing the side again honours the whitelist.
+        vm.prank(roleSetter);
+        gate.setIsOpen(true, false);
+        assertTrue(gate.canIncreaseCredit(account));
+        assertFalse(gate.canIncreaseCredit(other));
+    }
+
+    function testOpenDebtSideLetsAnyoneIn(address account, address other) public {
+        vm.assume(account != other);
+        vm.prank(whitelister);
+        gate.setIsWhitelisted(false, account, true);
+
+        vm.prank(roleSetter);
+        gate.setIsOpen(false, true);
+        assertTrue(gate.canIncreaseDebt(account));
+        assertTrue(gate.canIncreaseDebt(other));
+        // The credit side is unaffected.
+        assertFalse(gate.canIncreaseCredit(account));
+        assertFalse(gate.canIncreaseCredit(other));
+
+        vm.prank(roleSetter);
+        gate.setIsOpen(false, false);
+        assertTrue(gate.canIncreaseDebt(account));
+        assertFalse(gate.canIncreaseDebt(other));
+    }
+
+    function testAbdicateFreezesSetIsOpen(bool creditSide, bool open) public {
+        vm.startPrank(roleSetter);
+        gate.abdicate(creditSide);
+
+        vm.expectRevert(IManualEnterGate.Abdicated.selector);
+        gate.setIsOpen(creditSide, open);
+
+        // The other side is still configurable.
+        gate.setIsOpen(!creditSide, open);
+        vm.stopPrank();
+        assertEq(gate.isOpen(!creditSide), open);
+    }
+
+    function testOpenForever(bool creditSide, address account) public {
+        vm.startPrank(roleSetter);
+        gate.setIsOpen(creditSide, true);
+        gate.abdicate(creditSide);
+        vm.expectRevert(IManualEnterGate.Abdicated.selector);
+        gate.setIsOpen(creditSide, false);
+        vm.stopPrank();
+
+        assertTrue(gate.isOpen(creditSide));
+        assertTrue(creditSide ? gate.canIncreaseCredit(account) : gate.canIncreaseDebt(account));
     }
 
     function testAbdicate(bool creditSide) public {
