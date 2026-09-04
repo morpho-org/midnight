@@ -5,17 +5,14 @@ pragma solidity 0.8.34;
 import {
     IWhitelistEnterGate,
     Mode,
-    SET_IS_CREDIT_WHITELISTED_TYPEHASH,
-    SET_IS_CREDIT_BLACKLISTED_TYPEHASH,
-    SET_IS_DEBT_WHITELISTED_TYPEHASH,
-    SET_IS_DEBT_BLACKLISTED_TYPEHASH,
+    SET_IS_LISTED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IWhitelistEnterGate.sol";
 
 /// @dev Using this gate allows to restrict who can increase their credit or debt in a market.
-/// @dev Each side (credit, debt) has its own whitelist, its own blacklist and its own mode, fixed at deployment:
-/// whitelist (only whitelisted accounts can enter), blacklist (only non-blacklisted accounts can enter) or open (any
-/// account can enter). Only the list matching the mode is read.
+/// @dev A single list is shared by both sides (credit, debt). Each side has its own mode, fixed at deployment, which
+/// says how the list is read: whitelist (only listed accounts can enter), blacklist (only non-listed accounts can
+/// enter) or open (the list is ignored, any account can enter).
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev No-ops are allowed.
 /// @dev Zero checks are not systematically performed.
@@ -28,10 +25,7 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     address public roleSetter;
     mapping(address account => bool) public isWhitelister;
     mapping(address whitelister => mapping(address account => uint256)) public nonces;
-    mapping(address account => bool) public isCreditWhitelisted;
-    mapping(address account => bool) public isCreditBlacklisted;
-    mapping(address account => bool) public isDebtWhitelisted;
-    mapping(address account => bool) public isDebtBlacklisted;
+    mapping(address account => bool) public isListed;
 
     constructor(address _roleSetter, Mode _creditMode, Mode _debtMode) {
         CREDIT_MODE = _creditMode;
@@ -56,14 +50,14 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
 
     function canIncreaseCredit(address account) external view returns (bool) {
         if (CREDIT_MODE == Mode.Open) return true;
-        if (CREDIT_MODE == Mode.Whitelist) return isCreditWhitelisted[account];
-        return !isCreditBlacklisted[account];
+        if (CREDIT_MODE == Mode.Whitelist) return isListed[account];
+        return !isListed[account];
     }
 
     function canIncreaseDebt(address account) external view returns (bool) {
         if (DEBT_MODE == Mode.Open) return true;
-        if (DEBT_MODE == Mode.Whitelist) return isDebtWhitelisted[account];
-        return !isDebtBlacklisted[account];
+        if (DEBT_MODE == Mode.Whitelist) return isListed[account];
+        return !isListed[account];
     }
 
     function setRoleSetter(address newRoleSetter) external {
@@ -78,36 +72,18 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         emit SetIsWhitelister(account, newIsWhitelister);
     }
 
-    function setIsCreditWhitelisted(address account, bool newIsCreditWhitelisted) external {
+    function setIsListed(address account, bool newIsListed) external {
         require(isWhitelister[msg.sender], NotWhitelister());
-        isCreditWhitelisted[account] = newIsCreditWhitelisted;
-        emit SetIsCreditWhitelisted(msg.sender, account, newIsCreditWhitelisted);
-    }
-
-    function setIsCreditBlacklisted(address account, bool newIsCreditBlacklisted) external {
-        require(isWhitelister[msg.sender], NotWhitelister());
-        isCreditBlacklisted[account] = newIsCreditBlacklisted;
-        emit SetIsCreditBlacklisted(msg.sender, account, newIsCreditBlacklisted);
-    }
-
-    function setIsDebtWhitelisted(address account, bool newIsDebtWhitelisted) external {
-        require(isWhitelister[msg.sender], NotWhitelister());
-        isDebtWhitelisted[account] = newIsDebtWhitelisted;
-        emit SetIsDebtWhitelisted(msg.sender, account, newIsDebtWhitelisted);
-    }
-
-    function setIsDebtBlacklisted(address account, bool newIsDebtBlacklisted) external {
-        require(isWhitelister[msg.sender], NotWhitelister());
-        isDebtBlacklisted[account] = newIsDebtBlacklisted;
-        emit SetIsDebtBlacklisted(msg.sender, account, newIsDebtBlacklisted);
+        isListed[account] = newIsListed;
+        emit SetIsListed(msg.sender, account, newIsListed);
     }
 
     /// @dev Signature malleability is not explicitly prevented but it is not a problem thanks to the nonce.
-    /// @dev Allows to batch setIsCreditWhitelisted with the take, without requiring a transaction from the whitelister.
-    function setIsCreditWhitelistedWithSig(
+    /// @dev Allows to batch setIsListed with the take, without requiring a transaction from the whitelister.
+    function setIsListedWithSig(
         address whitelister,
         address account,
-        bool newIsCreditWhitelisted,
+        bool newIsListed,
         uint256 deadline,
         uint8 v,
         bytes32 r,
@@ -116,110 +92,15 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         require(deadline >= block.timestamp, DeadlineExpired());
         bytes32 hashStruct = keccak256(
             abi.encode(
-                SET_IS_CREDIT_WHITELISTED_TYPEHASH,
-                whitelister,
-                account,
-                newIsCreditWhitelisted,
-                nonces[whitelister][account]++,
-                deadline
+                SET_IS_LISTED_TYPEHASH, whitelister, account, newIsListed, nonces[whitelister][account]++, deadline
             )
         );
         bytes32 digest = keccak256(bytes.concat("\x19\x01", DOMAIN_SEPARATOR(), hashStruct));
         // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
         address recovered = ecrecover(digest, v, r, s);
         require(recovered != address(0) && recovered == whitelister && isWhitelister[recovered], InvalidSigner());
-        isCreditWhitelisted[account] = newIsCreditWhitelisted;
-        emit SetIsCreditWhitelistedWithSig(recovered, account, newIsCreditWhitelisted);
-    }
-
-    /// @dev Signature malleability is not explicitly prevented but it is not a problem thanks to the nonce.
-    /// @dev Allows to batch setIsCreditBlacklisted with the take, without requiring a transaction from the whitelister.
-    function setIsCreditBlacklistedWithSig(
-        address whitelister,
-        address account,
-        bool newIsCreditBlacklisted,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
-        require(deadline >= block.timestamp, DeadlineExpired());
-        bytes32 hashStruct = keccak256(
-            abi.encode(
-                SET_IS_CREDIT_BLACKLISTED_TYPEHASH,
-                whitelister,
-                account,
-                newIsCreditBlacklisted,
-                nonces[whitelister][account]++,
-                deadline
-            )
-        );
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", DOMAIN_SEPARATOR(), hashStruct));
-        // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
-        address recovered = ecrecover(digest, v, r, s);
-        require(recovered != address(0) && recovered == whitelister && isWhitelister[recovered], InvalidSigner());
-        isCreditBlacklisted[account] = newIsCreditBlacklisted;
-        emit SetIsCreditBlacklistedWithSig(recovered, account, newIsCreditBlacklisted);
-    }
-
-    /// @dev Signature malleability is not explicitly prevented but it is not a problem thanks to the nonce.
-    /// @dev Allows to batch setIsDebtWhitelisted with the take, without requiring a transaction from the whitelister.
-    function setIsDebtWhitelistedWithSig(
-        address whitelister,
-        address account,
-        bool newIsDebtWhitelisted,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
-        require(deadline >= block.timestamp, DeadlineExpired());
-        bytes32 hashStruct = keccak256(
-            abi.encode(
-                SET_IS_DEBT_WHITELISTED_TYPEHASH,
-                whitelister,
-                account,
-                newIsDebtWhitelisted,
-                nonces[whitelister][account]++,
-                deadline
-            )
-        );
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", DOMAIN_SEPARATOR(), hashStruct));
-        // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
-        address recovered = ecrecover(digest, v, r, s);
-        require(recovered != address(0) && recovered == whitelister && isWhitelister[recovered], InvalidSigner());
-        isDebtWhitelisted[account] = newIsDebtWhitelisted;
-        emit SetIsDebtWhitelistedWithSig(recovered, account, newIsDebtWhitelisted);
-    }
-
-    /// @dev Signature malleability is not explicitly prevented but it is not a problem thanks to the nonce.
-    /// @dev Allows to batch setIsDebtBlacklisted with the take, without requiring a transaction from the whitelister.
-    function setIsDebtBlacklistedWithSig(
-        address whitelister,
-        address account,
-        bool newIsDebtBlacklisted,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
-        require(deadline >= block.timestamp, DeadlineExpired());
-        bytes32 hashStruct = keccak256(
-            abi.encode(
-                SET_IS_DEBT_BLACKLISTED_TYPEHASH,
-                whitelister,
-                account,
-                newIsDebtBlacklisted,
-                nonces[whitelister][account]++,
-                deadline
-            )
-        );
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", DOMAIN_SEPARATOR(), hashStruct));
-        // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
-        address recovered = ecrecover(digest, v, r, s);
-        require(recovered != address(0) && recovered == whitelister && isWhitelister[recovered], InvalidSigner());
-        isDebtBlacklisted[account] = newIsDebtBlacklisted;
-        emit SetIsDebtBlacklistedWithSig(recovered, account, newIsDebtBlacklisted);
+        isListed[account] = newIsListed;
+        emit SetIsListedWithSig(recovered, account, newIsListed);
     }
 
     /// forge-lint: disable-next-item(mixed-case-function)
