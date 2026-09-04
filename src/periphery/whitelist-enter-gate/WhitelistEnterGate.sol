@@ -49,16 +49,13 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     }
 
     function canIncreaseCredit(address account) external view returns (bool) {
-        return canIncrease(Side.Credit, CREDIT_MODE, account);
+        if (CREDIT_MODE == Mode.Open) return true;
+        return isListed[Side.Credit][account] == (CREDIT_MODE == Mode.Whitelist);
     }
 
     function canIncreaseDebt(address account) external view returns (bool) {
-        return canIncrease(Side.Debt, DEBT_MODE, account);
-    }
-
-    function canIncrease(Side side, Mode sideMode, address account) internal view returns (bool) {
-        if (sideMode == Mode.Open) return true;
-        return isListed[side][account] == (sideMode == Mode.Whitelist);
+        if (DEBT_MODE == Mode.Open) return true;
+        return isListed[Side.Debt][account] == (DEBT_MODE == Mode.Whitelist);
     }
 
     function setRoleSetter(address newRoleSetter) external {
