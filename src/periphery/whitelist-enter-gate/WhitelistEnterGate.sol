@@ -51,13 +51,13 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     function canIncreaseCredit(address account) external view returns (bool) {
         if (CREDIT_MODE == Mode.Open) return true;
         if (CREDIT_MODE == Mode.Whitelist) return isListed[account];
-        return !isListed[account];
+        else return !isListed[account];
     }
 
     function canIncreaseDebt(address account) external view returns (bool) {
         if (DEBT_MODE == Mode.Open) return true;
         if (DEBT_MODE == Mode.Whitelist) return isListed[account];
-        return !isListed[account];
+        else return !isListed[account];
     }
 
     function setRoleSetter(address newRoleSetter) external {
