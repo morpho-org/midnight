@@ -14,8 +14,6 @@ import {
 /// says how the list is read: whitelist (only listed accounts can enter), blacklist (only non-listed accounts can
 /// enter) or open (the list is ignored, any account can enter).
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
-/// @dev No-ops are allowed.
-/// @dev Zero checks are not systematically performed.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
 /// no longer valid.
 contract WhitelistEnterGate is IWhitelistEnterGate {
