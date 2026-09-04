@@ -11,24 +11,27 @@ import {
 } from "./interfaces/IWhitelistEnterGate.sol";
 
 /// @dev Using this gate allows to restrict who can increase their credit or debt in a market.
-/// @dev Each side (credit, debt) has its own list and its own mode: whitelist (only listed accounts can enter),
-/// blacklist (only unlisted accounts can enter) or open (any account can enter).
-/// @dev Both sides start in whitelist mode. Switching a side to open is irreversible.
+/// @dev Each side (credit, debt) has its own list and its own mode, fixed at deployment: whitelist (only listed
+/// accounts can enter), blacklist (only unlisted accounts can enter) or open (any account can enter).
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev No-ops are allowed.
 /// @dev Zero checks are not systematically performed.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
 /// no longer valid.
 contract WhitelistEnterGate is IWhitelistEnterGate {
+    Mode public immutable CREDIT_MODE;
+    Mode public immutable DEBT_MODE;
+
     address public roleSetter;
-    mapping(Side side => Mode) public mode;
     mapping(address account => bool) public isWhitelister;
     mapping(address whitelister => mapping(address account => uint256)) public nonces;
     mapping(Side side => mapping(address account => bool)) public isListed;
 
-    constructor(address _roleSetter) {
+    constructor(address _roleSetter, Mode _creditMode, Mode _debtMode) {
+        CREDIT_MODE = _creditMode;
+        DEBT_MODE = _debtMode;
         roleSetter = _roleSetter;
-        emit Constructor(_roleSetter);
+        emit Constructor(_roleSetter, _creditMode, _debtMode);
     }
 
     /// @dev Useful for EOAs to batch privileged calls.
@@ -46,15 +49,14 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     }
 
     function canIncreaseCredit(address account) external view returns (bool) {
-        return canIncrease(Side.Credit, account);
+        return canIncrease(Side.Credit, CREDIT_MODE, account);
     }
 
     function canIncreaseDebt(address account) external view returns (bool) {
-        return canIncrease(Side.Debt, account);
+        return canIncrease(Side.Debt, DEBT_MODE, account);
     }
 
-    function canIncrease(Side side, address account) internal view returns (bool) {
-        Mode sideMode = mode[side];
+    function canIncrease(Side side, Mode sideMode, address account) internal view returns (bool) {
         if (sideMode == Mode.Open) return true;
         return isListed[side][account] == (sideMode == Mode.Whitelist);
     }
@@ -63,13 +65,6 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         require(msg.sender == roleSetter, NotRoleSetter());
         roleSetter = newRoleSetter;
         emit SetRoleSetter(newRoleSetter);
-    }
-
-    function setMode(Side side, Mode newMode) external {
-        require(msg.sender == roleSetter, NotRoleSetter());
-        require(mode[side] != Mode.Open, Abdicated());
-        mode[side] = newMode;
-        emit SetMode(side, newMode);
     }
 
     function setIsWhitelister(address account, bool newIsWhitelister) external {

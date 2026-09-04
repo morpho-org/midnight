@@ -31,9 +31,18 @@ contract WhitelistEnterGateTest is Test {
         whitelister2Pk = 0xB0B;
         whitelister = vm.addr(whitelisterPk);
         whitelister2 = vm.addr(whitelister2Pk);
-        gate = new WhitelistEnterGate(roleSetter);
+        gate = _deploy(Mode.Whitelist, Mode.Whitelist);
+    }
+
+    function _deploy(Mode creditMode, Mode debtMode) internal returns (WhitelistEnterGate g) {
+        g = new WhitelistEnterGate(roleSetter, creditMode, debtMode);
         vm.prank(roleSetter);
-        gate.setIsWhitelister(whitelister, true);
+        g.setIsWhitelister(whitelister, true);
+    }
+
+    /// @dev Deploys a gate with the given mode on side and whitelist mode on the other side.
+    function _deploy(Side side, Mode sideMode) internal returns (WhitelistEnterGate) {
+        return side == Side.Credit ? _deploy(sideMode, Mode.Whitelist) : _deploy(Mode.Whitelist, sideMode);
     }
 
     function _side(bool credit) internal pure returns (Side) {
@@ -48,8 +57,8 @@ contract WhitelistEnterGateTest is Test {
         return Mode(bound(raw, 0, 2));
     }
 
-    function _canIncrease(Side side, address account) internal view returns (bool) {
-        return side == Side.Credit ? gate.canIncreaseCredit(account) : gate.canIncreaseDebt(account);
+    function _canIncrease(WhitelistEnterGate g, Side side, address account) internal view returns (bool) {
+        return side == Side.Credit ? g.canIncreaseCredit(account) : g.canIncreaseDebt(account);
     }
 
     function _sign(Side side, address account, bool listed, uint256 deadline, uint256 pk)
@@ -79,14 +88,16 @@ contract WhitelistEnterGateTest is Test {
         assertEq(gate.DOMAIN_SEPARATOR(), expected);
     }
 
-    function testConstructor(address _roleSetter) public {
+    function testConstructor(address _roleSetter, uint8 rawCreditMode, uint8 rawDebtMode) public {
+        Mode creditMode = _mode(rawCreditMode);
+        Mode debtMode = _mode(rawDebtMode);
         vm.expectEmit();
-        emit IWhitelistEnterGate.Constructor(_roleSetter);
-        WhitelistEnterGate g = new WhitelistEnterGate(_roleSetter);
+        emit IWhitelistEnterGate.Constructor(_roleSetter, creditMode, debtMode);
+        WhitelistEnterGate g = new WhitelistEnterGate(_roleSetter, creditMode, debtMode);
         assertEq(g.roleSetter(), _roleSetter);
         assertFalse(g.isWhitelister(_roleSetter));
-        assertEq(uint256(g.mode(Side.Credit)), uint256(Mode.Whitelist));
-        assertEq(uint256(g.mode(Side.Debt)), uint256(Mode.Whitelist));
+        assertEq(uint256(g.CREDIT_MODE()), uint256(creditMode));
+        assertEq(uint256(g.DEBT_MODE()), uint256(debtMode));
     }
 
     function testSetRoleSetter(address newRoleSetter) public {
@@ -102,59 +113,6 @@ contract WhitelistEnterGateTest is Test {
         vm.expectRevert(IWhitelistEnterGate.NotRoleSetter.selector);
         vm.prank(caller);
         gate.setRoleSetter(newRoleSetter);
-    }
-
-    function testSetMode(bool credit, uint8 rawMode) public {
-        Side side = _side(credit);
-        Mode newMode = _mode(rawMode);
-        vm.expectEmit();
-        emit IWhitelistEnterGate.SetMode(side, newMode);
-        vm.prank(roleSetter);
-        gate.setMode(side, newMode);
-        assertEq(uint256(gate.mode(side)), uint256(newMode));
-        assertEq(uint256(gate.mode(_otherSide(side))), uint256(Mode.Whitelist));
-    }
-
-    function testSetModeNotRoleSetter(address caller, bool credit, uint8 rawMode) public {
-        vm.assume(caller != roleSetter);
-        vm.expectRevert(IWhitelistEnterGate.NotRoleSetter.selector);
-        vm.prank(caller);
-        gate.setMode(_side(credit), _mode(rawMode));
-    }
-
-    function testWhitelisterCannotSetMode(bool credit, uint8 rawMode) public {
-        vm.expectRevert(IWhitelistEnterGate.NotRoleSetter.selector);
-        vm.prank(whitelister);
-        gate.setMode(_side(credit), _mode(rawMode));
-    }
-
-    function testSetModeWhitelistBlacklistBothWays(bool credit) public {
-        Side side = _side(credit);
-        vm.startPrank(roleSetter);
-        gate.setMode(side, Mode.Blacklist);
-        assertEq(uint256(gate.mode(side)), uint256(Mode.Blacklist));
-        gate.setMode(side, Mode.Whitelist);
-        assertEq(uint256(gate.mode(side)), uint256(Mode.Whitelist));
-        vm.stopPrank();
-    }
-
-    function testSetModeAbdicated(bool credit, uint8 rawMode) public {
-        Side side = _side(credit);
-        vm.startPrank(roleSetter);
-        gate.setMode(side, Mode.Open);
-        vm.expectRevert(IWhitelistEnterGate.Abdicated.selector);
-        gate.setMode(side, _mode(rawMode));
-        vm.stopPrank();
-        assertEq(uint256(gate.mode(side)), uint256(Mode.Open));
-    }
-
-    function testSetModeAbdicatedDoesNotAffectOtherSide(bool credit, uint8 rawMode) public {
-        Side side = _side(credit);
-        vm.startPrank(roleSetter);
-        gate.setMode(side, Mode.Open);
-        gate.setMode(_otherSide(side), _mode(rawMode));
-        vm.stopPrank();
-        assertEq(uint256(gate.mode(_otherSide(side))), uint256(_mode(rawMode)));
     }
 
     function testSetIsWhitelister(address account, bool isWhitelister_) public {
@@ -232,33 +190,32 @@ contract WhitelistEnterGateTest is Test {
     function testCanIncreaseWhitelist(bool credit, address account, address other) public {
         vm.assume(account != other);
         Side side = _side(credit);
+        WhitelistEnterGate g = _deploy(side, Mode.Whitelist);
         vm.prank(whitelister);
-        gate.setIsListed(side, account, true);
-        assertTrue(_canIncrease(side, account));
-        assertFalse(_canIncrease(side, other));
-        assertFalse(_canIncrease(_otherSide(side), account));
+        g.setIsListed(side, account, true);
+        assertTrue(_canIncrease(g, side, account));
+        assertFalse(_canIncrease(g, side, other));
+        assertFalse(_canIncrease(g, _otherSide(side), account));
     }
 
     function testCanIncreaseBlacklist(bool credit, address account, address other) public {
         vm.assume(account != other);
         Side side = _side(credit);
-        vm.prank(roleSetter);
-        gate.setMode(side, Mode.Blacklist);
+        WhitelistEnterGate g = _deploy(side, Mode.Blacklist);
         vm.prank(whitelister);
-        gate.setIsListed(side, account, true);
-        assertFalse(_canIncrease(side, account));
-        assertTrue(_canIncrease(side, other));
-        assertFalse(_canIncrease(_otherSide(side), other));
+        g.setIsListed(side, account, true);
+        assertFalse(_canIncrease(g, side, account));
+        assertTrue(_canIncrease(g, side, other));
+        assertFalse(_canIncrease(g, _otherSide(side), other));
     }
 
     function testCanIncreaseOpen(bool credit, address account, bool listed) public {
         Side side = _side(credit);
-        vm.prank(roleSetter);
-        gate.setMode(side, Mode.Open);
+        WhitelistEnterGate g = _deploy(side, Mode.Open);
         vm.prank(whitelister);
-        gate.setIsListed(side, account, listed);
-        assertTrue(_canIncrease(side, account));
-        assertFalse(_canIncrease(_otherSide(side), account));
+        g.setIsListed(side, account, listed);
+        assertTrue(_canIncrease(g, side, account));
+        assertFalse(_canIncrease(g, _otherSide(side), account));
     }
 
     function testCanIncreaseCredit(address account, address other) public {
@@ -413,9 +370,7 @@ contract WhitelistEnterGateTest is Test {
 
         // wrong domain separator
         (v, r, s) = _sign(side, bob, true, deadline, whitelisterPk);
-        WhitelistEnterGate otherGate = new WhitelistEnterGate(roleSetter);
-        vm.prank(roleSetter);
-        otherGate.setIsWhitelister(whitelister, true);
+        WhitelistEnterGate otherGate = _deploy(Mode.Whitelist, Mode.Whitelist);
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         otherGate.setIsListedWithSig(whitelister, side, bob, true, deadline, v, r, s);
     }

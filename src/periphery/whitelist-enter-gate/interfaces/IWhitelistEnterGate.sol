@@ -24,23 +24,22 @@ bytes32 constant EIP712_DOMAIN_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea
 
 interface IWhitelistEnterGate is IEnterGate {
     /// ERRORS ///
-    error Abdicated();
     error DeadlineExpired();
     error InvalidSigner();
     error NotRoleSetter();
     error NotWhitelister();
 
     /// EVENTS ///
-    event Constructor(address indexed roleSetter);
+    event Constructor(address indexed roleSetter, Mode creditMode, Mode debtMode);
     event SetRoleSetter(address indexed newRoleSetter);
-    event SetMode(Side indexed side, Mode newMode);
     event SetIsWhitelister(address indexed account, bool newIsWhitelister);
     event SetIsListed(address indexed whitelister, Side indexed side, address indexed account, bool newIsListed);
     event SetIsListedWithSig(address indexed whitelister, Side indexed side, address indexed account, bool newIsListed);
 
     /// STORAGE GETTERS ///
+    function CREDIT_MODE() external view returns (Mode);
+    function DEBT_MODE() external view returns (Mode);
     function roleSetter() external view returns (address);
-    function mode(Side side) external view returns (Mode);
     function isWhitelister(address account) external view returns (bool);
     function nonces(address whitelister, address account) external view returns (uint256);
     function isListed(Side side, address account) external view returns (bool);
@@ -48,7 +47,6 @@ interface IWhitelistEnterGate is IEnterGate {
     /// FUNCTIONS ///
     function multicall(bytes[] calldata data) external;
     function setRoleSetter(address newRoleSetter) external;
-    function setMode(Side side, Mode newMode) external;
     function setIsWhitelister(address account, bool newIsWhitelister) external;
     function setIsListed(Side side, address account, bool newIsListed) external;
     function setIsListedWithSig(
