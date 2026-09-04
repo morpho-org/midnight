@@ -9,9 +9,8 @@ import {
 } from "./interfaces/IWhitelistEnterGate.sol";
 
 /// @dev Using this gate allows to restrict who can increase their credit or debt in a market.
-/// @dev Each side (credit, debt) has its own whitelist, stored in a single mapping keyed by side. Only whitelisted
-/// accounts can enter on that side.
-/// @dev A side can be made open at deployment, letting any account enter on that side.
+/// @dev Each side (credit, debt) has its own whitelist. Only whitelisted accounts can enter on that side.
+/// @dev A side can be made open at deployment, letting any account enter on that side (forever).
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
 /// no longer valid.

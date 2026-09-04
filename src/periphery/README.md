@@ -53,7 +53,7 @@ An enter gate that restricts which accounts can increase their credit or debt in
 Each side (credit, debt) has its own whitelist: only whitelisted accounts can enter on that side.
 The role setter grants or revokes the whitelister role.
 Whitelisters edit the lists directly with `setIsWhitelisted` or by EIP-712 signatures with `setIsWhitelistedWithSig`.
-A side can be made open at deployment, letting any account enter on that side.
+A side can be made open at deployment, letting any account enter on that side (forever).
 
 ## Libraries
 
