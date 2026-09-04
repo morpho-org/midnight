@@ -46,6 +46,13 @@ An onchain mempool for Midnight.
 Its fallback publishes calldata in a `Data` event.
 Calldata is limited to 1,000,000 bytes.
 
+### `WhitelistEnterGate`
+
+An enter gate that only lets whitelisted accounts increase their credit or debt in a Midnight market.
+
+The role setter grants or revokes the whitelister role.
+Whitelisters whitelist or un-whitelist accounts directly with `setIsWhitelisted` or by EIP-712 signature with `setIsWhitelistedWithSig`, which tracks one nonce per whitelister and account and rejects expired, replayed, invalid, or unauthorized signatures.
+
 ## Libraries
 
 ### `TakeAmountsLib`
