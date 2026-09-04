@@ -2,7 +2,11 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {IWhitelistEnterGate, SET_IS_WHITELISTED_TYPEHASH, EIP712_DOMAIN_TYPEHASH} from "./interfaces/IWhitelistEnterGate.sol";
+import {
+    IWhitelistEnterGate,
+    SET_IS_WHITELISTED_TYPEHASH,
+    EIP712_DOMAIN_TYPEHASH
+} from "./interfaces/IWhitelistEnterGate.sol";
 
 /// @dev Using this gate allows to restrict who can increase their credit or debt in a market.
 /// @dev Each side (credit, debt) has its own whitelist, stored in a single mapping keyed by side. Only whitelisted
@@ -12,6 +16,7 @@ import {IWhitelistEnterGate, SET_IS_WHITELISTED_TYPEHASH, EIP712_DOMAIN_TYPEHASH
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
 /// no longer valid.
 contract WhitelistEnterGate is IWhitelistEnterGate {
+    /// STORAGE ///
     bool public immutable CREDIT_OPEN;
     bool public immutable DEBT_OPEN;
 
@@ -20,6 +25,8 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     mapping(address whitelister => mapping(address account => uint256)) public nonces;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelisted;
 
+    /// CONSTRUCTOR ///
+
     constructor(address _roleSetter, bool _creditOpen, bool _debtOpen) {
         CREDIT_OPEN = _creditOpen;
         DEBT_OPEN = _debtOpen;
@@ -27,27 +34,7 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         emit Constructor(_roleSetter, _creditOpen, _debtOpen);
     }
 
-    /// @dev Useful for EOAs to batch privileged calls.
-    /// @dev Does not return anything, because accounts who would use the return data would be contracts, which can do
-    /// the multicall themselves.
-    function multicall(bytes[] calldata data) external {
-        for (uint256 i = 0; i < data.length; i++) {
-            (bool success, bytes memory returnData) = address(this).delegatecall(data[i]);
-            if (!success) {
-                assembly ("memory-safe") {
-                    revert(add(32, returnData), mload(returnData))
-                }
-            }
-        }
-    }
-
-    function canIncreaseCredit(address account) external view returns (bool) {
-        return CREDIT_OPEN || isWhitelisted[true][account];
-    }
-
-    function canIncreaseDebt(address account) external view returns (bool) {
-        return DEBT_OPEN || isWhitelisted[false][account];
-    }
+    /// SETTERS ///
 
     function setRoleSetter(address newRoleSetter) external {
         require(msg.sender == roleSetter, NotRoleSetter());
@@ -98,8 +85,34 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         emit SetIsWhitelistedWithSig(recovered, creditSide, account, newIsWhitelisted);
     }
 
+    /// GETTERS ///
+
     /// forge-lint: disable-next-item(mixed-case-function)
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
+    }
+
+    function canIncreaseCredit(address account) external view returns (bool) {
+        return CREDIT_OPEN || isWhitelisted[true][account];
+    }
+
+    function canIncreaseDebt(address account) external view returns (bool) {
+        return DEBT_OPEN || isWhitelisted[false][account];
+    }
+
+    /// MULTICALL ///
+
+    /// @dev Useful for EOAs to batch privileged calls.
+    /// @dev Does not return anything, because accounts who would use the return data would be contracts, which can do
+    /// the multicall themselves.
+    function multicall(bytes[] calldata data) external {
+        for (uint256 i = 0; i < data.length; i++) {
+            (bool success, bytes memory returnData) = address(this).delegatecall(data[i]);
+            if (!success) {
+                assembly ("memory-safe") {
+                    revert(add(32, returnData), mload(returnData))
+                }
+            }
+        }
     }
 }

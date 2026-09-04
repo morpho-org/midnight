@@ -37,8 +37,7 @@ interface IWhitelistEnterGate is IEnterGate {
     function nonces(address whitelister, address account) external view returns (uint256);
     function isWhitelisted(bool creditSide, address account) external view returns (bool);
 
-    /// FUNCTIONS ///
-    function multicall(bytes[] calldata data) external;
+    /// SETTERS ///
     function setRoleSetter(address newRoleSetter) external;
     function setIsWhitelister(address account, bool newIsWhitelister) external;
     function setIsWhitelisted(bool creditSide, address account, bool newIsWhitelisted) external;
@@ -52,5 +51,10 @@ interface IWhitelistEnterGate is IEnterGate {
         bytes32 r,
         bytes32 s
     ) external;
+
+    /// GETTERS ///
     function DOMAIN_SEPARATOR() external view returns (bytes32);
+
+    /// MULTICALL ///
+    function multicall(bytes[] calldata data) external;
 }
