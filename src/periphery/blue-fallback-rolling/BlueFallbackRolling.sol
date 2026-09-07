@@ -136,6 +136,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             address user
         ) = abi.decode(data, (Market, MarketParams, uint256, uint256, uint256, address));
 
+        // Borrowing on Blue introduces a rounding against the borrower because of share accounting. minRollableAssets
+        // mitigates this by limiting how many times the rounding can be applied.
         IMorpho(BLUE).borrow(blueMarketParams, assets + incentiveAssets, 0, user, address(this));
         SafeApproveLib.forceApproveMax(midnightMarket.loanToken, MIDNIGHT);
         IMidnight(MIDNIGHT).repay(midnightMarket, assets, user, address(0), hex"");
