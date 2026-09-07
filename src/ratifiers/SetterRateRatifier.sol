@@ -40,6 +40,7 @@ contract SetterRateRatifier is ISetterRateRatifier {
         (bytes32 root, uint256 leafIndex, bytes32[] memory proof, uint256 startRate, uint256 expiryRate) =
             abi.decode(ratifierData, (bytes32, uint256, bytes32[], uint256, uint256));
 
+        require(block.timestamp <= offer.expiry, OfferExpired());
         uint256 rate = startRate;
         if (startRate != expiryRate) {
             uint256 elapsed = block.timestamp - offer.start;

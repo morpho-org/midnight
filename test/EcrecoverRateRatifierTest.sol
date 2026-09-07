@@ -67,6 +67,7 @@ contract EcrecoverRateRatifierTest is BaseTest {
         offer.maker = maker;
         offer.buy = true;
         offer.tick = 0;
+        offer.expiry = type(uint256).max;
         offer.ratifier = address(ecrecoverRateRatifier);
         bytes32 root = HashLib.hashRateOffer(offer, 0, 0);
 
@@ -338,6 +339,20 @@ contract EcrecoverRateRatifierTest is BaseTest {
         ecrecoverRateRatifier.isRatified(offer, data, address(0));
     }
 
+    function testOfferExpired() public {
+        Offer memory offer = makeOffer(lender, true);
+        bytes memory data = buildRatifierData(offer, rate10pct(), rate10pct(), lender);
+
+        vm.warp(offer.expiry);
+        vm.prank(address(midnight));
+        assertEq(ecrecoverRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
+
+        vm.warp(offer.expiry + 1);
+        vm.prank(address(midnight));
+        vm.expectRevert(IEcrecoverRateRatifier.OfferExpired.selector);
+        ecrecoverRateRatifier.isRatified(offer, data, address(0));
+    }
+
     function testDutchAuctionFallingRateBuyer() public {
         uint256 startRate = 3 * rate10pct();
         uint256 expiryRate = rate10pct();
@@ -462,7 +477,7 @@ contract EcrecoverRateRatifierTest is BaseTest {
         vm.expectRevert(IEcrecoverRateRatifier.WorsePrice.selector);
         ecrecoverRateRatifier.isRatified(offer, data, address(0));
 
-        vm.warp(startTime + duration);
+        vm.warp(offer.expiry);
         vm.prank(address(midnight));
         assertEq(ecrecoverRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
     }

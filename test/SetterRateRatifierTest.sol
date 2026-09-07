@@ -243,6 +243,23 @@ contract SetterRateRatifierTest is BaseTest {
         assertEq(setterRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
     }
 
+    function testOfferExpired() public {
+        Offer memory offer = makeOffer(lender, true);
+        bytes memory data = buildRatifierData(offer, rate10pct(), rate10pct());
+
+        vm.prank(lender);
+        setterRateRatifier.setIsRootRatified(lender, HashLib.hashRateOffer(offer, rate10pct(), rate10pct()), true);
+
+        vm.warp(offer.expiry);
+        vm.prank(address(midnight));
+        assertEq(setterRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
+
+        vm.warp(offer.expiry + 1);
+        vm.prank(address(midnight));
+        vm.expectRevert(ISetterRateRatifier.OfferExpired.selector);
+        setterRateRatifier.isRatified(offer, data, address(0));
+    }
+
     function testWorsePriceBuyer() public {
         Offer memory offer = makeOffer(lender, true);
         uint256 rate = rate10pct();

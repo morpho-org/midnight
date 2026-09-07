@@ -81,6 +81,7 @@ contract FrontendSignatureTest is Test {
 }
 
 // Paste from frontend output (sign-rate-root.ts).
+address constant RATE_ACCOUNT = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
 uint256 constant START_RATE = 9512937594; // ~30%/yr
 uint256 constant EXPIRY_RATE = 3170979198; // ~10%/yr
 uint8 constant RATE_SIG_V = 28;
@@ -125,6 +126,21 @@ contract FrontendRateSignatureTest is Test {
         proof0[1] = right;
         assertTrue(HashLib.isLeaf(_root, h0, 0, proof0));
 
+        bytes32[] memory proof1 = new bytes32[](2);
+        proof1[0] = h0;
+        proof1[1] = right;
+        assertTrue(HashLib.isLeaf(_root, h1, 1, proof1));
+
+        bytes32[] memory proof2 = new bytes32[](2);
+        proof2[0] = h3;
+        proof2[1] = left;
+        assertTrue(HashLib.isLeaf(_root, h2, 2, proof2));
+
+        bytes32[] memory proof3 = new bytes32[](2);
+        proof3[0] = h2;
+        proof3[1] = left;
+        assertTrue(HashLib.isLeaf(_root, h3, 3, proof3));
+
         bytes memory ratifierData = abi.encode(
             Signature({v: RATE_SIG_V, r: RATE_SIG_R, s: RATE_SIG_S}), _root, uint256(0), proof0, START_RATE, EXPIRY_RATE
         );
@@ -134,6 +150,6 @@ contract FrontendRateSignatureTest is Test {
 
     // Trick to ensure isRatified checks that the signer is the maker, without having the offers depend on the maker.
     function isAuthorized(address, address signer) external pure returns (bool) {
-        return signer == ACCOUNT;
+        return signer == RATE_ACCOUNT;
     }
 }

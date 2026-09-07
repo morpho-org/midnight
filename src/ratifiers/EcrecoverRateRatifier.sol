@@ -11,7 +11,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed offers are
 /// no longer valid.
-/// @dev This ratifier checks that the offer has been signed by an authorized address in a Merkle tree of offers.
+/// @dev This ratifier checks that the offer has been signed by an authorized address in a Merkle tree of rate offers.
 /// To that end, it expects the ratifier data to contain the signature, the root of the tree, the leaf index of the
 /// offer, the proof of the offer in the tree and the start and expiry rate for the offer.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
@@ -50,6 +50,7 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
             uint256 expiryRate
         ) = abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[], uint256, uint256));
 
+        require(block.timestamp <= offer.expiry, OfferExpired());
         uint256 rate = startRate;
         if (startRate != expiryRate) {
             uint256 elapsed = block.timestamp - offer.start;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
-pragma solidity ^0.8.0;
+pragma solidity >=0.5.0;
 
 import {IRatifier} from "../../interfaces/IRatifier.sol";
 
@@ -17,6 +17,7 @@ interface IEcrecoverRateRatifier is IRatifier {
     /// ERRORS ///
     error InvalidProof();
     error InvalidSignature();
+    error OfferExpired();
     error RootCanceled();
     error Unauthorized();
     error WorsePrice();

@@ -7,8 +7,9 @@ import {IRatifier} from "../../interfaces/IRatifier.sol";
 interface ISetterRateRatifier is IRatifier {
     /// ERRORS ///
     error InvalidProof();
-    error Unauthorized();
     error NotRatified();
+    error OfferExpired();
+    error Unauthorized();
     error WorsePrice();
 
     /// EVENTS ///

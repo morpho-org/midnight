@@ -51,7 +51,8 @@ library HashLib {
 
     /// @dev Returns the EIP-712 typehash of RateOfferTree(RateOffer[2]...[2] offerTree) with height levels.
     /// @dev Same as keccak256(bytes.concat("RateOfferTree(RateOffer[2]...[2] offerTree)", COLLATERAL_PARAMS_TYPE,
-    /// MARKET_TYPE, RATE_OFFER_TYPE)).
+    /// MARKET_TYPE, RATE_OFFER_TYPE)), where RATE_OFFER_TYPE encodes an Offer with `tick` replaced by `startRate`
+    /// (uint256) and `expiryRate` (uint256).
     /// @dev Reverts if height is greater than 20.
     function rateOfferTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height <= 10) {
