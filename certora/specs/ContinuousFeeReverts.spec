@@ -12,8 +12,6 @@ methods {
 
     // Deterministic id: links the market argument to stored state, identical across both runs.
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
-
-    // Sound because the protocol doesn't use toMarket.
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
     // Deterministic ghost summaries of the rate-independent helpers (see header).
