@@ -13,7 +13,8 @@ const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 const ZERO_B32 = "0x" + "00".repeat(32);
 const RATIFIER = "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB";
 const HEIGHT = 2;
-const RATE = "3170979198";
+const START_RATE = "9512937594"; // ~30%/yr
+const EXPIRY_RATE = "3170979198"; // ~10%/yr
 
 function buildTypes(height: number) {
   let rateOfferTreeFieldType = "RateOffer";
@@ -78,8 +79,8 @@ function defaultRateOffer(number: string) {
     maker: ZERO_ADDR,
     start: "0",
     expiry: 2 ** 32,
-    startRate: RATE,
-    expiryRate: RATE,
+    startRate: START_RATE,
+    expiryRate: EXPIRY_RATE,
     group: ZERO_B32,
     callback: ZERO_ADDR,
     callbackData: "0x",
@@ -155,7 +156,8 @@ async function main() {
 
       resultEl.textContent = [
         `address constant ACCOUNT = ${account};`,
-        `uint256 constant RATE = ${RATE};`,
+        `uint256 constant START_RATE = ${START_RATE};`,
+        `uint256 constant EXPIRY_RATE = ${EXPIRY_RATE};`,
         `uint8 constant RATE_SIG_V = ${v};`,
         `bytes32 constant RATE_SIG_R = ${r};`,
         `bytes32 constant RATE_SIG_S = ${s};`,

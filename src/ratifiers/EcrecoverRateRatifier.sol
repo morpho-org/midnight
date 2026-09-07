@@ -54,10 +54,10 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
         if (startRate != expiryRate) {
             uint256 elapsed = block.timestamp - offer.start;
             uint256 duration = offer.expiry - offer.start;
-            if (expiryRate > startRate) {
-                rate = startRate + (expiryRate - startRate).mulDivDown(elapsed, duration);
-            } else {
+            if (startRate > expiryRate) {
                 rate = startRate - (startRate - expiryRate).mulDivDown(elapsed, duration);
+            } else {
+                rate = startRate + (expiryRate - startRate).mulDivDown(elapsed, duration);
             }
         }
 
