@@ -10,6 +10,7 @@ interface ISetterRateRatifier is IRatifier {
     error NotRatified();
     error OfferExpired();
     error Unauthorized();
+    error UnauthorizedTaker();
     error WorsePrice();
 
     /// EVENTS ///

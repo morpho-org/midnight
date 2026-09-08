@@ -59,7 +59,7 @@ contract SetterRateRatifierTest is BaseTest {
         pure
         returns (bytes memory)
     {
-        return abi.encode(root, uint256(0), new bytes32[](0), startRate, expiryRate);
+        return abi.encode(root, uint256(0), new bytes32[](0), startRate, expiryRate, address(0));
     }
 
     function buildRatifierData(Offer memory offer, uint256 startRate, uint256 expiryRate)
@@ -67,7 +67,7 @@ contract SetterRateRatifierTest is BaseTest {
         pure
         returns (bytes memory)
     {
-        return buildRatifierData(HashLib.hashRateOffer(offer, startRate, expiryRate), startRate, expiryRate);
+        return buildRatifierData(HashLib.hashRateOffer(offer, startRate, expiryRate, address(0)), startRate, expiryRate);
     }
 
     function testSetIsRootRatifiedMaker() public {
@@ -84,7 +84,7 @@ contract SetterRateRatifierTest is BaseTest {
 
     function testIsRatifiedAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashRateOffer(offer, 0, 0);
+        bytes32 _root = HashLib.hashRateOffer(offer, 0, 0, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(borrower, true, lender);
@@ -93,13 +93,14 @@ contract SetterRateRatifierTest is BaseTest {
         setterRateRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
-        bytes32 result = setterRateRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0), 0, 0), address(0));
+        bytes32 result =
+            setterRateRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0), 0, 0, address(0)), address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
     function testTakeAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashRateOffer(offer, 0, 0);
+        bytes32 _root = HashLib.hashRateOffer(offer, 0, 0, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(address(setterRateRatifier), true, lender);
@@ -110,7 +111,9 @@ contract SetterRateRatifierTest is BaseTest {
         setterRateRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(borrower);
-        midnight.take(offer, abi.encode(_root, 0, new bytes32[](0), 0, 0), 0, borrower, borrower, address(0), hex"");
+        midnight.take(
+            offer, abi.encode(_root, 0, new bytes32[](0), 0, 0, address(0)), 0, borrower, borrower, address(0), hex""
+        );
     }
 
     function testIsRatifiedUsesLeafIndex() public {
@@ -118,20 +121,22 @@ contract SetterRateRatifierTest is BaseTest {
         Offer memory rightOffer = makeOffer(lender);
         rightOffer.expiry += 1;
 
-        bytes32 _root =
-            HashLib.hashNode(HashLib.hashRateOffer(leftOffer, 0, 0), HashLib.hashRateOffer(rightOffer, 0, 0));
+        bytes32 _root = HashLib.hashNode(
+            HashLib.hashRateOffer(leftOffer, 0, 0, address(0)), HashLib.hashRateOffer(rightOffer, 0, 0, address(0))
+        );
         bytes32[] memory proof = new bytes32[](1);
-        proof[0] = HashLib.hashRateOffer(leftOffer, 0, 0);
+        proof[0] = HashLib.hashRateOffer(leftOffer, 0, 0, address(0));
 
         vm.prank(lender);
         setterRateRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
         vm.expectRevert(ISetterRateRatifier.InvalidProof.selector);
-        setterRateRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof, 0, 0), address(0));
+        setterRateRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof, 0, 0, address(0)), address(0));
 
         vm.prank(address(midnight));
-        bytes32 result = setterRateRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof, 0, 0), address(0));
+        bytes32 result =
+            setterRateRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof, 0, 0, address(0)), address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -147,7 +152,7 @@ contract SetterRateRatifierTest is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = 0;
         uint256 rate = rate10pct();
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
         bytes memory data = buildRatifierData(_root, rate, rate);
 
         vm.prank(lender);
@@ -169,7 +174,7 @@ contract SetterRateRatifierTest is BaseTest {
         uint256 rate = rate10pct();
         offer.tick = 0;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
         vm.prank(lender);
         setterRateRatifier.setIsRootRatified(lender, _root, true);
 
@@ -184,7 +189,7 @@ contract SetterRateRatifierTest is BaseTest {
         uint256 rate = rate10pct();
         offer.tick = MAX_TICK;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
         vm.prank(borrower);
         setterRateRatifier.setIsRootRatified(borrower, _root, true);
 
@@ -223,13 +228,14 @@ contract SetterRateRatifierTest is BaseTest {
         offer.tick = 0;
         uint256 rate = rate10pct();
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
         vm.prank(lender);
         setterRateRatifier.setIsRootRatified(lender, _root, true);
 
-        bytes memory data = abi.encode(_root, uint256(0), new bytes32[](0), rate, rate);
-        bytes memory tamperedDataStartRate = abi.encode(_root, uint256(0), new bytes32[](0), rate * 2, rate);
-        bytes memory tamperedDataExpiryRate = abi.encode(_root, uint256(0), new bytes32[](0), rate, rate * 2);
+        bytes memory data = abi.encode(_root, uint256(0), new bytes32[](0), rate, rate, address(0));
+        bytes memory tamperedDataStartRate = abi.encode(_root, uint256(0), new bytes32[](0), rate * 2, rate, address(0));
+        bytes memory tamperedDataExpiryRate =
+            abi.encode(_root, uint256(0), new bytes32[](0), rate, rate * 2, address(0));
 
         vm.prank(address(midnight));
         vm.expectRevert(ISetterRateRatifier.InvalidProof.selector);
@@ -248,7 +254,9 @@ contract SetterRateRatifierTest is BaseTest {
         bytes memory data = buildRatifierData(offer, rate10pct(), rate10pct());
 
         vm.prank(lender);
-        setterRateRatifier.setIsRootRatified(lender, HashLib.hashRateOffer(offer, rate10pct(), rate10pct()), true);
+        setterRateRatifier.setIsRootRatified(
+            lender, HashLib.hashRateOffer(offer, rate10pct(), rate10pct(), address(0)), true
+        );
 
         vm.warp(offer.expiry);
         vm.prank(address(midnight));
@@ -286,7 +294,7 @@ contract SetterRateRatifierTest is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = MAX_TICK;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, 0, 0);
+        bytes32 _root = HashLib.hashRateOffer(offer, 0, 0, address(0));
         vm.prank(lender);
         setterRateRatifier.setIsRootRatified(lender, _root, true);
 
@@ -303,7 +311,7 @@ contract SetterRateRatifierTest is BaseTest {
         // Tick price ~0.75e18 between priceLimitDown at t=0 (3x rate ~0.625e18) and at expiry (1x rate ~0.909e18).
         offer.tick = TickLib.priceToTick(0.75e18, 1);
 
-        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate);
+        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
         vm.prank(lender);
         setterRateRatifier.setIsRootRatified(lender, _root, true);
 
@@ -327,7 +335,7 @@ contract SetterRateRatifierTest is BaseTest {
         // Tick price ~0.8e18 between priceLimitUp at expiry (3x rate ~0.769e18) and at t=0 (1x rate ~0.833e18).
         offer.tick = TickLib.priceToTick(0.8e18, 1);
 
-        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate);
+        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
         vm.prank(borrower);
         setterRateRatifier.setIsRootRatified(borrower, _root, true);
 
@@ -340,5 +348,30 @@ contract SetterRateRatifierTest is BaseTest {
         vm.warp(offer.start + (offer.expiry - offer.start) * 3 / 4);
         vm.prank(address(midnight));
         assertEq(setterRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
+    }
+
+    function testAuthorizedTaker() public {
+        Offer memory offer = makeOffer(lender, true);
+        uint256 rate = rate10pct();
+        address authorizedTaker = borrower;
+
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, authorizedTaker);
+        vm.prank(lender);
+        setterRateRatifier.setIsRootRatified(lender, _root, true);
+
+        bytes memory data = abi.encode(_root, uint256(0), new bytes32[](0), rate, rate, authorizedTaker);
+
+        vm.prank(address(midnight));
+        vm.expectRevert(ISetterRateRatifier.UnauthorizedTaker.selector);
+        setterRateRatifier.isRatified(offer, data, otherBorrower);
+
+        vm.prank(address(midnight));
+        assertEq(setterRateRatifier.isRatified(offer, data, authorizedTaker), CALLBACK_SUCCESS);
+
+        vm.prank(authorizedTaker);
+        midnight.setIsAuthorized(otherBorrower, true, authorizedTaker);
+
+        vm.prank(address(midnight));
+        assertEq(setterRateRatifier.isRatified(offer, data, otherBorrower), CALLBACK_SUCCESS);
     }
 }

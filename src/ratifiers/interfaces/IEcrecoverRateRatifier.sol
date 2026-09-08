@@ -20,6 +20,7 @@ interface IEcrecoverRateRatifier is IRatifier {
     error OfferExpired();
     error RootCanceled();
     error Unauthorized();
+    error UnauthorizedTaker();
     error WorsePrice();
 
     /// EVENTS ///

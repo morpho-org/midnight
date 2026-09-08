@@ -11,7 +11,8 @@ import {HashLib} from "./libraries/HashLib.sol";
 
 /// @dev This ratifier checks that an authorized address has ratified the root of a Merkle tree of rate offers, and
 /// that the offer is a leaf in that tree.
-/// @dev The ratifier data must contain the root, the leaf index, the Merkle proof, and the start and expiry rates.
+/// @dev The ratifier data must contain the root, the leaf index, the Merkle proof, the start and expiry rates and the
+/// authorized taker.
 /// @dev The leaf index determines each sibling's left/right position during Merkle proof verification.
 /// @dev The maker sets a start and expiry rate instead of a fixed price. Both are WAD-scaled per-second rates.
 /// At ratification, the rate is linearly interpolated over the offer lifetime and used as a price limit against
@@ -36,9 +37,15 @@ contract SetterRateRatifier is ISetterRateRatifier {
         emit SetIsRootRatified(msg.sender, maker, root, newIsRootRatified);
     }
 
-    function isRatified(Offer memory offer, bytes memory ratifierData, address) external view returns (bytes32) {
-        (bytes32 root, uint256 leafIndex, bytes32[] memory proof, uint256 startRate, uint256 expiryRate) =
-            abi.decode(ratifierData, (bytes32, uint256, bytes32[], uint256, uint256));
+    function isRatified(Offer memory offer, bytes memory ratifierData, address taker) external view returns (bytes32) {
+        (
+            bytes32 root,
+            uint256 leafIndex,
+            bytes32[] memory proof,
+            uint256 startRate,
+            uint256 expiryRate,
+            address authorizedTaker
+        ) = abi.decode(ratifierData, (bytes32, uint256, bytes32[], uint256, uint256, address));
 
         require(block.timestamp <= offer.expiry, OfferExpired());
         uint256 rate = startRate;
@@ -63,9 +70,17 @@ contract SetterRateRatifier is ISetterRateRatifier {
         }
 
         require(
-            HashLib.isLeaf(root, HashLib.hashRateOffer(offer, startRate, expiryRate), leafIndex, proof), InvalidProof()
+            HashLib.isLeaf(
+                root, HashLib.hashRateOffer(offer, startRate, expiryRate, authorizedTaker), leafIndex, proof
+            ),
+            InvalidProof()
         );
         require(isRootRatified[offer.maker][root], NotRatified());
+        require(
+            authorizedTaker == address(0) || taker == authorizedTaker
+                || IMidnight(MIDNIGHT).isAuthorized(authorizedTaker, taker),
+            UnauthorizedTaker()
+        );
         return CALLBACK_SUCCESS;
     }
 }

@@ -13,7 +13,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// no longer valid.
 /// @dev This ratifier checks that the offer has been signed by an authorized address in a Merkle tree of rate offers.
 /// To that end, it expects the ratifier data to contain the signature, the root of the tree, the leaf index of the
-/// offer, the proof of the offer in the tree and the start and expiry rate for the offer.
+/// offer, the proof of the offer in the tree, the start and expiry rate for the offer, and the authorized taker.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each sibling's left/right position.
 /// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
@@ -40,15 +40,16 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
         emit CancelRoot(msg.sender, maker, root);
     }
 
-    function isRatified(Offer memory offer, bytes memory ratifierData, address) external view returns (bytes32) {
+    function isRatified(Offer memory offer, bytes memory ratifierData, address taker) external view returns (bytes32) {
         (
             Signature memory sig,
             bytes32 root,
             uint256 leafIndex,
             bytes32[] memory proof,
             uint256 startRate,
-            uint256 expiryRate
-        ) = abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[], uint256, uint256));
+            uint256 expiryRate,
+            address authorizedTaker
+        ) = abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[], uint256, uint256, address));
 
         require(block.timestamp <= offer.expiry, OfferExpired());
         uint256 rate = startRate;
@@ -74,7 +75,10 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
 
         require(!isRootCanceled[offer.maker][root], RootCanceled());
         require(
-            HashLib.isLeaf(root, HashLib.hashRateOffer(offer, startRate, expiryRate), leafIndex, proof), InvalidProof()
+            HashLib.isLeaf(
+                root, HashLib.hashRateOffer(offer, startRate, expiryRate, authorizedTaker), leafIndex, proof
+            ),
+            InvalidProof()
         );
         bytes32 structHash = keccak256(abi.encode(HashLib.rateOfferTreeTypeHash(proof.length), root));
         bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
@@ -83,6 +87,11 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
         address _signer = ecrecover(digest, sig.v, sig.r, sig.s);
         require(_signer != address(0), InvalidSignature());
         require(_signer == offer.maker || IMidnight(MIDNIGHT).isAuthorized(offer.maker, _signer), Unauthorized());
+        require(
+            authorizedTaker == address(0) || taker == authorizedTaker
+                || IMidnight(MIDNIGHT).isAuthorized(authorizedTaker, taker),
+            UnauthorizedTaker()
+        );
         return CALLBACK_SUCCESS;
     }
 }

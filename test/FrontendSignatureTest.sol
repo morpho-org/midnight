@@ -84,9 +84,9 @@ contract FrontendSignatureTest is Test {
 address constant RATE_ACCOUNT = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
 uint256 constant START_RATE = 9512937594; // ~30%/yr
 uint256 constant EXPIRY_RATE = 3170979198; // ~10%/yr
-uint8 constant RATE_SIG_V = 28;
-bytes32 constant RATE_SIG_R = 0x955206f2d438185a75d18f9e17f3125c4047b82f934786cd144f0a63a33cd4c9;
-bytes32 constant RATE_SIG_S = 0x6df01ae2d10d9bb420a64dc2e3e07bb850db621a0678cd98cd2365867680742d;
+uint8 constant RATE_SIG_V = 27;
+bytes32 constant RATE_SIG_R = 0xcd1ac6409cc970bce8a7458dac9e751a2223446459923ef73122646cfb0b00c9;
+bytes32 constant RATE_SIG_S = 0x572d236ad70e788759f1e9f92a19fad4639fa41dad1fae6c03f88ce8f086950c;
 
 contract FrontendRateSignatureTest is Test {
     function setUp() public {
@@ -113,10 +113,10 @@ contract FrontendRateSignatureTest is Test {
         offers[2] = defaultRateOffer(3);
         offers[3] = defaultRateOffer(4);
 
-        bytes32 h0 = HashLib.hashRateOffer(offers[0], START_RATE, EXPIRY_RATE);
-        bytes32 h1 = HashLib.hashRateOffer(offers[1], START_RATE, EXPIRY_RATE);
-        bytes32 h2 = HashLib.hashRateOffer(offers[2], START_RATE, EXPIRY_RATE);
-        bytes32 h3 = HashLib.hashRateOffer(offers[3], START_RATE, EXPIRY_RATE);
+        bytes32 h0 = HashLib.hashRateOffer(offers[0], START_RATE, EXPIRY_RATE, address(0));
+        bytes32 h1 = HashLib.hashRateOffer(offers[1], START_RATE, EXPIRY_RATE, address(0));
+        bytes32 h2 = HashLib.hashRateOffer(offers[2], START_RATE, EXPIRY_RATE, address(0));
+        bytes32 h3 = HashLib.hashRateOffer(offers[3], START_RATE, EXPIRY_RATE, address(0));
         bytes32 left = HashLib.hashNode(h0, h1);
         bytes32 right = HashLib.hashNode(h2, h3);
         bytes32 _root = HashLib.hashNode(left, right);
@@ -142,7 +142,13 @@ contract FrontendRateSignatureTest is Test {
         assertTrue(HashLib.isLeaf(_root, h3, 3, proof3));
 
         bytes memory ratifierData = abi.encode(
-            Signature({v: RATE_SIG_V, r: RATE_SIG_R, s: RATE_SIG_S}), _root, uint256(0), proof0, START_RATE, EXPIRY_RATE
+            Signature({v: RATE_SIG_V, r: RATE_SIG_R, s: RATE_SIG_S}),
+            _root,
+            uint256(0),
+            proof0,
+            START_RATE,
+            EXPIRY_RATE,
+            address(0)
         );
         bytes32 result = EcrecoverRateRatifier(RATIFIER).isRatified(offers[0], ratifierData, address(0));
         assertEq(result, CALLBACK_SUCCESS);

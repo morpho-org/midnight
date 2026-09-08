@@ -25,7 +25,7 @@ contract EcrecoverRateRatifierTest is BaseTest {
         returns (bytes memory)
     {
         Signature memory sig = rateSignature(_root, privateKey[signer], address(ecrecoverRateRatifier), 0);
-        return abi.encode(sig, _root, 0, new bytes32[](0), startRate, expiryRate);
+        return abi.encode(sig, _root, 0, new bytes32[](0), startRate, expiryRate, address(0));
     }
 
     function buildRatifierData(Offer memory offer, uint256 startRate, uint256 expiryRate, address signer)
@@ -33,7 +33,9 @@ contract EcrecoverRateRatifierTest is BaseTest {
         view
         returns (bytes memory)
     {
-        return buildRatifierData(HashLib.hashRateOffer(offer, startRate, expiryRate), startRate, expiryRate, signer);
+        return buildRatifierData(
+            HashLib.hashRateOffer(offer, startRate, expiryRate, address(0)), startRate, expiryRate, signer
+        );
     }
 
     function makeOffer(address maker, bool buy) internal view returns (Offer memory offer) {
@@ -69,13 +71,13 @@ contract EcrecoverRateRatifierTest is BaseTest {
         offer.tick = 0;
         offer.expiry = type(uint256).max;
         offer.ratifier = address(ecrecoverRateRatifier);
-        bytes32 root = HashLib.hashRateOffer(offer, 0, 0);
+        bytes32 root = HashLib.hashRateOffer(offer, 0, 0, address(0));
 
         Signature memory _sig = rateSignature(root, privateKey, address(ecrecoverRateRatifier), 0);
 
         vm.prank(address(midnight));
         bytes32 result = ecrecoverRateRatifier.isRatified(
-            offer, abi.encode(_sig, root, 0, new bytes32[](0), uint256(0), uint256(0)), address(0)
+            offer, abi.encode(_sig, root, 0, new bytes32[](0), uint256(0), uint256(0), address(0)), address(0)
         );
         assertEq(result, CALLBACK_SUCCESS);
     }
@@ -128,14 +130,15 @@ contract EcrecoverRateRatifierTest is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = 0;
         uint256 rate = rate10pct();
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
         bytes memory data = abi.encode(
             Signature({v: 27, r: bytes32(uint256(1)), s: bytes32(uint256(2))}),
             _root,
             uint256(0),
             new bytes32[](0),
             rate,
-            rate
+            rate,
+            address(0)
         );
 
         vm.prank(address(midnight));
@@ -163,8 +166,8 @@ contract EcrecoverRateRatifierTest is BaseTest {
         rightOffer.tick = 0;
         rightOffer.expiry += 1;
 
-        bytes32 leftHash = HashLib.hashRateOffer(leftOffer, rate, rate);
-        bytes32 rightHash = HashLib.hashRateOffer(rightOffer, rate, rate);
+        bytes32 leftHash = HashLib.hashRateOffer(leftOffer, rate, rate, address(0));
+        bytes32 rightHash = HashLib.hashRateOffer(rightOffer, rate, rate, address(0));
         if (leftHash < rightHash) {
             (leftOffer, rightOffer) = (rightOffer, leftOffer);
             (leftHash, rightHash) = (rightHash, leftHash);
@@ -174,7 +177,7 @@ contract EcrecoverRateRatifierTest is BaseTest {
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = leftHash;
         Signature memory sig = rateSignature(root, privateKey[lender], address(ecrecoverRateRatifier), 1);
-        bytes memory ratifierData = abi.encode(sig, root, 1, proof, rate, rate);
+        bytes memory ratifierData = abi.encode(sig, root, 1, proof, rate, rate, address(0));
 
         vm.prank(address(midnight));
         bytes32 result = ecrecoverRateRatifier.isRatified(rightOffer, ratifierData, address(0));
@@ -185,7 +188,7 @@ contract EcrecoverRateRatifierTest is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = 0;
         uint256 rate = rate10pct();
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
         bytes memory ratifierData = buildRatifierData(_root, rate, rate, lender);
 
         vm.expectEmit();
@@ -204,7 +207,7 @@ contract EcrecoverRateRatifierTest is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = 0;
         uint256 rate = rate10pct();
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
         bytes memory ratifierData = buildRatifierData(_root, rate, rate, lender);
 
         vm.prank(lender);
@@ -320,12 +323,12 @@ contract EcrecoverRateRatifierTest is BaseTest {
         offer.tick = 0;
         uint256 rate = rate10pct();
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
         Signature memory sig = rateSignature(_root, privateKey[lender], address(ecrecoverRateRatifier), 0);
-        bytes memory data = abi.encode(sig, _root, 0, new bytes32[](0), rate, rate);
+        bytes memory data = abi.encode(sig, _root, 0, new bytes32[](0), rate, rate, address(0));
 
-        bytes memory tamperedDataStartRate = abi.encode(sig, _root, 0, new bytes32[](0), rate * 2, rate);
-        bytes memory tamperedDataExpiryRate = abi.encode(sig, _root, 0, new bytes32[](0), rate, rate * 2);
+        bytes memory tamperedDataStartRate = abi.encode(sig, _root, 0, new bytes32[](0), rate * 2, rate, address(0));
+        bytes memory tamperedDataExpiryRate = abi.encode(sig, _root, 0, new bytes32[](0), rate, rate * 2, address(0));
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRateRatifier.InvalidProof.selector);
@@ -497,5 +500,28 @@ contract EcrecoverRateRatifierTest is BaseTest {
         vm.prank(address(midnight));
         vm.expectRevert();
         ecrecoverRateRatifier.isRatified(offer, data, address(0));
+    }
+
+    function testAuthorizedTaker() public {
+        Offer memory offer = makeOffer(lender, true);
+        uint256 rate = rate10pct();
+        address authorizedTaker = borrower;
+
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, authorizedTaker);
+        Signature memory sig = rateSignature(_root, privateKey[lender], address(ecrecoverRateRatifier), 0);
+        bytes memory data = abi.encode(sig, _root, 0, new bytes32[](0), rate, rate, authorizedTaker);
+
+        vm.prank(address(midnight));
+        vm.expectRevert(IEcrecoverRateRatifier.UnauthorizedTaker.selector);
+        ecrecoverRateRatifier.isRatified(offer, data, otherBorrower);
+
+        vm.prank(address(midnight));
+        assertEq(ecrecoverRateRatifier.isRatified(offer, data, authorizedTaker), CALLBACK_SUCCESS);
+
+        vm.prank(authorizedTaker);
+        midnight.setIsAuthorized(otherBorrower, true, authorizedTaker);
+
+        vm.prank(address(midnight));
+        assertEq(ecrecoverRateRatifier.isRatified(offer, data, otherBorrower), CALLBACK_SUCCESS);
     }
 }
