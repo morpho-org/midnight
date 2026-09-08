@@ -45,10 +45,7 @@ persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
 
 function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (d == 0) {
-        revert();
-    }
-    if (x * y > max_uint256) {
+    if (d == 0 || x * y >= 2 ^ 256) {
         revert();
     }
     uint256 result = ghostMulDivDown(x, y, d);
@@ -61,10 +58,7 @@ function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
 }
 
 function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (d == 0) {
-        revert();
-    }
-    if (x * y + d - 1 > max_uint256) {
+    if (d == 0 || x * y + d - 1 >= 2 ^ 256) {
         revert();
     }
     uint256 result = ghostMulDivUp(x, y, d);

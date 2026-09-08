@@ -5,7 +5,6 @@ pragma solidity ^0.8.0;
 import {PermitExt} from "./PermitExt.sol";
 
 contract ERC20NoReturn is PermitExt {
-    uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
 
@@ -29,8 +28,7 @@ contract ERC20NoReturn is PermitExt {
         _transfer(_from, _to, _amount);
     }
 
-    function approve(address _spender, uint256 _amount) public returns (bool) {
+    function approve(address _spender, uint256 _amount) public {
         allowance[msg.sender][_spender] = _amount;
-        return true;
     }
 }

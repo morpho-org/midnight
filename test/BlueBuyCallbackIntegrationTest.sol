@@ -9,6 +9,7 @@ import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {BlueBuyCallback} from "../src/periphery/blue-buy-callback/BlueBuyCallback.sol";
 import {BlueBuyCallbackFactory} from "../src/periphery/blue-buy-callback/BlueBuyCallbackFactory.sol";
+import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 contract BlueBuyCallbackIntegrationTest is BaseTest {
@@ -61,7 +62,7 @@ contract BlueBuyCallbackIntegrationTest is BaseTest {
     function testBuyUsesLiquiditySuppliedOnBlue(uint256 units) public {
         units = bound(units, 1, 1e30);
         deal(address(loanToken), address(this), units);
-        require(loanToken.approve(address(blue), units));
+        ERC20Lib.safeApprove(address(loanToken), address(blue), units);
         (uint256 suppliedAssets, uint256 suppliedShares) =
             blue.supply(blueMarketParams, units, 0, address(callback), hex"");
         assertEq(suppliedAssets, units);
@@ -95,12 +96,12 @@ contract BlueBuyCallbackIntegrationTest is BaseTest {
         suppliedAssets = bound(suppliedAssets, 2, 1e30);
         borrowedAssets = bound(borrowedAssets, 1, suppliedAssets / 2);
         deal(address(loanToken), address(this), suppliedAssets);
-        require(loanToken.approve(address(blue), suppliedAssets));
+        ERC20Lib.safeApprove(address(loanToken), address(blue), suppliedAssets);
         blue.supply(blueMarketParams, suppliedAssets, 0, address(callback), hex"");
 
         deal(address(collateralToken1), borrower, borrowedAssets * 2);
         vm.startPrank(borrower);
-        require(collateralToken1.approve(address(blue), borrowedAssets * 2));
+        ERC20Lib.safeApprove(address(collateralToken1), address(blue), borrowedAssets * 2);
         blue.supplyCollateral(blueMarketParams, borrowedAssets * 2, borrower, hex"");
         blue.borrow(blueMarketParams, borrowedAssets, 0, borrower, borrower);
         vm.stopPrank();
@@ -114,7 +115,7 @@ contract BlueBuyCallbackIntegrationTest is BaseTest {
         suppliedAssets = bound(suppliedAssets, 1, 1e30);
         flashloanedAssets = bound(flashloanedAssets, 1, suppliedAssets);
         deal(address(loanToken), address(this), suppliedAssets);
-        require(loanToken.approve(address(blue), suppliedAssets));
+        ERC20Lib.safeApprove(address(loanToken), address(blue), suppliedAssets);
         blue.supply(blueMarketParams, suppliedAssets, 0, address(callback), hex"");
 
         assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, abi.encode(blueMarketParams)), suppliedAssets);
@@ -126,6 +127,6 @@ contract BlueBuyCallbackIntegrationTest is BaseTest {
 
     function onMorphoFlashLoan(uint256 assets, bytes calldata) external {
         observedBound = callback.buyerAssetsBound(bytes32(0), market, lender, abi.encode(blueMarketParams));
-        require(loanToken.approve(address(blue), assets));
+        ERC20Lib.safeApprove(address(loanToken), address(blue), assets);
     }
 }

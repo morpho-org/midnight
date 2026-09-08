@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {IMorpho, Id, MarketParams, Authorization, Signature} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {IMorpho, MarketParams, Authorization, Signature} from "../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {AUTHORIZATION_TYPEHASH, DOMAIN_TYPEHASH} from "../../../lib/morpho-blue/src/libraries/ConstantsLib.sol";
 import {MarketParamsLib} from "../../../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
 import {MorphoBalancesLib} from "../../../lib/morpho-blue/src/libraries/periphery/MorphoBalancesLib.sol";
@@ -58,6 +58,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
         bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, address(this)));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
+        // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
         address signer = ecrecover(digest, signature.v, signature.r, signature.s);
         require(signer != address(0) && signer == authorization.authorizer && signer == OWNER, InvalidSignature());
 
@@ -109,7 +110,9 @@ contract BlueBuyCallback is IBlueBuyCallback {
 
         (uint256 totalSupplyAssets, uint256 totalSupplyShares, uint256 totalBorrowAssets,) =
             IMorpho(BLUE).expectedMarketBalances(marketParams);
-        uint256 supplyAssets = IMorpho(BLUE).position(marketParams.id(), address(this)).supplyShares
+        uint256 supplyAssets = IMorpho(BLUE)
+            .position(marketParams.id(), address(this))
+            .supplyShares
             .toAssetsDown(totalSupplyAssets, totalSupplyShares);
         uint256 liquidity = totalSupplyAssets - totalBorrowAssets;
         uint256 blueBalance = IERC20Extended(marketParams.loanToken).balanceOf(BLUE);

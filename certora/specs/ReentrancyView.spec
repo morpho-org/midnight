@@ -8,6 +8,11 @@ methods {
     // valid even if they changed the state.
     function touchMarket(Midnight.Market memory) internal returns (bytes32) => NONDET;
     function _updatePosition(Midnight.Market memory, bytes32, address) internal returns (uint128, uint128, uint128) => NONDET;
+
+    // These functions are over-approximated, except for the reverting behavior. We don't look at the reverting behavior in this file.
+    function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => NONDET;
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => NONDET;
 }
 
 // True when at least one slot was written.

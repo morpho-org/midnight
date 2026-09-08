@@ -16,7 +16,7 @@ jobs:
         with:
           submodules: recursive
       - name: Install Foundry (old)
-        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
         with:
           version: v1.5.1
       - name: Verify forge executable hash
@@ -41,23 +41,37 @@ jobs:
       - name: Export bytecode manifest (old)
         run: |
           mkdir -p compare
-          find out -name '*.json' -print0 | sort -z | while IFS= read -r -d '' file; do
-            rel="${file#out/}"
-            jq -r --arg rel "$rel" '[$rel, (.bytecode.object // ""), (.deployedBytecode.object // "")] | @tsv' "$file"
-          done > compare/old.tsv
-          [ -s compare/old.tsv ] || { echo "old manifest is empty"; exit 1; }
+          find out -name '*.json' -print0 | while IFS= read -r -d '' file; do
+            target="$(jq -r '((.metadata.settings.compilationTarget // {}) | keys[0]) // .ast.absolutePath // empty' "$file")"
+            case "$target" in src/*) ;; *) continue ;; esac
+            name="$(jq -r '((.metadata.settings.compilationTarget // {}) | to_entries[0].value) // empty' "$file")"
+            [ -n "$name" ] || name="$(basename "$file" .json)"
+            jq -r --arg rel "$target:$name" '[$rel, (.bytecode.object // ""), (.deployedBytecode.object // "")] | @tsv' "$file"
+          done | sort > compare/old.tsv
+          [ -s compare/old.tsv ] || { echo "old manifest is empty (no src/ artifact carried a source path)"; exit 1; }
+          if grep -qv '^src/' compare/old.tsv; then
+            echo "old manifest contains non-src artifacts:"; grep -v '^src/' compare/old.tsv | cut -f1; exit 1
+          fi
+          echo "old manifest: $(wc -l < compare/old.tsv) src/ artifacts"
       - name: Run Forge tests
         run: forge test
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
       - name: Build with Foundry
         run: forge build --force --out out-new --cache-path cache-new
       - name: Export bytecode manifest (new)
         run: |
-          find out-new -name '*.json' -print0 | sort -z | while IFS= read -r -d '' file; do
-            rel="${file#out-new/}"
-            jq -r --arg rel "$rel" '[$rel, (.bytecode.object // ""), (.deployedBytecode.object // "")] | @tsv' "$file"
-          done > compare/new.tsv
-          [ -s compare/new.tsv ] || { echo "new manifest is empty"; exit 1; }
+          find out-new -name '*.json' -print0 | while IFS= read -r -d '' file; do
+            target="$(jq -r '((.metadata.settings.compilationTarget // {}) | keys[0]) // .ast.absolutePath // empty' "$file")"
+            case "$target" in src/*) ;; *) continue ;; esac
+            name="$(jq -r '((.metadata.settings.compilationTarget // {}) | to_entries[0].value) // empty' "$file")"
+            [ -n "$name" ] || name="$(basename "$file" .json)"
+            jq -r --arg rel "$target:$name" '[$rel, (.bytecode.object // ""), (.deployedBytecode.object // "")] | @tsv' "$file"
+          done | sort > compare/new.tsv
+          [ -s compare/new.tsv ] || { echo "new manifest is empty (no src/ artifact carried a source path)"; exit 1; }
+          if grep -qv '^src/' compare/new.tsv; then
+            echo "new manifest contains non-src artifacts:"; grep -v '^src/' compare/new.tsv | cut -f1; exit 1
+          fi
+          echo "new manifest: $(wc -l < compare/new.tsv) src/ artifacts"
       - name: Compare bytecode
         run: diff -u compare/old.tsv compare/new.tsv

@@ -10,7 +10,7 @@ interface IBlueBuyCallbackFactory {
     function MIDNIGHT() external view returns (address);
     function BLUE() external view returns (address);
     function callbackOf(address owner, bytes32 salt) external view returns (address);
-    function isBlueCallback(address callback) external view returns (bool);
+    function isBlueBuyCallback(address callback) external view returns (bool);
 
     /// FUNCTIONS ///
     function createBlueBuyCallback(address owner, bytes32 salt) external returns (address);

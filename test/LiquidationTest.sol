@@ -9,7 +9,7 @@ import {
     MAX_CONTINUOUS_FEE,
     CALLBACK_SUCCESS
 } from "../src/libraries/ConstantsLib.sol";
-import {IMidnight, Market, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {IMidnight, Market, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
 import {IdLib} from "../src/libraries/IdLib.sol";
 import {IOracle} from "../src/interfaces/IOracle.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
@@ -453,7 +453,8 @@ contract LiquidationTest is BaseTest {
         uint256 maxRepaid = _maxRepaid(units, debtAfterBadDebt, liquidationOraclePrice);
         uint256 lif0 = maxLif(market.collateralParams[0]);
         uint256 maxRepaidFromCollat = midnight.collateral(id, borrower, 0)
-            .mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE).mulDivDown(WAD, lif0);
+            .mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
+            .mulDivDown(WAD, lif0);
         repaid = bound(repaid, 0, UtilsLib.min(UtilsLib.min(maxRepaid, debtAfterBadDebt), maxRepaidFromCollat));
 
         midnight.liquidate(market, 0, 0, repaid, borrower, false, address(this), address(0), "");
@@ -614,7 +615,8 @@ contract LiquidationTest is BaseTest {
         uint256 maxRepaid = _maxRepaid(units, units, liquidationOraclePrice);
         uint256 lif0 = maxLif(market.collateralParams[0]);
         uint256 remainingRepayable = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
-            .mulDivDown(WAD, lif0).zeroFloorSub(maxRepaid);
+            .mulDivDown(WAD, lif0)
+            .zeroFloorSub(maxRepaid);
         market.rcfThreshold = bound(rcfThreshold, remainingRepayable + 1, type(uint256).max);
 
         collateralize(market, borrower, units);
@@ -641,7 +643,8 @@ contract LiquidationTest is BaseTest {
         uint256 maxRepaid = _maxRepaid(units, units, liquidationOraclePrice);
         vm.assume(maxRepaid < units); // needed because of the round up.
         uint256 remainingRepayable = collatAmount.mulDivDown(liquidationOraclePrice, ORACLE_PRICE_SCALE)
-            .mulDivDown(WAD, maxLif(market.collateralParams[0])).zeroFloorSub(maxRepaid);
+            .mulDivDown(WAD, maxLif(market.collateralParams[0]))
+            .zeroFloorSub(maxRepaid);
         market.rcfThreshold = bound(rcfThreshold, 0, remainingRepayable);
 
         collateralize(market, borrower, units);
@@ -912,6 +915,24 @@ contract LiquidationTest is BaseTest {
         assertEq(midnight.collateral(id, borrower, 0), 0, "collateral withdrawn");
     }
 
+    function testFullBadDebtTakeReverts(uint256 units) public {
+        units = bound(units, 10, MAX_UNITS);
+        collateralize(market, borrower, units);
+        setupMarket(market, units);
+
+        Oracle(market.collateralParams[0].oracle).setPrice(0);
+        midnight.liquidate(market, 0, 0, 0, borrower, false, address(this), address(0), "");
+        assertEq(midnight.lossFactor(id), type(uint128).max, "loss factor");
+
+        // The market is now permanently unusable: any take reverts.
+        Offer memory borrowerOffer = _setupMarketOffer(market);
+        deal(address(loanToken), lender, units);
+
+        vm.expectRevert(IMidnight.MarketLossFactorMaxedOut.selector);
+        vm.prank(lender);
+        midnight.take(borrowerOffer, hex"", units, lender, address(0), address(0), hex"");
+    }
+
     // helpers.
 
     /// @dev Bad debt as computed in liquidate
@@ -923,7 +944,8 @@ contract LiquidationTest is BaseTest {
             CollateralParams memory _collateral = market.collateralParams[i];
             uint256 price = IOracle(_collateral.oracle).price();
             badDebt = badDebt.zeroFloorSub(
-                midnight.collateral(id, borrower, i).mulDivUp(price, ORACLE_PRICE_SCALE)
+                midnight.collateral(id, borrower, i)
+                    .mulDivUp(price, ORACLE_PRICE_SCALE)
                     .mulDivUp(WAD, maxLif(_collateral))
             );
             require(i < 128, "i is too large");
