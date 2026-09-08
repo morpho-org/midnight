@@ -17,18 +17,17 @@ methods {
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
-    // Deterministic ghost summaries of the rate-independent helpers (see header).
+    // Deterministic ghost summaries of the internal math functions.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDownWithRevert(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUpWithRevert(x, y, d);
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => ghostTickToPrice(tick);
     function settlementFee(bytes32 id, uint256 ttm) internal returns (uint256) => ghostSettlementFee(id, ttm);
 
     // Enter gates: deterministic per (gate, user) so the rate-independent gate decision is identical across both runs.
-    // Without this they get an AUTO summary that havocs (and can revert) independently per run, producing a spurious revert difference.
     function _.canIncreaseCredit(address user) external => ghostCanIncreaseCredit(calledContract, user) expect(bool);
     function _.canIncreaseDebt(address user) external => ghostCanIncreaseDebt(calledContract, user) expect(bool);
 
-    // Oracle summary: we assume the price does not change during the execution of a transaction.
+    // Oracle summary: we assume the price does not change between the two calls to take.
     function _.price() external => PER_CALLEE_CONSTANT;
 
     // Callbacks and ratifier: assumed to succeed deterministically. We verify take's own body, not the behavior of untrusted callbacks, and this spec (like ContinuousFee.spec) assumes no reentrancy.
@@ -41,8 +40,6 @@ methods {
 }
 
 /// CONSTANTS ///
-
-definition WAD() returns uint256 = 10 ^ 18;
 
 definition MAX_TTM() returns mathint = 100 * 365 * 86400;
 
@@ -78,17 +75,9 @@ persistent ghost ghostCanIncreaseCredit(address, address) returns bool;
 
 persistent ghost ghostCanIncreaseDebt(address, address) returns bool;
 
-persistent ghost ghostCanLiquidate(address, address) returns bool;
-
 persistent ghost ghostTickToPrice(uint256) returns uint256;
 
 persistent ghost ghostSettlementFee(bytes32, uint256) returns uint256;
-
-persistent ghost ghostIsHealthy(bytes32, address) returns bool;
-
-persistent ghost ghostTExchange(uint256, bytes32, address, bool) returns bool;
-
-persistent ghost ghostTGet(uint256, bytes32, address) returns bool;
 
 function deterministicSuccess() returns bytes32 {
     return Utils.callbackSuccess();
