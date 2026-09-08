@@ -2,6 +2,9 @@
 
 // EQUIVALENCE OF REVERTS: activating the continuous fee never makes `take` revert in new ways, provided the fee doesn't exceed the offer's continuousFeeCap.
 
+import "BitmapSummaries.spec";
+import "MulDivAxioms.spec";
+
 using Utils as Utils;
 
 methods {
@@ -19,15 +22,14 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUpWithRevert(x, y, d);
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => ghostTickToPrice(tick);
     function settlementFee(bytes32 id, uint256 ttm) internal returns (uint256) => ghostSettlementFee(id, ttm);
-    function isHealthy(Midnight.Market memory market, bytes32 id, address user) internal returns (bool) => ghostIsHealthy(id, user);
-    function UtilsLib.tExchange(uint256 slot, bytes32 id, address user, bool val) internal returns (bool) => ghostTExchange(slot, id, user, val);
-    function UtilsLib.tGet(uint256 slot, bytes32 id, address user) internal returns (bool) => ghostTGet(slot, id, user);
 
-    // Enter/liquidator gates: deterministic per (gate, user) so the rate-independent gate decision is identical across both runs.
+    // Enter gates: deterministic per (gate, user) so the rate-independent gate decision is identical across both runs.
     // Without this they get an AUTO summary that havocs (and can revert) independently per run, producing a spurious revert difference.
     function _.canIncreaseCredit(address user) external => ghostCanIncreaseCredit(calledContract, user) expect(bool);
     function _.canIncreaseDebt(address user) external => ghostCanIncreaseDebt(calledContract, user) expect(bool);
-    function _.canLiquidate(address user) external => ghostCanLiquidate(calledContract, user) expect(bool);
+
+    // Oracle summary: we assume the price does not change during the execution of a transaction.
+    function _.price() external => PER_CALLEE_CONSTANT;
 
     // Callbacks and ratifier: assumed to succeed deterministically. We verify take's own body, not the behavior of untrusted callbacks, and this spec (like ContinuousFee.spec) assumes no reentrancy.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => deterministicSuccess() expect(bytes32);
@@ -36,7 +38,6 @@ methods {
 
     // Token transfers: deterministic no-op (void => no havoc); identical across both runs.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
 
 /// CONSTANTS ///
@@ -51,38 +52,26 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
 }
 
-// mulDivDown: deterministic, reverts on d == 0 and on x*y overflow (see mulOverflow below).
-// The axiom mulDivArgumentLesserThanDenominator, proved in MulDiv.spec, is needed:
-//     y <= d => result <= x.
-// This bounds the enabled-run fee increase by buyerCreditIncrease.
-persistent ghost summaryMulDivDownGhost(mathint, mathint, mathint) returns mathint {
-    axiom forall mathint x. forall mathint y. forall mathint d. (d > 0 && 0 <= y && y <= d) => summaryMulDivDownGhost(x, y, d) <= x;
+persistent ghost ghostMulDivDownOverflow(uint256, uint256, uint256) returns bool {
+    // No overflow if both a and b fit in uint128, because overflow condition is a * b >= 2^256.
+    axiom forall uint256 a. forall uint256 b. forall uint256 d. a < 2 ^ 128 && b < 2 ^ 128 => !ghostMulDivDownOverflow(a, b, d);
 }
 
-// mulDivUp: deterministic, reverts on d == 0 and on x*y overflow.
-persistent ghost summaryMulDivUpGhost(mathint, mathint, mathint) returns mathint;
-
-// mulDiv reverts when x*y overflows 256 bits.
-// We model that overflow as a deterministic uninterpreted predicate rather than the literal nonlinear `x * y >= 2^256`, for two reasons:
-//   - The many rate-independent mulDiv calls have identical (x,y) across both runs, so they share the same overflow outcome by congruence (an uninterpreted function), with no nonlinear arithmetic to discharge.
-//   - The one rate-dependent fee mulDiv (x = buyerCreditIncrease, y = continuousFee*ttm) is provably non-overflowing via the LINEAR safe-region axiom below instead of a product-of-bounds NIA argument.
-// Soundness: the axiom only asserts no-overflow where it genuinely holds (x,y <= max_uint128 => x*y < 2^256), so it never hides a real overflow revert. Outside that region the predicate is free, but in every such case both runs revert anyway (e.g. the rate-independent toUint128(buyerCreditIncrease) at Midnight.sol:417).
-persistent ghost mulOverflow(mathint, mathint) returns bool {
-    axiom forall mathint x. forall mathint y. (0 <= x && x <= max_uint128 && 0 <= y && y <= max_uint128) => !mulOverflow(x, y);
-}
+persistent ghost ghostMulDivUpOverflow(uint256, uint256, uint256) returns bool;
 
 function summaryMulDivDownWithRevert(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (d == 0 || x * y >= 2 ^ 256) {
+    if (d == 0 || ghostMulDivDownOverflow(x, y, d)) {
         revert();
     }
-    return require_uint256(summaryMulDivDownGhost(x, y, d));
+    require axiomMathMulDivDownArgumentLesserThanDenominatorB(x, y, d), "axiom";
+    return require_uint256(ghostMulDivDown(x, y, d));
 }
 
 function summaryMulDivUpWithRevert(uint256 x, uint256 y, uint256 d) returns uint256 {
-    if (d == 0 || x * y + d - 1 >= 2 ^ 256) {
+    if (d == 0 || ghostMulDivUpOverflow(x, y, d)) {
         revert();
     }
-    return require_uint256(summaryMulDivUpGhost(x, y, d));
+    return require_uint256(ghostMulDivUp(x, y, d));
 }
 
 persistent ghost ghostCanIncreaseCredit(address, address) returns bool;
