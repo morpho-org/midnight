@@ -27,9 +27,9 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     /// CONSTRUCTOR ///
 
     constructor(address _roleSetter, bool _creditOpen, bool _debtOpen) {
+        roleSetter = _roleSetter;
         CREDIT_OPEN = _creditOpen;
         DEBT_OPEN = _debtOpen;
-        roleSetter = _roleSetter;
         emit Constructor(_roleSetter, _creditOpen, _debtOpen);
     }
 
