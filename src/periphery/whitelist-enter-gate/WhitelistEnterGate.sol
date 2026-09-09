@@ -61,22 +61,19 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         bool creditSide,
         address account,
         bool newIsWhitelisted,
+        uint256 nonce,
         uint256 deadline,
         uint8 v,
         bytes32 r,
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, DeadlineExpired());
+        uint256 currentNonce = nonces[creditSide][whitelister][account];
+        if (nonce < currentNonce && isWhitelisted[creditSide][account] == newIsWhitelisted) return;
+        require(nonce == currentNonce, InvalidNonce());
+        nonces[creditSide][whitelister][account] = currentNonce + 1;
         bytes32 hashStruct = keccak256(
-            abi.encode(
-                SET_IS_WHITELISTED_TYPEHASH,
-                whitelister,
-                creditSide,
-                account,
-                newIsWhitelisted,
-                nonces[creditSide][whitelister][account]++,
-                deadline
-            )
+            abi.encode(SET_IS_WHITELISTED_TYPEHASH, whitelister, creditSide, account, newIsWhitelisted, nonce, deadline)
         );
         bytes32 digest = keccak256(bytes.concat("\x19\x01", DOMAIN_SEPARATOR(), hashStruct));
         // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
