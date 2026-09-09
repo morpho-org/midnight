@@ -10,6 +10,7 @@ import {
 
 /// @dev This gate can restrict which accounts can increase their credit or debt in a market.
 /// @dev Each side (credit, debt) has its own whitelist. Only whitelisted accounts can enter on that side.
+/// @dev Each side has its own role setter and whitelisters.
 /// @dev A side can be made open at deployment, letting any account enter on that side (forever).
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
@@ -19,36 +20,37 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     bool public immutable CREDIT_OPEN;
     bool public immutable DEBT_OPEN;
 
-    address public roleSetter;
-    mapping(address account => bool) public isWhitelister;
+    mapping(bool creditSide => address) public roleSetter;
+    mapping(bool creditSide => mapping(address account => bool)) public isWhitelister;
     mapping(address whitelister => mapping(address account => uint256)) public nonces;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelisted;
 
     /// CONSTRUCTOR ///
 
-    constructor(address _roleSetter, bool _creditOpen, bool _debtOpen) {
-        roleSetter = _roleSetter;
+    constructor(address _creditRoleSetter, address _debtRoleSetter, bool _creditOpen, bool _debtOpen) {
+        roleSetter[true] = _creditRoleSetter;
+        roleSetter[false] = _debtRoleSetter;
         CREDIT_OPEN = _creditOpen;
         DEBT_OPEN = _debtOpen;
-        emit Constructor(_roleSetter, _creditOpen, _debtOpen);
+        emit Constructor(_creditRoleSetter, _debtRoleSetter, _creditOpen, _debtOpen);
     }
 
     /// SETTERS ///
 
-    function setRoleSetter(address newRoleSetter) external {
-        require(msg.sender == roleSetter, NotRoleSetter());
-        roleSetter = newRoleSetter;
-        emit SetRoleSetter(newRoleSetter);
+    function setRoleSetter(bool creditSide, address newRoleSetter) external {
+        require(msg.sender == roleSetter[creditSide], NotRoleSetter());
+        roleSetter[creditSide] = newRoleSetter;
+        emit SetRoleSetter(creditSide, newRoleSetter);
     }
 
-    function setIsWhitelister(address account, bool newIsWhitelister) external {
-        require(msg.sender == roleSetter, NotRoleSetter());
-        isWhitelister[account] = newIsWhitelister;
-        emit SetIsWhitelister(account, newIsWhitelister);
+    function setIsWhitelister(bool creditSide, address account, bool newIsWhitelister) external {
+        require(msg.sender == roleSetter[creditSide], NotRoleSetter());
+        isWhitelister[creditSide][account] = newIsWhitelister;
+        emit SetIsWhitelister(creditSide, account, newIsWhitelister);
     }
 
     function setIsWhitelisted(bool creditSide, address account, bool newIsWhitelisted) external {
-        require(isWhitelister[msg.sender], NotWhitelister());
+        require(isWhitelister[creditSide][msg.sender], NotWhitelister());
         isWhitelisted[creditSide][account] = newIsWhitelisted;
         emit SetIsWhitelisted(msg.sender, creditSide, account, newIsWhitelisted);
     }
@@ -79,7 +81,9 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         bytes32 digest = keccak256(bytes.concat("\x19\x01", DOMAIN_SEPARATOR(), hashStruct));
         // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
         address recovered = ecrecover(digest, v, r, s);
-        require(recovered != address(0) && recovered == whitelister && isWhitelister[recovered], InvalidSigner());
+        require(
+            recovered != address(0) && recovered == whitelister && isWhitelister[creditSide][recovered], InvalidSigner()
+        );
         isWhitelisted[creditSide][account] = newIsWhitelisted;
         emit SetIsWhitelistedWithSig(recovered, creditSide, account, newIsWhitelisted);
     }
