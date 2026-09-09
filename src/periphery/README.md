@@ -55,6 +55,11 @@ Each side has its own role setter, who grants or revokes the whitelister role on
 Whitelisters edit the lists directly with `setIsWhitelisted` or allow to edit the list by EIP-712 signatures used by `setIsWhitelistedWithSig`.
 A side can be made open at deployment, letting any account enter on that side (forever).
 
+### `WhitelistEnterGateFactory`
+
+Deploys a deterministic `WhitelistEnterGate` using `CREATE2` with a salt derived from the caller and a caller-provided pre-salt.
+The factory records gates in `isWhitelistEnterGate`.
+
 ## Libraries
 
 ### `TakeAmountsLib`
