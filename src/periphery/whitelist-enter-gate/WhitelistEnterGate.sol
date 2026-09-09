@@ -12,7 +12,7 @@ import {
 /// @dev This gate can restrict which accounts can increase their credit or debt in a market.
 /// @dev On a restricted side, an account must be on both the global whitelist and that side's whitelist.
 /// @dev Global, credit, and debt whitelisters are administered independently.
-/// @dev A side can be made open at deployment, letting any account enter on that side (forever).
+/// @dev A side whitelist can be made open at deployment, but the global whitelist still applies.
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
 /// no longer valid.
@@ -140,11 +140,11 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     }
 
     function canIncreaseCredit(address account) external view returns (bool) {
-        return CREDIT_OPEN || (isGloballyWhitelisted[account] && isWhitelisted[true][account]);
+        return isGloballyWhitelisted[account] && (CREDIT_OPEN || isWhitelisted[true][account]);
     }
 
     function canIncreaseDebt(address account) external view returns (bool) {
-        return DEBT_OPEN || (isGloballyWhitelisted[account] && isWhitelisted[false][account]);
+        return isGloballyWhitelisted[account] && (DEBT_OPEN || isWhitelisted[false][account]);
     }
 
     /// MULTICALL ///

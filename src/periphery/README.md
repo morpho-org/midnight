@@ -51,13 +51,12 @@ Calldata is limited to 1,000,000 bytes.
 An enter gate that restricts which accounts can increase their credit or debt in a Midnight market.
 
 The gate has a global whitelist and one whitelist for each side (credit, debt). On a restricted side, an account
-must be on both the global whitelist and that side's whitelist. A side can instead be permissionless from
-deployment.
+must be on the global whitelist and, unless that side list was opened at deployment, on the relevant side list.
 
 The role setter grants or revokes the global, credit, and debt whitelister roles independently, so different
 entities can administer each list. Whitelisters edit their list directly or authorize an edit with an EIP-712
 signature.
-A side can be made open at deployment, letting any account enter on that side (forever).
+Opening a side at deployment bypasses only that side's whitelist; the global whitelist still applies.
 
 ## Libraries
 
