@@ -19,9 +19,9 @@ interface IWhitelistEnterGate is IEnterGate {
     error NotWhitelister();
 
     /// EVENTS ///
-    event Constructor(address indexed roleSetter, bool creditOpen, bool debtOpen);
-    event SetRoleSetter(address indexed newRoleSetter);
-    event SetIsWhitelister(address indexed account, bool newIsWhitelister);
+    event Constructor(address indexed creditRoleSetter, address indexed debtRoleSetter, bool creditOpen, bool debtOpen);
+    event SetRoleSetter(bool creditSide, address indexed newRoleSetter);
+    event SetIsWhitelister(bool creditSide, address indexed account, bool newIsWhitelister);
     event SetIsWhitelisted(
         address indexed whitelister, bool creditSide, address indexed account, bool newIsWhitelisted
     );
@@ -32,14 +32,14 @@ interface IWhitelistEnterGate is IEnterGate {
     /// STORAGE GETTERS ///
     function CREDIT_OPEN() external view returns (bool);
     function DEBT_OPEN() external view returns (bool);
-    function roleSetter() external view returns (address);
-    function isWhitelister(address account) external view returns (bool);
-    function nonces(address whitelister, address account) external view returns (uint256);
+    function roleSetter(bool creditSide) external view returns (address);
+    function isWhitelister(bool creditSide, address account) external view returns (bool);
+    function nonces(bool creditSide, address whitelister, address account) external view returns (uint256);
     function isWhitelisted(bool creditSide, address account) external view returns (bool);
 
     /// SETTERS ///
-    function setRoleSetter(address newRoleSetter) external;
-    function setIsWhitelister(address account, bool newIsWhitelister) external;
+    function setRoleSetter(bool creditSide, address newRoleSetter) external;
+    function setIsWhitelister(bool creditSide, address account, bool newIsWhitelister) external;
     function setIsWhitelisted(bool creditSide, address account, bool newIsWhitelisted) external;
     function setIsWhitelistedWithSig(
         address whitelister,
