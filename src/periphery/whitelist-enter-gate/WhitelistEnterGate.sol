@@ -5,14 +5,12 @@ pragma solidity 0.8.34;
 import {
     IWhitelistEnterGate,
     SET_IS_WHITELISTED_TYPEHASH,
-    SET_IS_GLOBALLY_WHITELISTED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IWhitelistEnterGate.sol";
 
 /// @dev This gate can restrict which accounts can increase their credit or debt in a market.
-/// @dev On a restricted side, an account must be on both the global whitelist and that side's whitelist.
-/// @dev Global, credit, and debt whitelisters are administered independently.
-/// @dev A side whitelist can be made open at deployment, but the global whitelist still applies.
+/// @dev Each side (credit, debt) has its own whitelist. Only whitelisted accounts can enter on that side.
+/// @dev A side can be made open at deployment, letting any account enter on that side (forever).
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
 /// no longer valid.
@@ -21,82 +19,39 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     bool public immutable CREDIT_OPEN;
     bool public immutable DEBT_OPEN;
 
-    address public roleSetter;
-    mapping(address account => bool) public isGlobalWhitelister;
+    mapping(bool creditSide => address) public roleSetter;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelister;
     mapping(address whitelister => mapping(address account => uint256)) public nonces;
-    mapping(address account => bool) public isGloballyWhitelisted;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelisted;
 
     /// CONSTRUCTOR ///
 
-    constructor(address _roleSetter, bool _creditOpen, bool _debtOpen) {
-        roleSetter = _roleSetter;
+    constructor(address _creditRoleSetter, address _debtRoleSetter, bool _creditOpen, bool _debtOpen) {
+        roleSetter[true] = _creditRoleSetter;
+        roleSetter[false] = _debtRoleSetter;
         CREDIT_OPEN = _creditOpen;
         DEBT_OPEN = _debtOpen;
-        emit Constructor(_roleSetter, _creditOpen, _debtOpen);
+        emit Constructor(_creditRoleSetter, _debtRoleSetter, _creditOpen, _debtOpen);
     }
 
     /// SETTERS ///
 
-    function setRoleSetter(address newRoleSetter) external {
-        require(msg.sender == roleSetter, NotRoleSetter());
-        roleSetter = newRoleSetter;
-        emit SetRoleSetter(newRoleSetter);
-    }
-
-    function setIsGlobalWhitelister(address account, bool newIsWhitelister) external {
-        require(msg.sender == roleSetter, NotRoleSetter());
-        isGlobalWhitelister[account] = newIsWhitelister;
-        emit SetIsGlobalWhitelister(account, newIsWhitelister);
+    function setRoleSetter(bool creditSide, address newRoleSetter) external {
+        require(msg.sender == roleSetter[creditSide], NotRoleSetter());
+        roleSetter[creditSide] = newRoleSetter;
+        emit SetRoleSetter(creditSide, newRoleSetter);
     }
 
     function setIsWhitelister(bool creditSide, address account, bool newIsWhitelister) external {
-        require(msg.sender == roleSetter, NotRoleSetter());
+        require(msg.sender == roleSetter[creditSide], NotRoleSetter());
         isWhitelister[creditSide][account] = newIsWhitelister;
         emit SetIsWhitelister(creditSide, account, newIsWhitelister);
-    }
-
-    function setIsGloballyWhitelisted(address account, bool newIsWhitelisted) external {
-        require(isGlobalWhitelister[msg.sender], NotWhitelister());
-        isGloballyWhitelisted[account] = newIsWhitelisted;
-        emit SetIsGloballyWhitelisted(msg.sender, account, newIsWhitelisted);
     }
 
     function setIsWhitelisted(bool creditSide, address account, bool newIsWhitelisted) external {
         require(isWhitelister[creditSide][msg.sender], NotWhitelister());
         isWhitelisted[creditSide][account] = newIsWhitelisted;
         emit SetIsWhitelisted(msg.sender, creditSide, account, newIsWhitelisted);
-    }
-
-    /// @dev Allows to batch setIsGloballyWhitelisted with the take, without requiring a transaction from the
-    /// whitelister.
-    function setIsGloballyWhitelistedWithSig(
-        address whitelister,
-        address account,
-        bool newIsWhitelisted,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
-        require(deadline >= block.timestamp, DeadlineExpired());
-        bytes32 hashStruct = keccak256(
-            abi.encode(
-                SET_IS_GLOBALLY_WHITELISTED_TYPEHASH,
-                whitelister,
-                account,
-                newIsWhitelisted,
-                nonces[whitelister][account]++,
-                deadline
-            )
-        );
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", DOMAIN_SEPARATOR(), hashStruct));
-        // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
-        address recovered = ecrecover(digest, v, r, s);
-        require(recovered != address(0) && recovered == whitelister && isGlobalWhitelister[recovered], InvalidSigner());
-        isGloballyWhitelisted[account] = newIsWhitelisted;
-        emit SetIsGloballyWhitelistedWithSig(recovered, account, newIsWhitelisted);
     }
 
     /// @dev Allows to batch setIsWhitelisted with the take, without requiring a transaction from the whitelister.
@@ -140,11 +95,11 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     }
 
     function canIncreaseCredit(address account) external view returns (bool) {
-        return isGloballyWhitelisted[account] && (CREDIT_OPEN || isWhitelisted[true][account]);
+        return CREDIT_OPEN || isWhitelisted[true][account];
     }
 
     function canIncreaseDebt(address account) external view returns (bool) {
-        return isGloballyWhitelisted[account] && (DEBT_OPEN || isWhitelisted[false][account]);
+        return DEBT_OPEN || isWhitelisted[false][account];
     }
 
     /// MULTICALL ///
