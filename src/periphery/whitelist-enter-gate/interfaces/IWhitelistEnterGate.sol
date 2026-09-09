@@ -34,7 +34,7 @@ interface IWhitelistEnterGate is IEnterGate {
     function DEBT_OPEN() external view returns (bool);
     function roleSetter(bool creditSide) external view returns (address);
     function isWhitelister(bool creditSide, address account) external view returns (bool);
-    function nonces(address whitelister, address account) external view returns (uint256);
+    function nonces(bool creditSide, address whitelister, address account) external view returns (uint256);
     function isWhitelisted(bool creditSide, address account) external view returns (bool);
 
     /// SETTERS ///

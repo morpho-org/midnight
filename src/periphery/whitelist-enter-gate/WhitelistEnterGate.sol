@@ -22,7 +22,7 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
 
     mapping(bool creditSide => address) public roleSetter;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelister;
-    mapping(address whitelister => mapping(address account => uint256)) public nonces;
+    mapping(bool creditSide => mapping(address whitelister => mapping(address account => uint256))) public nonces;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelisted;
 
     /// CONSTRUCTOR ///
@@ -74,7 +74,7 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
                 creditSide,
                 account,
                 newIsWhitelisted,
-                nonces[whitelister][account]++,
+                nonces[creditSide][whitelister][account]++,
                 deadline
             )
         );

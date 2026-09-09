@@ -58,7 +58,7 @@ contract WhitelistEnterGateTest is Test {
                 creditSide,
                 account,
                 listed,
-                gate.nonces(vm.addr(pk), account),
+                gate.nonces(creditSide, vm.addr(pk), account),
                 deadline
             )
         );
@@ -297,7 +297,7 @@ contract WhitelistEnterGateTest is Test {
 
         assertEq(gate.isWhitelisted(creditSide, account), listed);
         assertFalse(gate.isWhitelisted(!creditSide, account));
-        assertEq(gate.nonces(whitelister, account), 1);
+        assertEq(gate.nonces(creditSide, whitelister, account), 1);
     }
 
     function testSetIsWhitelistedWithSigRejectsOtherSide(
@@ -348,7 +348,7 @@ contract WhitelistEnterGateTest is Test {
         gate.setIsWhitelistedWithSig(whitelister2, creditSide, account, listed, deadline, v, r, s);
 
         assertEq(gate.isWhitelisted(creditSide, account), listed);
-        assertEq(gate.nonces(whitelister2, account), 1);
+        assertEq(gate.nonces(creditSide, whitelister2, account), 1);
     }
 
     function testNoncesArePerWhitelister(bool creditSide, address account, uint256 deadline) public {
@@ -363,21 +363,23 @@ contract WhitelistEnterGateTest is Test {
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, true, deadline, v1, r1, s1);
         gate.setIsWhitelistedWithSig(whitelister2, creditSide, account, true, deadline, v2, r2, s2);
 
-        assertEq(gate.nonces(whitelister, account), 1);
-        assertEq(gate.nonces(whitelister2, account), 1);
+        assertEq(gate.nonces(creditSide, whitelister, account), 1);
+        assertEq(gate.nonces(creditSide, whitelister2, account), 1);
     }
 
-    function testNoncesAreSharedByBothSides(address account, uint256 deadline) public {
+    function testNoncesArePerSide(bool creditSide, address account, uint256 deadline) public {
         deadline = bound(deadline, block.timestamp, type(uint256).max);
 
-        (uint8 v, bytes32 r, bytes32 s) = _sign(true, account, true, deadline, whitelisterPk);
-        gate.setIsWhitelistedWithSig(whitelister, true, account, true, deadline, v, r, s);
-        assertEq(gate.nonces(whitelister, account), 1);
+        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, true, deadline, whitelisterPk);
+        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, true, deadline, v, r, s);
+        assertEq(gate.nonces(creditSide, whitelister, account), 1);
+        assertEq(gate.nonces(!creditSide, whitelister, account), 0);
 
-        // The debt side signature must use the nonce consumed by the credit side one.
-        (v, r, s) = _sign(false, account, true, deadline, whitelisterPk);
-        gate.setIsWhitelistedWithSig(whitelister, false, account, true, deadline, v, r, s);
-        assertEq(gate.nonces(whitelister, account), 2);
+        // The other side signature still uses nonce 0.
+        (v, r, s) = _sign(!creditSide, account, true, deadline, whitelisterPk);
+        gate.setIsWhitelistedWithSig(whitelister, !creditSide, account, true, deadline, v, r, s);
+        assertEq(gate.nonces(creditSide, whitelister, account), 1);
+        assertEq(gate.nonces(!creditSide, whitelister, account), 1);
     }
 
     function testSetIsWhitelistedWithSigRejectsRevokedWhitelister(bool creditSide, address account, bool listed)
