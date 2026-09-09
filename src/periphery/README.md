@@ -57,7 +57,7 @@ A side can be made open at deployment, letting any account enter on that side (f
 
 ### `WhitelistEnterGateFactory`
 
-Deploys a deterministic `WhitelistEnterGate` using `CREATE2` with a caller-provided salt.
+Deploys a deterministic `WhitelistEnterGate` using `CREATE2` with a salt derived from the caller and a caller-provided pre-salt.
 The factory records gates in `isWhitelistEnterGate`.
 
 ## Libraries

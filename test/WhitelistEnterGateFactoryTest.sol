@@ -24,7 +24,8 @@ contract WhitelistEnterGateFactoryTest is Test {
         address _debtRoleSetter,
         bool creditOpen,
         bool debtOpen,
-        bytes32 salt
+        bytes32 preSalt,
+        address _caller
     ) internal view returns (address) {
         // forge-lint: disable-next-item(encode-packed-collision)
         bytes32 initCodeHash = keccak256(
@@ -33,7 +34,7 @@ contract WhitelistEnterGateFactoryTest is Test {
                 abi.encode(_creditRoleSetter, _debtRoleSetter, creditOpen, debtOpen)
             )
         );
-        return vm.computeCreate2Address(salt, initCodeHash, address(factory));
+        return vm.computeCreate2Address(keccak256(abi.encode(preSalt, _caller)), initCodeHash, address(factory));
     }
 
     function testCreateWhitelistEnterGate(
@@ -41,17 +42,17 @@ contract WhitelistEnterGateFactoryTest is Test {
         address _debtRoleSetter,
         bool creditOpen,
         bool debtOpen,
-        bytes32 salt
+        bytes32 preSalt
     ) public {
-        address expected = _expectedGate(_creditRoleSetter, _debtRoleSetter, creditOpen, debtOpen, salt);
+        address expected = _expectedGate(_creditRoleSetter, _debtRoleSetter, creditOpen, debtOpen, preSalt, caller);
 
         vm.expectEmit();
         emit IWhitelistEnterGateFactory.CreateWhitelistEnterGate(
-            caller, expected, _creditRoleSetter, _debtRoleSetter, creditOpen, debtOpen, salt
+            caller, expected, _creditRoleSetter, _debtRoleSetter, creditOpen, debtOpen, preSalt
         );
         vm.prank(caller);
         address gateAddress =
-            factory.createWhitelistEnterGate(_creditRoleSetter, _debtRoleSetter, creditOpen, debtOpen, salt);
+            factory.createWhitelistEnterGate(_creditRoleSetter, _debtRoleSetter, creditOpen, debtOpen, preSalt);
 
         assertEq(gateAddress, expected);
         assertTrue(factory.isWhitelistEnterGate(gateAddress));
@@ -62,27 +63,42 @@ contract WhitelistEnterGateFactoryTest is Test {
         assertEq(gate.DEBT_OPEN(), debtOpen);
     }
 
-    function testCreateWhitelistEnterGateSameSaltReverts(bytes32 salt) public {
-        factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, salt);
+    function testCreateWhitelistEnterGateSamePreSaltReverts(bytes32 preSalt) public {
+        factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, preSalt);
 
         vm.expectRevert();
-        factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, salt);
+        factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, preSalt);
     }
 
-    function testCreateWhitelistEnterGateDifferentSalts(bytes32 salt1, bytes32 salt2) public {
-        vm.assume(salt1 != salt2);
+    function testCreateWhitelistEnterGateDifferentCallers(bytes32 preSalt, address caller1, address caller2) public {
+        vm.assume(caller1 != caller2);
 
-        address gate1 = factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, salt1);
-        address gate2 = factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, salt2);
+        vm.prank(caller1);
+        address gate1 = factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, preSalt);
+        vm.prank(caller2);
+        address gate2 = factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, preSalt);
+
+        assertEq(gate1, _expectedGate(creditRoleSetter, debtRoleSetter, false, false, preSalt, caller1));
+        assertEq(gate2, _expectedGate(creditRoleSetter, debtRoleSetter, false, false, preSalt, caller2));
+        assertTrue(gate1 != gate2);
+        assertTrue(factory.isWhitelistEnterGate(gate1));
+        assertTrue(factory.isWhitelistEnterGate(gate2));
+    }
+
+    function testCreateWhitelistEnterGateDifferentPreSalts(bytes32 preSalt1, bytes32 preSalt2) public {
+        vm.assume(preSalt1 != preSalt2);
+
+        address gate1 = factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, preSalt1);
+        address gate2 = factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, preSalt2);
 
         assertTrue(gate1 != gate2);
         assertTrue(factory.isWhitelistEnterGate(gate1));
         assertTrue(factory.isWhitelistEnterGate(gate2));
     }
 
-    function testCreateWhitelistEnterGateDifferentArgs(bytes32 salt) public {
-        address gate1 = factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, salt);
-        address gate2 = factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, true, false, salt);
+    function testCreateWhitelistEnterGateDifferentArgs(bytes32 preSalt) public {
+        address gate1 = factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, false, false, preSalt);
+        address gate2 = factory.createWhitelistEnterGate(creditRoleSetter, debtRoleSetter, true, false, preSalt);
 
         assertTrue(gate1 != gate2);
         assertTrue(factory.isWhitelistEnterGate(gate1));

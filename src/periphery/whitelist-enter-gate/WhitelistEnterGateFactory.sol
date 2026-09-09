@@ -13,14 +13,16 @@ contract WhitelistEnterGateFactory is IWhitelistEnterGateFactory {
         address debtRoleSetter,
         bool creditOpen,
         bool debtOpen,
-        bytes32 salt
+        bytes32 preSalt
     ) external returns (address) {
         address gate = address(
-            new WhitelistEnterGate{salt: salt}(creditRoleSetter, debtRoleSetter, creditOpen, debtOpen)
+            new WhitelistEnterGate{salt: keccak256(abi.encode(preSalt, msg.sender))}(
+                creditRoleSetter, debtRoleSetter, creditOpen, debtOpen
+            )
         );
         isWhitelistEnterGate[gate] = true;
 
-        emit CreateWhitelistEnterGate(msg.sender, gate, creditRoleSetter, debtRoleSetter, creditOpen, debtOpen, salt);
+        emit CreateWhitelistEnterGate(msg.sender, gate, creditRoleSetter, debtRoleSetter, creditOpen, debtOpen, preSalt);
         return gate;
     }
 }

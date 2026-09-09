@@ -11,7 +11,7 @@ interface IWhitelistEnterGateFactory {
         address debtRoleSetter,
         bool creditOpen,
         bool debtOpen,
-        bytes32 salt
+        bytes32 preSalt
     );
 
     /// STORAGE GETTERS ///
@@ -23,6 +23,6 @@ interface IWhitelistEnterGateFactory {
         address debtRoleSetter,
         bool creditOpen,
         bool debtOpen,
-        bytes32 salt
+        bytes32 preSalt
     ) external returns (address);
 }
