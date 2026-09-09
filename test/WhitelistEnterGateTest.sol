@@ -38,21 +38,13 @@ contract WhitelistEnterGateTest is Test {
         g.setIsWhitelister(whitelister, true);
     }
 
-    function _sign(bool creditSide, address account, bool listed, uint256 deadline, uint256 pk)
+    function _sign(bool creditSide, address account, bool listed, uint256 nonce, uint256 deadline, uint256 pk)
         internal
         view
         returns (uint8 v, bytes32 r, bytes32 s)
     {
         bytes32 hashStruct = keccak256(
-            abi.encode(
-                SET_IS_WHITELISTED_TYPEHASH,
-                vm.addr(pk),
-                creditSide,
-                account,
-                listed,
-                gate.nonces(vm.addr(pk), account),
-                deadline
-            )
+            abi.encode(SET_IS_WHITELISTED_TYPEHASH, vm.addr(pk), creditSide, account, listed, nonce, deadline)
         );
         bytes32 digest = keccak256(bytes.concat("\x19\x01", gate.DOMAIN_SEPARATOR(), hashStruct));
         return vm.sign(pk, digest);
@@ -237,17 +229,18 @@ contract WhitelistEnterGateTest is Test {
         address relayer
     ) public {
         deadline = bound(deadline, block.timestamp, type(uint256).max);
-        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
+        uint256 nonce = gate.nonces(whitelister, account);
+        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, nonce, deadline, whitelisterPk);
 
         vm.expectEmit();
         emit IWhitelistEnterGate.SetIsWhitelistedWithSig(whitelister, creditSide, account, listed);
         // Relayed by an arbitrary account.
         vm.prank(relayer);
-        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, deadline, v, r, s);
+        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, nonce, deadline, v, r, s);
 
         assertEq(gate.isWhitelisted(creditSide, account), listed);
         assertFalse(gate.isWhitelisted(!creditSide, account));
-        assertEq(gate.nonces(whitelister, account), 1);
+        assertEq(gate.nonces(whitelister, account), nonce + 1);
     }
 
     function testSetIsWhitelistedWithSigRejectsOtherSide(
@@ -257,10 +250,11 @@ contract WhitelistEnterGateTest is Test {
         uint256 deadline
     ) public {
         deadline = bound(deadline, block.timestamp, type(uint256).max);
-        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
+        uint256 nonce = gate.nonces(whitelister, account);
+        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, nonce, deadline, whitelisterPk);
 
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
-        gate.setIsWhitelistedWithSig(whitelister, !creditSide, account, listed, deadline, v, r, s);
+        gate.setIsWhitelistedWithSig(whitelister, !creditSide, account, listed, nonce, deadline, v, r, s);
     }
 
     function testSetIsWhitelistedWithSigAcceptsAnyWhitelister(
@@ -273,16 +267,17 @@ contract WhitelistEnterGateTest is Test {
         deadline = bound(deadline, block.timestamp, type(uint256).max);
         vm.prank(roleSetter);
         gate.setIsWhitelister(whitelister2, true);
-        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelister2Pk);
+        uint256 nonce = gate.nonces(whitelister2, account);
+        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, nonce, deadline, whitelister2Pk);
 
         vm.expectEmit();
         emit IWhitelistEnterGate.SetIsWhitelistedWithSig(whitelister2, creditSide, account, listed);
         // Relayed by an arbitrary account.
         vm.prank(relayer);
-        gate.setIsWhitelistedWithSig(whitelister2, creditSide, account, listed, deadline, v, r, s);
+        gate.setIsWhitelistedWithSig(whitelister2, creditSide, account, listed, nonce, deadline, v, r, s);
 
         assertEq(gate.isWhitelisted(creditSide, account), listed);
-        assertEq(gate.nonces(whitelister2, account), 1);
+        assertEq(gate.nonces(whitelister2, account), nonce + 1);
     }
 
     function testNoncesArePerWhitelister(bool creditSide, address account, uint256 deadline) public {
@@ -291,82 +286,99 @@ contract WhitelistEnterGateTest is Test {
         gate.setIsWhitelister(whitelister2, true);
 
         // Both whitelisters sign for the same account at their own nonce 0.
-        (uint8 v1, bytes32 r1, bytes32 s1) = _sign(creditSide, account, true, deadline, whitelisterPk);
-        (uint8 v2, bytes32 r2, bytes32 s2) = _sign(creditSide, account, true, deadline, whitelister2Pk);
+        uint256 nonce1 = gate.nonces(whitelister, account);
+        uint256 nonce2 = gate.nonces(whitelister2, account);
+        (uint8 v1, bytes32 r1, bytes32 s1) = _sign(creditSide, account, true, nonce1, deadline, whitelisterPk);
+        (uint8 v2, bytes32 r2, bytes32 s2) = _sign(creditSide, account, true, nonce2, deadline, whitelister2Pk);
 
-        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, true, deadline, v1, r1, s1);
-        gate.setIsWhitelistedWithSig(whitelister2, creditSide, account, true, deadline, v2, r2, s2);
+        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, true, nonce1, deadline, v1, r1, s1);
+        gate.setIsWhitelistedWithSig(whitelister2, creditSide, account, true, nonce2, deadline, v2, r2, s2);
 
-        assertEq(gate.nonces(whitelister, account), 1);
-        assertEq(gate.nonces(whitelister2, account), 1);
+        assertEq(gate.nonces(whitelister, account), nonce1 + 1);
+        assertEq(gate.nonces(whitelister2, account), nonce2 + 1);
     }
 
     function testNoncesAreSharedByBothSides(address account, uint256 deadline) public {
         deadline = bound(deadline, block.timestamp, type(uint256).max);
 
-        (uint8 v, bytes32 r, bytes32 s) = _sign(true, account, true, deadline, whitelisterPk);
-        gate.setIsWhitelistedWithSig(whitelister, true, account, true, deadline, v, r, s);
-        assertEq(gate.nonces(whitelister, account), 1);
+        uint256 nonce = gate.nonces(whitelister, account);
+        (uint8 v, bytes32 r, bytes32 s) = _sign(true, account, true, nonce, deadline, whitelisterPk);
+        gate.setIsWhitelistedWithSig(whitelister, true, account, true, nonce, deadline, v, r, s);
+        assertEq(gate.nonces(whitelister, account), nonce + 1);
 
         // The debt side signature must use the nonce consumed by the credit side one.
-        (v, r, s) = _sign(false, account, true, deadline, whitelisterPk);
-        gate.setIsWhitelistedWithSig(whitelister, false, account, true, deadline, v, r, s);
-        assertEq(gate.nonces(whitelister, account), 2);
+        nonce = gate.nonces(whitelister, account);
+        (v, r, s) = _sign(false, account, true, nonce, deadline, whitelisterPk);
+        gate.setIsWhitelistedWithSig(whitelister, false, account, true, nonce, deadline, v, r, s);
+        assertEq(gate.nonces(whitelister, account), nonce + 1);
     }
 
     function testSetIsWhitelistedWithSigRejectsRevokedWhitelister(bool creditSide, address account, bool listed)
         public
     {
         uint256 deadline = block.timestamp + 1 days;
-        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
+        uint256 nonce = gate.nonces(whitelister, account);
+        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, nonce, deadline, whitelisterPk);
 
         vm.prank(roleSetter);
         gate.setIsWhitelister(whitelister, false);
 
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
-        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, deadline, v, r, s);
+        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, nonce, deadline, v, r, s);
     }
 
     function testSetIsWhitelistedWithSigRejectsReplayAndTampering() public {
         uint256 deadline = block.timestamp + 1 days;
 
-        (uint8 v, bytes32 r, bytes32 s) = _sign(true, alice, true, deadline, whitelisterPk);
-        gate.setIsWhitelistedWithSig(whitelister, true, alice, true, deadline, v, r, s);
+        uint256 nonce = gate.nonces(whitelister, alice);
+        (uint8 v, bytes32 r, bytes32 s) = _sign(true, alice, true, nonce, deadline, whitelisterPk);
+        gate.setIsWhitelistedWithSig(whitelister, true, alice, true, nonce, deadline, v, r, s);
+        assertEq(gate.nonces(whitelister, alice), nonce + 1);
 
-        // replay
-        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
-        gate.setIsWhitelistedWithSig(whitelister, true, alice, true, deadline, v, r, s);
+        // replay is a no-op, not a revert
+        gate.setIsWhitelistedWithSig(whitelister, true, alice, true, nonce, deadline, v, r, s);
+        assertEq(gate.nonces(whitelister, alice), nonce + 1);
+
+        nonce = gate.nonces(whitelister, alice);
 
         // wrong side
-        (v, r, s) = _sign(true, alice, false, deadline, whitelisterPk);
+        (v, r, s) = _sign(true, alice, false, nonce, deadline, whitelisterPk);
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
-        gate.setIsWhitelistedWithSig(whitelister, false, alice, false, deadline, v, r, s);
+        gate.setIsWhitelistedWithSig(whitelister, false, alice, false, nonce, deadline, v, r, s);
 
         // wrong account
-        (v, r, s) = _sign(true, alice, false, deadline, whitelisterPk);
+        (v, r, s) = _sign(true, alice, false, nonce, deadline, whitelisterPk);
+        uint256 bobNonceForWhitelister = gate.nonces(whitelister, bob);
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
-        gate.setIsWhitelistedWithSig(whitelister, true, bob, false, deadline, v, r, s);
+        gate.setIsWhitelistedWithSig(whitelister, true, bob, false, bobNonceForWhitelister, deadline, v, r, s);
 
         // wrong value
-        (v, r, s) = _sign(true, alice, false, deadline, whitelisterPk);
+        (v, r, s) = _sign(true, alice, false, nonce, deadline, whitelisterPk);
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
-        gate.setIsWhitelistedWithSig(whitelister, true, alice, true, deadline, v, r, s);
+        gate.setIsWhitelistedWithSig(whitelister, true, alice, true, nonce, deadline, v, r, s);
 
         // wrong deadline
-        (v, r, s) = _sign(true, alice, false, deadline, whitelisterPk);
+        (v, r, s) = _sign(true, alice, false, nonce, deadline, whitelisterPk);
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
-        gate.setIsWhitelistedWithSig(whitelister, true, alice, false, deadline + 1, v, r, s);
+        gate.setIsWhitelistedWithSig(whitelister, true, alice, false, nonce, deadline + 1, v, r, s);
+
+        // wrong nonce
+        (v, r, s) = _sign(true, alice, false, nonce, deadline, whitelisterPk);
+        vm.expectRevert(IWhitelistEnterGate.InvalidNonce.selector);
+        gate.setIsWhitelistedWithSig(whitelister, true, alice, false, nonce + 1, deadline, v, r, s);
 
         // wrong whitelister
-        (v, r, s) = _sign(true, alice, false, deadline, whitelisterPk);
+        (v, r, s) = _sign(true, alice, false, nonce, deadline, whitelisterPk);
+        uint256 aliceNonceForWhitelister2 = gate.nonces(whitelister2, alice);
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
-        gate.setIsWhitelistedWithSig(whitelister2, true, alice, false, deadline, v, r, s);
+        gate.setIsWhitelistedWithSig(whitelister2, true, alice, false, aliceNonceForWhitelister2, deadline, v, r, s);
 
         // wrong domain separator
-        (v, r, s) = _sign(true, bob, true, deadline, whitelisterPk);
+        uint256 bobNonce = gate.nonces(whitelister, bob);
+        (v, r, s) = _sign(true, bob, true, bobNonce, deadline, whitelisterPk);
         WhitelistEnterGate otherGate = _deploy(false, false);
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
-        otherGate.setIsWhitelistedWithSig(whitelister, true, bob, true, deadline, v, r, s);
+        otherGate.setIsWhitelistedWithSig(whitelister, true, bob, true, bobNonce, deadline, v, r, s);
     }
 
     function testSetIsWhitelistedWithSigDeadlineExpired(
@@ -379,10 +391,11 @@ contract WhitelistEnterGateTest is Test {
         deadline = bound(deadline, 0, type(uint256).max - 1);
         currentTime = bound(currentTime, deadline + 1, type(uint256).max);
         vm.warp(currentTime);
-        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
+        uint256 nonce = gate.nonces(whitelister, account);
+        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, nonce, deadline, whitelisterPk);
 
         vm.expectRevert(IWhitelistEnterGate.DeadlineExpired.selector);
-        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, deadline, v, r, s);
+        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, nonce, deadline, v, r, s);
     }
 
     function testSetIsWhitelistedWithSigInvalidSigner(
@@ -395,10 +408,11 @@ contract WhitelistEnterGateTest is Test {
         wrongPk = bound(wrongPk, 1, type(uint128).max);
         vm.assume(vm.addr(wrongPk) != whitelister);
         deadline = bound(deadline, block.timestamp, type(uint256).max);
-        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, wrongPk);
+        uint256 nonce = gate.nonces(vm.addr(wrongPk), account);
+        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, nonce, deadline, wrongPk);
 
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
-        gate.setIsWhitelistedWithSig(vm.addr(wrongPk), creditSide, account, listed, deadline, v, r, s);
+        gate.setIsWhitelistedWithSig(vm.addr(wrongPk), creditSide, account, listed, nonce, deadline, v, r, s);
     }
 
     function testSetIsWhitelistedWithSigEcrecoverReturnsZero(
@@ -408,11 +422,12 @@ contract WhitelistEnterGateTest is Test {
         uint256 deadline
     ) public {
         deadline = bound(deadline, block.timestamp, type(uint256).max);
-        (, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
+        uint256 nonce = gate.nonces(whitelister, account);
+        (, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, nonce, deadline, whitelisterPk);
 
         // Invalid v (valid values are 27/28) -> ecrecover returns address(0).
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
-        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, deadline, 0, r, s);
+        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, nonce, deadline, 0, r, s);
     }
 
     function testMulticall(address account, bool creditListed, address account2, bool debtListed) public {

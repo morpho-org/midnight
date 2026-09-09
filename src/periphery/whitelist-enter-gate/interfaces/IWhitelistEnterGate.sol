@@ -37,7 +37,7 @@ interface IWhitelistEnterGate is IEnterGate {
     function isWhitelister(address account) external view returns (bool);
     function nonces(address whitelister, address account) external view returns (uint256);
     function isWhitelisted(bool creditSide, address account) external view returns (bool);
-    function acceptedDigests(uint256 nonce, bytes32 digest) external view returns (bool);
+    function acceptedDigests(bytes32 digest) external view returns (bool);
 
     /// SETTERS ///
     function setRoleSetter(address newRoleSetter) external;
