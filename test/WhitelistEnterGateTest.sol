@@ -7,11 +7,14 @@ import {WhitelistEnterGate} from "../src/periphery/whitelist-enter-gate/Whitelis
 import {
     IWhitelistEnterGate,
     SET_IS_WHITELISTED_TYPEHASH,
+    SET_IS_GLOBALLY_WHITELISTED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
 } from "../src/periphery/whitelist-enter-gate/interfaces/IWhitelistEnterGate.sol";
 
 bytes constant SET_IS_WHITELISTED_TYPE =
     "SetIsWhitelisted(address whitelister,bool creditSide,address account,bool newIsWhitelisted,uint256 nonce,uint256 deadline)";
+bytes constant SET_IS_GLOBALLY_WHITELISTED_TYPE =
+    "SetIsGloballyWhitelisted(address whitelister,address account,bool newIsWhitelisted,uint256 nonce,uint256 deadline)";
 bytes constant EIP712_DOMAIN_TYPE = "EIP712Domain(uint256 chainId,address verifyingContract)";
 
 contract WhitelistEnterGateTest is Test {
@@ -34,8 +37,11 @@ contract WhitelistEnterGateTest is Test {
 
     function _deploy(bool creditOpen, bool debtOpen) internal returns (WhitelistEnterGate g) {
         g = new WhitelistEnterGate(roleSetter, creditOpen, debtOpen);
-        vm.prank(roleSetter);
-        g.setIsWhitelister(whitelister, true);
+        vm.startPrank(roleSetter);
+        g.setIsGlobalWhitelister(whitelister, true);
+        g.setIsWhitelister(true, whitelister, true);
+        g.setIsWhitelister(false, whitelister, true);
+        vm.stopPrank();
     }
 
     function _sign(bool creditSide, address account, bool listed, uint256 deadline, uint256 pk)
@@ -58,8 +64,31 @@ contract WhitelistEnterGateTest is Test {
         return vm.sign(pk, digest);
     }
 
+    function _signGlobal(address account, bool listed, uint256 deadline, uint256 pk)
+        internal
+        view
+        returns (uint8 v, bytes32 r, bytes32 s)
+    {
+        bytes32 hashStruct = keccak256(
+            abi.encode(
+                SET_IS_GLOBALLY_WHITELISTED_TYPEHASH,
+                vm.addr(pk),
+                account,
+                listed,
+                gate.nonces(vm.addr(pk), account),
+                deadline
+            )
+        );
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", gate.DOMAIN_SEPARATOR(), hashStruct));
+        return vm.sign(pk, digest);
+    }
+
     function testSetIsWhitelistedTypeHash() public pure {
         assertEq(SET_IS_WHITELISTED_TYPEHASH, keccak256(SET_IS_WHITELISTED_TYPE));
+    }
+
+    function testSetIsGloballyWhitelistedTypeHash() public pure {
+        assertEq(SET_IS_GLOBALLY_WHITELISTED_TYPEHASH, keccak256(SET_IS_GLOBALLY_WHITELISTED_TYPE));
     }
 
     function testEip712DomainTypeHash() public pure {
@@ -78,7 +107,9 @@ contract WhitelistEnterGateTest is Test {
         assertEq(g.roleSetter(), _roleSetter);
         assertEq(g.CREDIT_OPEN(), creditOpen);
         assertEq(g.DEBT_OPEN(), debtOpen);
-        assertFalse(g.isWhitelister(_roleSetter));
+        assertFalse(g.isGlobalWhitelister(_roleSetter));
+        assertFalse(g.isWhitelister(true, _roleSetter));
+        assertFalse(g.isWhitelister(false, _roleSetter));
     }
 
     function testSetRoleSetter(address newRoleSetter) public {
@@ -96,25 +127,46 @@ contract WhitelistEnterGateTest is Test {
         gate.setRoleSetter(newRoleSetter);
     }
 
-    function testSetIsWhitelister(address account, bool isWhitelister_) public {
+    function testSetIsGlobalWhitelister(address account, bool newIsWhitelister) public {
         vm.expectEmit();
-        emit IWhitelistEnterGate.SetIsWhitelister(account, isWhitelister_);
+        emit IWhitelistEnterGate.SetIsGlobalWhitelister(account, newIsWhitelister);
         vm.prank(roleSetter);
-        gate.setIsWhitelister(account, isWhitelister_);
-        assertEq(gate.isWhitelister(account), isWhitelister_);
+        gate.setIsGlobalWhitelister(account, newIsWhitelister);
+        assertEq(gate.isGlobalWhitelister(account), newIsWhitelister);
     }
 
-    function testSetIsWhitelisterNotRoleSetter(address caller, address account, bool isWhitelister_) public {
+    function testSetIsWhitelister(bool creditSide, address account, bool newIsWhitelister) public {
+        vm.expectEmit();
+        emit IWhitelistEnterGate.SetIsWhitelister(creditSide, account, newIsWhitelister);
+        vm.prank(roleSetter);
+        gate.setIsWhitelister(creditSide, account, newIsWhitelister);
+        assertEq(gate.isWhitelister(creditSide, account), newIsWhitelister);
+        assertFalse(gate.isWhitelister(!creditSide, account));
+    }
+
+    function testSetIsGlobalWhitelisterNotRoleSetter(address caller, address account, bool newIsWhitelister) public {
         vm.assume(caller != roleSetter);
         vm.expectRevert(IWhitelistEnterGate.NotRoleSetter.selector);
         vm.prank(caller);
-        gate.setIsWhitelister(account, isWhitelister_);
+        gate.setIsGlobalWhitelister(account, newIsWhitelister);
     }
 
-    function testWhitelisterCannotSetIsWhitelister(address account, bool isWhitelister_) public {
+    function testSetIsWhitelisterNotRoleSetter(address caller, bool creditSide, address account, bool newIsWhitelister)
+        public
+    {
+        vm.assume(caller != roleSetter);
         vm.expectRevert(IWhitelistEnterGate.NotRoleSetter.selector);
-        vm.prank(whitelister);
-        gate.setIsWhitelister(account, isWhitelister_);
+        vm.prank(caller);
+        gate.setIsWhitelister(creditSide, account, newIsWhitelister);
+    }
+
+    function testWhitelisterCannotSetWhitelisterRoles(bool creditSide, address account, bool newIsWhitelister) public {
+        vm.startPrank(whitelister);
+        vm.expectRevert(IWhitelistEnterGate.NotRoleSetter.selector);
+        gate.setIsGlobalWhitelister(account, newIsWhitelister);
+        vm.expectRevert(IWhitelistEnterGate.NotRoleSetter.selector);
+        gate.setIsWhitelister(creditSide, account, newIsWhitelister);
+        vm.stopPrank();
     }
 
     function testSetIsWhitelisted(bool creditSide, address account, bool listed) public {
@@ -135,7 +187,7 @@ contract WhitelistEnterGateTest is Test {
 
     function testRevokedWhitelisterCannotSetIsWhitelisted(bool creditSide, address account) public {
         vm.prank(roleSetter);
-        gate.setIsWhitelister(whitelister, false);
+        gate.setIsWhitelister(creditSide, whitelister, false);
 
         vm.expectRevert(IWhitelistEnterGate.NotWhitelister.selector);
         vm.prank(whitelister);
@@ -146,7 +198,7 @@ contract WhitelistEnterGateTest is Test {
         vm.assume(account != account2);
 
         vm.prank(roleSetter);
-        gate.setIsWhitelister(whitelister2, true);
+        gate.setIsWhitelister(creditSide, whitelister2, true);
 
         vm.prank(whitelister);
         gate.setIsWhitelisted(creditSide, account, true);
@@ -157,54 +209,103 @@ contract WhitelistEnterGateTest is Test {
         assertTrue(gate.isWhitelisted(creditSide, account2));
     }
 
-    function testCanIncreaseCredit(address account, address other) public {
-        vm.assume(account != other);
+    function testSetIsGloballyWhitelisted(address account, bool listed) public {
+        vm.expectEmit();
+        emit IWhitelistEnterGate.SetIsGloballyWhitelisted(whitelister, account, listed);
         vm.prank(whitelister);
+        gate.setIsGloballyWhitelisted(account, listed);
+        assertEq(gate.isGloballyWhitelisted(account), listed);
+    }
+
+    function testSetIsGloballyWhitelistedNotGlobalWhitelister(address caller, address account, bool listed) public {
+        vm.assume(caller != whitelister);
+        vm.expectRevert(IWhitelistEnterGate.NotWhitelister.selector);
+        vm.prank(caller);
+        gate.setIsGloballyWhitelisted(account, listed);
+    }
+
+    function testRevokedGlobalWhitelisterCannotSetIsGloballyWhitelisted(address account) public {
+        vm.prank(roleSetter);
+        gate.setIsGlobalWhitelister(whitelister, false);
+
+        vm.expectRevert(IWhitelistEnterGate.NotWhitelister.selector);
+        vm.prank(whitelister);
+        gate.setIsGloballyWhitelisted(account, true);
+    }
+
+    function testWhitelistersAreScopedToTheirList(bool creditSide, address account) public {
+        vm.startPrank(roleSetter);
+        gate.setIsGlobalWhitelister(whitelister2, true);
+        gate.setIsWhitelister(creditSide, alice, true);
+        vm.stopPrank();
+
+        vm.prank(whitelister2);
+        gate.setIsGloballyWhitelisted(account, true);
+        vm.expectRevert(IWhitelistEnterGate.NotWhitelister.selector);
+        vm.prank(whitelister2);
+        gate.setIsWhitelisted(creditSide, account, true);
+
+        vm.prank(alice);
+        gate.setIsWhitelisted(creditSide, account, true);
+        vm.expectRevert(IWhitelistEnterGate.NotWhitelister.selector);
+        vm.prank(alice);
+        gate.setIsWhitelisted(!creditSide, account, true);
+        vm.expectRevert(IWhitelistEnterGate.NotWhitelister.selector);
+        vm.prank(alice);
+        gate.setIsGloballyWhitelisted(account, true);
+    }
+
+    function testCanIncreaseCreditRequiresGlobalAndCreditWhitelists(address account, address other) public {
+        vm.assume(account != other);
+        vm.startPrank(whitelister);
         gate.setIsWhitelisted(true, account, true);
+        assertFalse(gate.canIncreaseCredit(account));
+        gate.setIsGloballyWhitelisted(account, true);
+        vm.stopPrank();
+
         assertTrue(gate.canIncreaseCredit(account));
         assertFalse(gate.canIncreaseCredit(other));
-    }
-
-    function testCanIncreaseCreditIgnoresDebtList(address account, bool listed) public {
-        vm.prank(whitelister);
-        gate.setIsWhitelisted(false, account, listed);
-        assertFalse(gate.canIncreaseCredit(account));
-    }
-
-    function testCanIncreaseDebt(address account, address other) public {
-        vm.assume(account != other);
-        vm.prank(whitelister);
-        gate.setIsWhitelisted(false, account, true);
-        assertTrue(gate.canIncreaseDebt(account));
-        assertFalse(gate.canIncreaseDebt(other));
-    }
-
-    function testCanIncreaseDebtIgnoresCreditList(address account, bool listed) public {
-        vm.prank(whitelister);
-        gate.setIsWhitelisted(true, account, listed);
         assertFalse(gate.canIncreaseDebt(account));
     }
 
-    function testSidesAreIndependent(address account, bool creditListed, bool debtListed) public {
+    function testCanIncreaseDebtRequiresGlobalAndDebtWhitelists(address account, address other) public {
+        vm.assume(account != other);
         vm.startPrank(whitelister);
-        gate.setIsWhitelisted(true, account, creditListed);
-        gate.setIsWhitelisted(false, account, debtListed);
+        gate.setIsWhitelisted(false, account, true);
+        assertFalse(gate.canIncreaseDebt(account));
+        gate.setIsGloballyWhitelisted(account, true);
         vm.stopPrank();
-        assertEq(gate.isWhitelisted(true, account), creditListed);
-        assertEq(gate.isWhitelisted(false, account), debtListed);
-        assertEq(gate.canIncreaseCredit(account), creditListed);
-        assertEq(gate.canIncreaseDebt(account), debtListed);
+
+        assertTrue(gate.canIncreaseDebt(account));
+        assertFalse(gate.canIncreaseDebt(other));
+        assertFalse(gate.canIncreaseCredit(account));
+    }
+
+    function testGlobalWhitelistAppliesToBothSides(address account) public {
+        vm.startPrank(whitelister);
+        gate.setIsWhitelisted(true, account, true);
+        gate.setIsWhitelisted(false, account, true);
+        vm.stopPrank();
+
+        assertFalse(gate.canIncreaseCredit(account));
+        assertFalse(gate.canIncreaseDebt(account));
+
+        vm.prank(whitelister);
+        gate.setIsGloballyWhitelisted(account, true);
+        assertTrue(gate.canIncreaseCredit(account));
+        assertTrue(gate.canIncreaseDebt(account));
     }
 
     function testOpenCreditSideLetsAnyoneIn(address account, address other) public {
         vm.assume(account != other);
         gate = _deploy(true, false);
-        vm.prank(whitelister);
+        vm.startPrank(whitelister);
+        gate.setIsGloballyWhitelisted(account, true);
         gate.setIsWhitelisted(false, account, true);
+        vm.stopPrank();
 
         assertTrue(gate.canIncreaseCredit(account));
         assertTrue(gate.canIncreaseCredit(other));
-        // The debt side still honours its whitelist.
         assertTrue(gate.canIncreaseDebt(account));
         assertFalse(gate.canIncreaseDebt(other));
     }
@@ -212,21 +313,50 @@ contract WhitelistEnterGateTest is Test {
     function testOpenDebtSideLetsAnyoneIn(address account, address other) public {
         vm.assume(account != other);
         gate = _deploy(false, true);
-        vm.prank(whitelister);
+        vm.startPrank(whitelister);
+        gate.setIsGloballyWhitelisted(account, true);
         gate.setIsWhitelisted(true, account, true);
+        vm.stopPrank();
 
         assertTrue(gate.canIncreaseDebt(account));
         assertTrue(gate.canIncreaseDebt(other));
-        // The credit side still honours its whitelist.
         assertTrue(gate.canIncreaseCredit(account));
         assertFalse(gate.canIncreaseCredit(other));
     }
 
-    function testOpenSideIgnoresWhitelist(bool creditSide, address account, bool whitelisted) public {
+    function testOpenSideIgnoresAllWhitelists(bool creditSide, address account) public {
         gate = _deploy(creditSide, !creditSide);
-        vm.prank(whitelister);
-        gate.setIsWhitelisted(creditSide, account, whitelisted);
         assertTrue(creditSide ? gate.canIncreaseCredit(account) : gate.canIncreaseDebt(account));
+    }
+
+    function testSetIsGloballyWhitelistedWithSig(address account, bool listed, uint256 deadline, address relayer)
+        public
+    {
+        deadline = bound(deadline, block.timestamp, type(uint256).max);
+        (uint8 v, bytes32 r, bytes32 s) = _signGlobal(account, listed, deadline, whitelisterPk);
+
+        vm.expectEmit();
+        emit IWhitelistEnterGate.SetIsGloballyWhitelistedWithSig(whitelister, account, listed);
+        vm.prank(relayer);
+        gate.setIsGloballyWhitelistedWithSig(whitelister, account, listed, deadline, v, r, s);
+
+        assertEq(gate.isGloballyWhitelisted(account), listed);
+        assertEq(gate.nonces(whitelister, account), 1);
+    }
+
+    function testSetIsGloballyWhitelistedWithSigRejectsSideWhitelister(
+        bool creditSide,
+        address account,
+        bool listed,
+        uint256 deadline
+    ) public {
+        deadline = bound(deadline, block.timestamp, type(uint256).max);
+        vm.prank(roleSetter);
+        gate.setIsWhitelister(creditSide, whitelister2, true);
+        (uint8 v, bytes32 r, bytes32 s) = _signGlobal(account, listed, deadline, whitelister2Pk);
+
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
+        gate.setIsGloballyWhitelistedWithSig(whitelister2, account, listed, deadline, v, r, s);
     }
 
     function testSetIsWhitelistedWithSig(
@@ -272,7 +402,7 @@ contract WhitelistEnterGateTest is Test {
     ) public {
         deadline = bound(deadline, block.timestamp, type(uint256).max);
         vm.prank(roleSetter);
-        gate.setIsWhitelister(whitelister2, true);
+        gate.setIsWhitelister(creditSide, whitelister2, true);
         (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelister2Pk);
 
         vm.expectEmit();
@@ -288,7 +418,7 @@ contract WhitelistEnterGateTest is Test {
     function testNoncesArePerWhitelister(bool creditSide, address account, uint256 deadline) public {
         deadline = bound(deadline, block.timestamp, type(uint256).max);
         vm.prank(roleSetter);
-        gate.setIsWhitelister(whitelister2, true);
+        gate.setIsWhitelister(creditSide, whitelister2, true);
 
         // Both whitelisters sign for the same account at their own nonce 0.
         (uint8 v1, bytes32 r1, bytes32 s1) = _sign(creditSide, account, true, deadline, whitelisterPk);
@@ -301,17 +431,20 @@ contract WhitelistEnterGateTest is Test {
         assertEq(gate.nonces(whitelister2, account), 1);
     }
 
-    function testNoncesAreSharedByBothSides(address account, uint256 deadline) public {
+    function testNoncesAreSharedByAllLists(address account, uint256 deadline) public {
         deadline = bound(deadline, block.timestamp, type(uint256).max);
 
-        (uint8 v, bytes32 r, bytes32 s) = _sign(true, account, true, deadline, whitelisterPk);
-        gate.setIsWhitelistedWithSig(whitelister, true, account, true, deadline, v, r, s);
+        (uint8 v, bytes32 r, bytes32 s) = _signGlobal(account, true, deadline, whitelisterPk);
+        gate.setIsGloballyWhitelistedWithSig(whitelister, account, true, deadline, v, r, s);
         assertEq(gate.nonces(whitelister, account), 1);
 
-        // The debt side signature must use the nonce consumed by the credit side one.
+        (v, r, s) = _sign(true, account, true, deadline, whitelisterPk);
+        gate.setIsWhitelistedWithSig(whitelister, true, account, true, deadline, v, r, s);
+        assertEq(gate.nonces(whitelister, account), 2);
+
         (v, r, s) = _sign(false, account, true, deadline, whitelisterPk);
         gate.setIsWhitelistedWithSig(whitelister, false, account, true, deadline, v, r, s);
-        assertEq(gate.nonces(whitelister, account), 2);
+        assertEq(gate.nonces(whitelister, account), 3);
     }
 
     function testSetIsWhitelistedWithSigRejectsRevokedWhitelister(bool creditSide, address account, bool listed)
@@ -321,7 +454,7 @@ contract WhitelistEnterGateTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, deadline, whitelisterPk);
 
         vm.prank(roleSetter);
-        gate.setIsWhitelister(whitelister, false);
+        gate.setIsWhitelister(creditSide, whitelister, false);
 
         vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, deadline, v, r, s);
