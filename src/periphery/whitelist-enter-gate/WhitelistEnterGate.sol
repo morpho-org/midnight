@@ -23,6 +23,7 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     mapping(address account => bool) public isWhitelister;
     mapping(address whitelister => mapping(address account => uint256)) public nonces;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelisted;
+    mapping(bytes32 digest => bool) public acceptedDigests;
 
     /// CONSTRUCTOR ///
 
@@ -59,6 +60,7 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         bool creditSide,
         address account,
         bool newIsWhitelisted,
+        uint256 nonce,
         uint256 deadline,
         uint8 v,
         bytes32 r,
@@ -66,22 +68,17 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     ) external {
         require(deadline >= block.timestamp, DeadlineExpired());
         bytes32 hashStruct = keccak256(
-            abi.encode(
-                SET_IS_WHITELISTED_TYPEHASH,
-                whitelister,
-                creditSide,
-                account,
-                newIsWhitelisted,
-                nonces[whitelister][account]++,
-                deadline
-            )
+            abi.encode(SET_IS_WHITELISTED_TYPEHASH, whitelister, creditSide, account, newIsWhitelisted, nonce, deadline)
         );
         bytes32 digest = keccak256(bytes.concat("\x19\x01", DOMAIN_SEPARATOR(), hashStruct));
+        if (acceptedDigests[digest]) return;
+        require(nonce == nonces[whitelister][account]++, InvalidNonce());
         // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
         address recovered = ecrecover(digest, v, r, s);
         require(recovered != address(0) && recovered == whitelister && isWhitelister[recovered], InvalidSigner());
         isWhitelisted[creditSide][account] = newIsWhitelisted;
         emit SetIsWhitelistedWithSig(recovered, creditSide, account, newIsWhitelisted);
+        acceptedDigests[digest] = true;
     }
 
     /// GETTERS ///
