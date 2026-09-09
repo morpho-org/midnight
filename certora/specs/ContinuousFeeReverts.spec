@@ -6,7 +6,8 @@
 // * Gates are deterministic and don't revert (they can return false, but then they do it in both calls).
 // * Callbacks and ratifier succeed.
 // * No reverts caused by tickToPrice or settlementFee.
-// * Token transfers don't revert or change the state of the contract. 
+// * Token transfers don't revert or change the state of the contract.
+// * No reentrancy.
 
 import "BitmapSummaries.spec";
 import "MulDivAxioms.spec";
