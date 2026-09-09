@@ -419,7 +419,7 @@ contract WhitelistEnterGateTest is Test {
         gate.setIsWhitelistedWithSig(whitelister, true, alice, false, 1, deadline + 1, v, r, s);
 
         // wrong nonce
-        (v, r, s) = _sign(true, alice, false, 1, deadline, whitelisterPk);
+        (v, r, s) = _sign(true, alice, false, 2, deadline, whitelisterPk);
         vm.expectRevert(IWhitelistEnterGate.InvalidNonce.selector);
         gate.setIsWhitelistedWithSig(whitelister, true, alice, false, 2, deadline, v, r, s);
 
@@ -447,10 +447,31 @@ contract WhitelistEnterGateTest is Test {
 
         vm.recordLogs();
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, deadline, v, r, s);
-        // The signature is not checked on the no-op path.
-        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, deadline, 0, bytes32(0), bytes32(0));
 
         assertEq(vm.getRecordedLogs().length, 0);
+        assertEq(gate.isWhitelisted(creditSide, account), listed);
+        assertEq(gate.nonces(creditSide, whitelister, account), 1);
+    }
+
+    function testSetIsWhitelistedWithSigStaleNonceChecksSignature(
+        bool creditSide,
+        address account,
+        bool listed,
+        uint256 deadline
+    ) public {
+        deadline = bound(deadline, block.timestamp, type(uint256).max);
+        (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, 0, deadline, whitelisterPk);
+        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, deadline, v, r, s);
+
+        // garbage signature
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
+        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, deadline, 0, bytes32(0), bytes32(0));
+
+        // signature from another account
+        (v, r, s) = _sign(creditSide, account, listed, 0, deadline, whitelister2Pk);
+        vm.expectRevert(IWhitelistEnterGate.InvalidSigner.selector);
+        gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, deadline, v, r, s);
+
         assertEq(gate.isWhitelisted(creditSide, account), listed);
         assertEq(gate.nonces(creditSide, whitelister, account), 1);
     }

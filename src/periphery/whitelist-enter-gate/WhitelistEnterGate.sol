@@ -68,10 +68,6 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, DeadlineExpired());
-        uint256 currentNonce = nonces[creditSide][whitelister][account];
-        if (nonce < currentNonce && isWhitelisted[creditSide][account] == newIsWhitelisted) return;
-        require(nonce == currentNonce, InvalidNonce());
-        nonces[creditSide][whitelister][account] = currentNonce + 1;
         bytes32 hashStruct = keccak256(
             abi.encode(SET_IS_WHITELISTED_TYPEHASH, whitelister, creditSide, account, newIsWhitelisted, nonce, deadline)
         );
@@ -81,6 +77,10 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         require(
             recovered != address(0) && recovered == whitelister && isWhitelister[creditSide][recovered], InvalidSigner()
         );
+        uint256 currentNonce = nonces[creditSide][whitelister][account];
+        if (nonce < currentNonce && isWhitelisted[creditSide][account] == newIsWhitelisted) return;
+        require(nonce == currentNonce, InvalidNonce());
+        nonces[creditSide][whitelister][account] = currentNonce + 1;
         isWhitelisted[creditSide][account] = newIsWhitelisted;
         emit SetIsWhitelistedWithSig(recovered, creditSide, account, newIsWhitelisted);
     }
