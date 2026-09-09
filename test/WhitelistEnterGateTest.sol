@@ -445,10 +445,10 @@ contract WhitelistEnterGateTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, 0, deadline, whitelisterPk);
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, deadline, v, r, s);
 
-        vm.recordLogs();
+        vm.expectEmit();
+        emit IWhitelistEnterGate.SetIsWhitelistedWithSig(whitelister, creditSide, account, listed);
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, deadline, v, r, s);
 
-        assertEq(vm.getRecordedLogs().length, 0);
         assertEq(gate.isWhitelisted(creditSide, account), listed);
         assertEq(gate.nonces(creditSide, whitelister, account), 1);
     }
