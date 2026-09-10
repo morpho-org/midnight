@@ -28,7 +28,12 @@ interface IWhitelistEnterGate is IEnterGate {
         address indexed whitelister, bool creditSide, address indexed account, bool newIsWhitelisted
     );
     event SetIsWhitelistedWithSig(
-        address indexed whitelister, bool creditSide, address indexed account, bool newIsWhitelisted
+        address indexed whitelister,
+        bool creditSide,
+        address indexed account,
+        bool newIsWhitelisted,
+        uint256 nonce,
+        uint256 currentNonce
     );
 
     /// STORAGE GETTERS ///

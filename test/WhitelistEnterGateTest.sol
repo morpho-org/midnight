@@ -282,7 +282,7 @@ contract WhitelistEnterGateTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, 0, deadline, whitelisterPk);
 
         vm.expectEmit();
-        emit IWhitelistEnterGate.SetIsWhitelistedWithSig(whitelister, creditSide, account, listed);
+        emit IWhitelistEnterGate.SetIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, 0);
         // Relayed by an arbitrary account.
         vm.prank(relayer);
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, deadline, v, r, s);
@@ -334,7 +334,7 @@ contract WhitelistEnterGateTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = _sign(creditSide, account, listed, 0, deadline, whitelister2Pk);
 
         vm.expectEmit();
-        emit IWhitelistEnterGate.SetIsWhitelistedWithSig(whitelister2, creditSide, account, listed);
+        emit IWhitelistEnterGate.SetIsWhitelistedWithSig(whitelister2, creditSide, account, listed, 0, 0);
         // Relayed by an arbitrary account.
         vm.prank(relayer);
         gate.setIsWhitelistedWithSig(whitelister2, creditSide, account, listed, 0, deadline, v, r, s);
@@ -446,7 +446,7 @@ contract WhitelistEnterGateTest is Test {
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, deadline, v, r, s);
 
         vm.expectEmit();
-        emit IWhitelistEnterGate.SetIsWhitelistedWithSig(whitelister, creditSide, account, listed);
+        emit IWhitelistEnterGate.SetIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, 1);
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, listed, 0, deadline, v, r, s);
 
         assertEq(gate.isWhitelisted(creditSide, account), listed);
