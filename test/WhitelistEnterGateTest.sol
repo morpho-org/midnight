@@ -486,7 +486,7 @@ contract WhitelistEnterGateTest is Test {
         vm.prank(whitelister);
         gate.setIsWhitelisted(creditSide, account, false);
 
-        vm.expectRevert(IWhitelistEnterGate.InvalidNonce.selector);
+        vm.expectRevert(IWhitelistEnterGate.WhitelistedStatusChanged.selector);
         gate.setIsWhitelistedWithSig(whitelister, creditSide, account, true, 0, deadline, v, r, s);
     }
 

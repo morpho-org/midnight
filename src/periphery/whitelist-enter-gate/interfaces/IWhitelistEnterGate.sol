@@ -18,6 +18,7 @@ interface IWhitelistEnterGate is IEnterGate {
     error InvalidNonce();
     error NotRoleSetter();
     error NotWhitelister();
+    error WhitelistedStatusChanged();
 
     /// EVENTS ///
     event Constructor(address indexed creditRoleSetter, address indexed debtRoleSetter, bool creditOpen, bool debtOpen);
