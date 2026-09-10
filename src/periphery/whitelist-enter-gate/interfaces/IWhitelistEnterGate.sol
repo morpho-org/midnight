@@ -15,8 +15,10 @@ interface IWhitelistEnterGate is IEnterGate {
     /// ERRORS ///
     error DeadlineExpired();
     error InvalidSigner();
+    error InvalidNonce();
     error NotRoleSetter();
     error NotWhitelister();
+    error WhitelistedStatusChanged();
 
     /// EVENTS ///
     event Constructor(address indexed creditRoleSetter, address indexed debtRoleSetter, bool creditOpen, bool debtOpen);
@@ -26,7 +28,12 @@ interface IWhitelistEnterGate is IEnterGate {
         address indexed whitelister, bool creditSide, address indexed account, bool newIsWhitelisted
     );
     event SetIsWhitelistedWithSig(
-        address indexed whitelister, bool creditSide, address indexed account, bool newIsWhitelisted
+        address indexed whitelister,
+        bool creditSide,
+        address indexed account,
+        bool newIsWhitelisted,
+        uint256 nonce,
+        uint256 currentNonce
     );
 
     /// STORAGE GETTERS ///
@@ -46,6 +53,7 @@ interface IWhitelistEnterGate is IEnterGate {
         bool creditSide,
         address account,
         bool newIsWhitelisted,
+        uint256 nonce,
         uint256 deadline,
         uint8 v,
         bytes32 r,
