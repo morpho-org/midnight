@@ -62,11 +62,9 @@ contract SetterRateRatifier is ISetterRateRatifier {
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         if (offer.buy) {
-            uint256 priceLimitDown = WAD.mulDivDown(WAD, WAD + rate * timeToMaturity);
-            require(offerPrice <= priceLimitDown, WorsePrice());
+            require(offerPrice <= WAD.mulDivDown(WAD, WAD + rate * timeToMaturity), WorsePrice());
         } else {
-            uint256 priceLimitUp = WAD.mulDivUp(WAD, WAD + rate * timeToMaturity);
-            require(offerPrice >= priceLimitUp, WorsePrice());
+            require(offerPrice >= WAD.mulDivUp(WAD, WAD + rate * timeToMaturity), WorsePrice());
         }
 
         require(

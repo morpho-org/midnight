@@ -51,7 +51,7 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
             address authorizedTaker
         ) = abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[], uint256, uint256, address));
 
-        require(block.timestamp <= offer.expiry, OfferExpired());
+        require(block.timestamp <= offer.expiry, OfferExpired()); // to avoid returning an inconsistent price when not called from Midnight.
         uint256 rate = startRate;
         if (startRate != expiryRate) {
             uint256 elapsed = block.timestamp - offer.start;
