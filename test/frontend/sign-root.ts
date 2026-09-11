@@ -15,6 +15,7 @@ const RATIFIER = "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB";
 const HEIGHT = 2;
 const START_RATE = "9512937594"; // ~30%/yr
 const EXPIRY_RATE = "3170979198"; // ~10%/yr
+const ALLOWED_TAKER = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
 
 const DOMAIN_TYPE = [
   { name: "chainId", type: "uint256" },
@@ -85,7 +86,7 @@ function buildRateOfferTypes(height: number) {
       { name: "expiry", type: "uint256" },
       { name: "startRate", type: "uint256" },
       { name: "expiryRate", type: "uint256" },
-      { name: "onlyTaker", type: "address" },
+      { name: "allowedTaker", type: "address" },
       { name: "group", type: "bytes32" },
       { name: "callback", type: "address" },
       { name: "callbackData", type: "bytes" },
@@ -141,7 +142,7 @@ function defaultRateOffer(number: string) {
     expiry: 2 ** 32,
     startRate: START_RATE,
     expiryRate: EXPIRY_RATE,
-    onlyTaker: ZERO_ADDR,
+    allowedTaker: ALLOWED_TAKER,
     group: ZERO_B32,
     callback: ZERO_ADDR,
     callbackData: "0x",
@@ -263,6 +264,7 @@ async function main() {
         `address constant RATE_ACCOUNT = ${account};`,
         `uint256 constant START_RATE = ${START_RATE};`,
         `uint256 constant EXPIRY_RATE = ${EXPIRY_RATE};`,
+        `address constant ALLOWED_TAKER = ${ALLOWED_TAKER};`,
         `uint8 constant RATE_SIG_V = ${sig.v};`,
         `bytes32 constant RATE_SIG_R = ${sig.r};`,
         `bytes32 constant RATE_SIG_S = ${sig.s};`,

@@ -6,6 +6,7 @@ import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
 import {EcrecoverRateRatifier} from "../src/ratifiers/EcrecoverRateRatifier.sol";
 import {Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {IEcrecoverRateRatifier} from "../src/ratifiers/interfaces/IEcrecoverRateRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
@@ -84,9 +85,10 @@ contract FrontendSignatureTest is Test {
 address constant RATE_ACCOUNT = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
 uint256 constant START_RATE = 9512937594; // ~30%/yr
 uint256 constant EXPIRY_RATE = 3170979198; // ~10%/yr
+address constant ALLOWED_TAKER = 0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC;
 uint8 constant RATE_SIG_V = 28;
-bytes32 constant RATE_SIG_R = 0x5b4aaf6b5e49b2f7bd84d6ca4789e7f63429461be22bfb370a166a05c8cfadc5;
-bytes32 constant RATE_SIG_S = 0x2949c9e045d35f231be688cd5db1cf39f246641de68a099c628d00a513f94588;
+bytes32 constant RATE_SIG_R = 0xea5e8a479f8adfee91160a25e2ba376713d6487fd5a4b5ab9b2c85d1123eb8ca;
+bytes32 constant RATE_SIG_S = 0x3ef2caf18c8a0be9ec054341176bfb1a0be6d679719d73b65b3ecb0acc29f2d9;
 
 contract FrontendRateSignatureTest is Test {
     function setUp() public {
@@ -106,17 +108,17 @@ contract FrontendRateSignatureTest is Test {
         offer.ratifier = RATIFIER;
     }
 
-    function testFrontendRateSignatureVerification() public view {
+    function testFrontendRateSignatureVerification() public {
         Offer[4] memory offers;
         offers[0] = defaultRateOffer(1);
         offers[1] = defaultRateOffer(2);
         offers[2] = defaultRateOffer(3);
         offers[3] = defaultRateOffer(4);
 
-        bytes32 h0 = HashLib.hashRateOffer(offers[0], START_RATE, EXPIRY_RATE, address(0));
-        bytes32 h1 = HashLib.hashRateOffer(offers[1], START_RATE, EXPIRY_RATE, address(0));
-        bytes32 h2 = HashLib.hashRateOffer(offers[2], START_RATE, EXPIRY_RATE, address(0));
-        bytes32 h3 = HashLib.hashRateOffer(offers[3], START_RATE, EXPIRY_RATE, address(0));
+        bytes32 h0 = HashLib.hashRateOffer(offers[0], START_RATE, EXPIRY_RATE, ALLOWED_TAKER);
+        bytes32 h1 = HashLib.hashRateOffer(offers[1], START_RATE, EXPIRY_RATE, ALLOWED_TAKER);
+        bytes32 h2 = HashLib.hashRateOffer(offers[2], START_RATE, EXPIRY_RATE, ALLOWED_TAKER);
+        bytes32 h3 = HashLib.hashRateOffer(offers[3], START_RATE, EXPIRY_RATE, ALLOWED_TAKER);
         bytes32 left = HashLib.hashNode(h0, h1);
         bytes32 right = HashLib.hashNode(h2, h3);
         bytes32 _root = HashLib.hashNode(left, right);
@@ -148,10 +150,14 @@ contract FrontendRateSignatureTest is Test {
             proof0,
             START_RATE,
             EXPIRY_RATE,
-            address(0)
+            ALLOWED_TAKER
         );
-        bytes32 result = EcrecoverRateRatifier(RATIFIER).isRatified(offers[0], ratifierData, address(0));
+        bytes32 result = EcrecoverRateRatifier(RATIFIER).isRatified(offers[0], ratifierData, ALLOWED_TAKER);
         assertEq(result, CALLBACK_SUCCESS);
+
+        // The signed allowedTaker is enforced: any other taker is rejected.
+        vm.expectRevert(IEcrecoverRateRatifier.UnauthorizedTaker.selector);
+        EcrecoverRateRatifier(RATIFIER).isRatified(offers[0], ratifierData, address(0));
     }
 
     // Trick to ensure isRatified checks that the signer is the maker, without having the offers depend on the maker.

@@ -12,7 +12,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev This ratifier checks that an authorized address has ratified the root of a Merkle tree of rate offers, and
 /// that the offer is a leaf in that tree.
 /// @dev The ratifier data must contain the root, the leaf index, the Merkle proof, the start and expiry rates and the
-/// offer's only taker.
+/// offer's allowed taker.
 /// @dev The leaf index determines each sibling's left/right position during Merkle proof verification.
 /// @dev The maker sets a start and expiry rate instead of a fixed price. Both are WAD-scaled per-second rates.
 /// At ratification, the rate is linearly interpolated over the offer lifetime and used as a price limit against
@@ -44,9 +44,9 @@ contract SetterRateRatifier is ISetterRateRatifier {
             bytes32[] memory proof,
             uint256 startRate,
             uint256 expiryRate,
-            address onlyTaker
+            address allowedTaker
         ) = abi.decode(ratifierData, (bytes32, uint256, bytes32[], uint256, uint256, address));
-        require(onlyTaker == address(0) || taker == onlyTaker, UnauthorizedTaker());
+        require(allowedTaker == address(0) || taker == allowedTaker, UnauthorizedTaker());
         // to avoid returning an inconsistent price when not called from Midnight.
         require(block.timestamp <= offer.expiry, OfferExpired());
         uint256 rate;
@@ -69,7 +69,7 @@ contract SetterRateRatifier is ISetterRateRatifier {
         }
 
         require(
-            HashLib.isLeaf(root, HashLib.hashRateOffer(offer, startRate, expiryRate, onlyTaker), leafIndex, proof),
+            HashLib.isLeaf(root, HashLib.hashRateOffer(offer, startRate, expiryRate, allowedTaker), leafIndex, proof),
             InvalidProof()
         );
         require(isRootRatified[offer.maker][root], NotRatified());

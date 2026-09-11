@@ -13,7 +13,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// no longer valid.
 /// @dev This ratifier checks that the offer has been signed by an authorized address in a Merkle tree of rate offers.
 /// To that end, it expects the ratifier data to contain the signature, the root of the tree, the leaf index of the
-/// offer, the proof of the offer in the tree, the start and expiry rate for the offer, and the offer's only taker.
+/// offer, the proof of the offer in the tree, the start and expiry rate for the offer, and the offer's allowed taker.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each sibling's left/right position.
 /// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
@@ -48,9 +48,9 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
             bytes32[] memory proof,
             uint256 startRate,
             uint256 expiryRate,
-            address onlyTaker
+            address allowedTaker
         ) = abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[], uint256, uint256, address));
-        require(onlyTaker == address(0) || taker == onlyTaker, UnauthorizedTaker());
+        require(allowedTaker == address(0) || taker == allowedTaker, UnauthorizedTaker());
         // to avoid returning an inconsistent price when not called from Midnight.
         require(block.timestamp <= offer.expiry, OfferExpired());
         uint256 rate;
@@ -74,7 +74,7 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
 
         require(!isRootCanceled[offer.maker][root], RootCanceled());
         require(
-            HashLib.isLeaf(root, HashLib.hashRateOffer(offer, startRate, expiryRate, onlyTaker), leafIndex, proof),
+            HashLib.isLeaf(root, HashLib.hashRateOffer(offer, startRate, expiryRate, allowedTaker), leafIndex, proof),
             InvalidProof()
         );
         bytes32 structHash = keccak256(abi.encode(HashLib.rateOfferTreeTypeHash(proof.length), root));

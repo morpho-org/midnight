@@ -502,25 +502,25 @@ contract EcrecoverRateRatifierTest is BaseTest {
         ecrecoverRateRatifier.isRatified(offer, data, address(0));
     }
 
-    function testOnlyTaker() public {
+    function testAllowedTaker() public {
         Offer memory offer = makeOffer(lender, true);
         uint256 rate = rate10pct();
-        address onlyTaker = borrower;
+        address allowedTaker = borrower;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, onlyTaker);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, allowedTaker);
         Signature memory sig = rateSignature(_root, privateKey[lender], address(ecrecoverRateRatifier), 0);
-        bytes memory data = abi.encode(sig, _root, 0, new bytes32[](0), rate, rate, onlyTaker);
+        bytes memory data = abi.encode(sig, _root, 0, new bytes32[](0), rate, rate, allowedTaker);
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRateRatifier.UnauthorizedTaker.selector);
         ecrecoverRateRatifier.isRatified(offer, data, otherBorrower);
 
         vm.prank(address(midnight));
-        assertEq(ecrecoverRateRatifier.isRatified(offer, data, onlyTaker), CALLBACK_SUCCESS);
+        assertEq(ecrecoverRateRatifier.isRatified(offer, data, allowedTaker), CALLBACK_SUCCESS);
 
-        // Being authorized by `onlyTaker` is not enough: the taker itself must be `onlyTaker`.
-        vm.prank(onlyTaker);
-        midnight.setIsAuthorized(otherBorrower, true, onlyTaker);
+        // Being authorized by `allowedTaker` is not enough: the taker itself must be `allowedTaker`.
+        vm.prank(allowedTaker);
+        midnight.setIsAuthorized(otherBorrower, true, allowedTaker);
 
         vm.prank(address(midnight));
         vm.expectRevert(IEcrecoverRateRatifier.UnauthorizedTaker.selector);
