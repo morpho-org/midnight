@@ -11,6 +11,7 @@ methods {
     function debt(bytes32 id, address user) external returns (uint128) envfree;
     function isHealthyNoBitmap(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function maxRepaidFor(Midnight.Market, bytes32, uint256, address) external returns (uint256) envfree;
+    function maxDebtFor(Midnight.Market, bytes32, address) external returns (uint256) envfree;
 
     // Assumption: price does not change during the rule (same value in maxRepaidFor, in liquidate and in the
     // post-state isHealthyNoBitmap). Deterministic per oracle address, as in Healthiness.spec.
@@ -73,14 +74,7 @@ persistent ghost address globalMarketLoanToken;
 
 persistent ghost uint256 globalMarketChainId;
 
-// Exactly two collaterals is not a restriction on the result. Liquidating touches a single collateral, so the
-// whole contribution of every other collateral to maxDebt enters the reasoning as one arbitrary non-negative
-// value, and one extra collateral with an arbitrary amount, price and LLTV already realizes every such value.
-// The second collateral therefore plays the role of the arbitrary otherCollatContribution of the Rocq proof,
-// and a market with more collaterals is covered by the same argument.
-persistent ghost uint256 globalMarketCollateralLength {
-    axiom globalMarketCollateralLength == 2;
-}
+persistent ghost uint256 globalMarketCollateralLength;
 
 persistent ghost mapping(uint256 => address) globalMarketCollateralOracle;
 
@@ -105,7 +99,7 @@ persistent ghost bytes32 globalId;
 definition collateralMatches(Midnight.Market market, uint256 index) returns bool = (index < globalMarketCollateralLength => market.collateralParams[index].oracle == globalMarketCollateralOracle[index] && market.collateralParams[index].token == globalMarketCollateralToken[index] && market.collateralParams[index].lltv == globalMarketCollateralLLTV[index] && market.collateralParams[index].liquidationCursor == globalMarketCollateralLiquidationCursor[index]);
 
 function equalsGlobalMarket(Midnight.Market market) returns (bool) {
-    return market.chainId == globalMarketChainId && market.midnight == currentContract && market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
+    return market.chainId == globalMarketChainId && market.midnight == currentContract && market.loanToken == globalMarketLoanToken && market.collateralParams.length == globalMarketCollateralLength && collateralMatches(market, 0) && collateralMatches(market, 1) && collateralMatches(market, 2) && globalMarketCollateralLength <= 3 && market.maturity == globalMarketMaturity && market.rcfThreshold == globalMarketRcfThreshold && market.enterGate == globalMarketEnterGate && market.liquidatorGate == globalMarketLiquidatorGate;
 }
 
 function getGlobalMarket() returns (Midnight.Market) {
@@ -126,9 +120,8 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
 
 /// RULE ///
 
-// In a two-collateral market, liquidating at the amount computed by maxRepaidFor leaves the position healthy.
-// The call uses normal mode and covers the strictly unhealthy and health-boundary cases. See the
-// globalMarketCollateralLength axiom for why two collaterals is general enough.
+// In a market, liquidating at the amount computed by maxRepaidFor leaves the position healthy.
+// The call uses normal mode and covers the strictly unhealthy and health-boundary cases.
 rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrower, address receiver, address callback, bytes data) {
     Midnight.Market globalMarket = getGlobalMarket();
 
@@ -137,12 +130,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
 
     // This rule checks that using `repaidUnits == maxRepaid` is enough to put the account healthy. This means that the RCF doesn't prevent to put the position back to health.
     uint256 repaidUnits = maxRepaidFor(globalMarket, globalId, collateralIndex, borrower);
-
-    // maxRepaidFor's non-reverting collateral lookup establishes collateralIndex < 2.
-    uint256 otherIndex = assert_uint256(1 - collateralIndex);
-    uint256 otherCollatBefore = collateral(globalId, borrower, otherIndex);
-    uint256 otherLltv = globalMarketCollateralLLTV[otherIndex];
-    uint256 otherPrice = summaryPrice(globalMarket.collateralParams[otherIndex].oracle);
+    uint256 maxDebtBefore = maxDebtFor(globalMarket, globalId, borrower);
 
     uint256 seizedOut;
     uint256 repaidOut;
@@ -191,9 +179,6 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // repaidUnits is ceil(gap * WAD^2 / (WAD^2 - lif * lltv)). The two rounding facts below imply
     // maxDebtDropBound <= repaidUnits - gap. Therefore the new max debt falls by no more than the amount
     // repaid in excess of the old health gap.
-    mathint otherCollatValue = ghostMulDivDown(otherCollatBefore, otherPrice, ORACLE_PRICE_SCALE());
-    mathint otherContrib = ghostMulDivDown(otherCollatValue, otherLltv, WAD());
-    mathint maxDebtBefore = oldContrib + otherContrib;
 
     mathint gap = debtBefore - maxDebtBefore;
     mathint rcfDenominator = WAD_SQUARED() - lifTimesLltv;
