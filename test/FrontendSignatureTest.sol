@@ -3,8 +3,10 @@ pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {EcrecoverRatifier} from "../src/ratifiers/EcrecoverRatifier.sol";
+import {EcrecoverRateRatifier} from "../src/ratifiers/EcrecoverRateRatifier.sol";
 import {Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {Signature} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
+import {IEcrecoverRateRatifier} from "../src/ratifiers/interfaces/IEcrecoverRateRatifier.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
@@ -76,5 +78,90 @@ contract FrontendSignatureTest is Test {
     // Trick to ensure isRatified checks that the signer is the maker, without having the offers depend on the maker.
     function isAuthorized(address, address signer) external pure returns (bool) {
         return signer == ACCOUNT;
+    }
+}
+
+// Paste from frontend output (sign-rate-root.ts).
+address constant RATE_ACCOUNT = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+uint256 constant START_RATE = 9512937594; // ~30%/yr
+uint256 constant EXPIRY_RATE = 3170979198; // ~10%/yr
+address constant ALLOWED_TAKER = 0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC;
+uint8 constant RATE_SIG_V = 28;
+bytes32 constant RATE_SIG_R = 0xea5e8a479f8adfee91160a25e2ba376713d6487fd5a4b5ab9b2c85d1123eb8ca;
+bytes32 constant RATE_SIG_S = 0x3ef2caf18c8a0be9ec054341176bfb1a0be6d679719d73b65b3ecb0acc29f2d9;
+
+contract FrontendRateSignatureTest is Test {
+    function setUp() public {
+        vm.chainId(1);
+        EcrecoverRateRatifier impl = new EcrecoverRateRatifier(address(this));
+        vm.etch(RATIFIER, address(impl).code);
+    }
+
+    function defaultRateOffer(uint8 number) internal pure returns (Offer memory offer) {
+        CollateralParams[] memory collateralParams = new CollateralParams[](1);
+        offer.market.chainId = 1;
+        offer.market.midnight = address(0);
+        offer.market.loanToken = address(uint160(0x1111111111111111111111111111111111111111) * uint160(number));
+        offer.market.collateralParams = collateralParams;
+        offer.expiry = 2 ** 32;
+        offer.buy = true;
+        offer.ratifier = RATIFIER;
+    }
+
+    function testFrontendRateSignatureVerification() public {
+        Offer[4] memory offers;
+        offers[0] = defaultRateOffer(1);
+        offers[1] = defaultRateOffer(2);
+        offers[2] = defaultRateOffer(3);
+        offers[3] = defaultRateOffer(4);
+
+        bytes32 h0 = HashLib.hashRateOffer(offers[0], START_RATE, EXPIRY_RATE, ALLOWED_TAKER);
+        bytes32 h1 = HashLib.hashRateOffer(offers[1], START_RATE, EXPIRY_RATE, ALLOWED_TAKER);
+        bytes32 h2 = HashLib.hashRateOffer(offers[2], START_RATE, EXPIRY_RATE, ALLOWED_TAKER);
+        bytes32 h3 = HashLib.hashRateOffer(offers[3], START_RATE, EXPIRY_RATE, ALLOWED_TAKER);
+        bytes32 left = HashLib.hashNode(h0, h1);
+        bytes32 right = HashLib.hashNode(h2, h3);
+        bytes32 _root = HashLib.hashNode(left, right);
+
+        bytes32[] memory proof0 = new bytes32[](2);
+        proof0[0] = h1;
+        proof0[1] = right;
+        assertTrue(HashLib.isLeaf(_root, h0, 0, proof0));
+
+        bytes32[] memory proof1 = new bytes32[](2);
+        proof1[0] = h0;
+        proof1[1] = right;
+        assertTrue(HashLib.isLeaf(_root, h1, 1, proof1));
+
+        bytes32[] memory proof2 = new bytes32[](2);
+        proof2[0] = h3;
+        proof2[1] = left;
+        assertTrue(HashLib.isLeaf(_root, h2, 2, proof2));
+
+        bytes32[] memory proof3 = new bytes32[](2);
+        proof3[0] = h2;
+        proof3[1] = left;
+        assertTrue(HashLib.isLeaf(_root, h3, 3, proof3));
+
+        bytes memory ratifierData = abi.encode(
+            Signature({v: RATE_SIG_V, r: RATE_SIG_R, s: RATE_SIG_S}),
+            _root,
+            uint256(0),
+            proof0,
+            START_RATE,
+            EXPIRY_RATE,
+            ALLOWED_TAKER
+        );
+        bytes32 result = EcrecoverRateRatifier(RATIFIER).isRatified(offers[0], ratifierData, ALLOWED_TAKER);
+        assertEq(result, CALLBACK_SUCCESS);
+
+        // The signed allowedTaker is enforced: any other taker is rejected.
+        vm.expectRevert(IEcrecoverRateRatifier.UnauthorizedTaker.selector);
+        EcrecoverRateRatifier(RATIFIER).isRatified(offers[0], ratifierData, address(0));
+    }
+
+    // Trick to ensure isRatified checks that the signer is the maker, without having the offers depend on the maker.
+    function isAuthorized(address, address signer) external pure returns (bool) {
+        return signer == RATE_ACCOUNT;
     }
 }
