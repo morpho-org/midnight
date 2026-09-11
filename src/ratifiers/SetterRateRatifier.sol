@@ -46,7 +46,7 @@ contract SetterRateRatifier is ISetterRateRatifier {
             uint256 expiryRate,
             address authorizedTaker
         ) = abi.decode(ratifierData, (bytes32, uint256, bytes32[], uint256, uint256, address));
-
+        // to avoid returning an inconsistent price when not called from Midnight.
         require(block.timestamp <= offer.expiry, OfferExpired());
         uint256 rate = startRate;
         if (startRate != expiryRate) {

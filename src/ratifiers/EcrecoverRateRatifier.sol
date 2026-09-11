@@ -50,8 +50,8 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
             uint256 expiryRate,
             address authorizedTaker
         ) = abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[], uint256, uint256, address));
-
-        require(block.timestamp <= offer.expiry, OfferExpired()); // to avoid returning an inconsistent price when not called from Midnight.
+        // to avoid returning an inconsistent price when not called from Midnight.
+        require(block.timestamp <= offer.expiry, OfferExpired());
         uint256 rate = startRate;
         if (startRate != expiryRate) {
             uint256 elapsed = block.timestamp - offer.start;
@@ -66,11 +66,9 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
         if (offer.buy) {
-            uint256 priceLimitDown = WAD.mulDivDown(WAD, WAD + rate * timeToMaturity);
-            require(offerPrice <= priceLimitDown, WorsePrice());
+            require(offerPrice <= WAD.mulDivDown(WAD, WAD + rate * timeToMaturity), WorsePrice());
         } else {
-            uint256 priceLimitUp = WAD.mulDivUp(WAD, WAD + rate * timeToMaturity);
-            require(offerPrice >= priceLimitUp, WorsePrice());
+            require(offerPrice >= WAD.mulDivUp(WAD, WAD + rate * timeToMaturity), WorsePrice());
         }
 
         require(!isRootCanceled[offer.maker][root], RootCanceled());
