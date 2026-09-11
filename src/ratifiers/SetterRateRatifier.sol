@@ -53,9 +53,9 @@ contract SetterRateRatifier is ISetterRateRatifier {
             uint256 elapsed = block.timestamp - offer.start;
             uint256 duration = offer.expiry - offer.start;
             if (startRate > expiryRate) {
-                rate = startRate - (startRate - expiryRate).mulDivDown(elapsed, duration);
+                rate -= (startRate - expiryRate).mulDivDown(elapsed, duration);
             } else {
-                rate = startRate + (expiryRate - startRate).mulDivDown(elapsed, duration);
+                rate += (expiryRate - startRate).mulDivDown(elapsed, duration);
             }
         }
 
