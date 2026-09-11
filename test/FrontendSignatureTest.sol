@@ -84,9 +84,9 @@ contract FrontendSignatureTest is Test {
 address constant RATE_ACCOUNT = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
 uint256 constant START_RATE = 9512937594; // ~30%/yr
 uint256 constant EXPIRY_RATE = 3170979198; // ~10%/yr
-uint8 constant RATE_SIG_V = 27;
-bytes32 constant RATE_SIG_R = 0xcd1ac6409cc970bce8a7458dac9e751a2223446459923ef73122646cfb0b00c9;
-bytes32 constant RATE_SIG_S = 0x572d236ad70e788759f1e9f92a19fad4639fa41dad1fae6c03f88ce8f086950c;
+uint8 constant RATE_SIG_V = 28;
+bytes32 constant RATE_SIG_R = 0x5b4aaf6b5e49b2f7bd84d6ca4789e7f63429461be22bfb370a166a05c8cfadc5;
+bytes32 constant RATE_SIG_S = 0x2949c9e045d35f231be688cd5db1cf39f246641de68a099c628d00a513f94588;
 
 contract FrontendRateSignatureTest is Test {
     function setUp() public {

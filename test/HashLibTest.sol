@@ -18,7 +18,7 @@ bytes constant MARKET_TYPE =
 bytes constant OFFER_TYPE =
     "Offer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint128 maxUnits,uint128 maxAssets,uint256 continuousFeeCap)";
 bytes constant RATE_OFFER_TYPE =
-    "RateOffer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 startRate,uint256 expiryRate,address authorizedTaker,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint128 maxUnits,uint128 maxAssets,uint256 continuousFeeCap)";
+    "RateOffer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 startRate,uint256 expiryRate,address onlyTaker,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint128 maxUnits,uint128 maxAssets,uint256 continuousFeeCap)";
 
 contract HashLibTest is Test {
     function testCollateralParamsTypeHash() public pure {

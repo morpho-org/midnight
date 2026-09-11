@@ -11,7 +11,7 @@ bytes32 constant MARKET_TYPEHASH = 0x510b3862f3816a109c9340b76972e8a30984246be06
 /// @dev keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
 bytes32 constant OFFER_TYPEHASH = 0x9905214264a9fb7b6cc1b0e33db7a04687c6e4185a84755d29914314aa9d8906;
 /// @dev keccak256(bytes.concat(RATE_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
-bytes32 constant RATE_OFFER_TYPEHASH = 0xc98e30dfa4faaa44a6983c8c9c5deb6ff6b3ac10fcbe3e118127436de578ce9e;
+bytes32 constant RATE_OFFER_TYPEHASH = 0xc20e58558abaad23c23a8647fddfd5ddfb4a2ffccf572b8ff814fe7a3a460be9;
 
 library HashLib {
     error LeafIndexOutOfRange();
@@ -52,32 +52,32 @@ library HashLib {
     /// @dev Returns the EIP-712 typehash of RateOfferTree(RateOffer[2]...[2] offerTree) with height levels.
     /// @dev Same as keccak256(bytes.concat("RateOfferTree(RateOffer[2]...[2] offerTree)", COLLATERAL_PARAMS_TYPE,
     /// MARKET_TYPE, RATE_OFFER_TYPE)), where RATE_OFFER_TYPE encodes an Offer with `tick` replaced by `startRate`
-    /// (uint256), `expiryRate` (uint256), and `authorizedTaker` (address).
+    /// (uint256), `expiryRate` (uint256), and `onlyTaker` (address).
     /// @dev Reverts if height is greater than 20.
     function rateOfferTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height <= 10) {
-            if (height == 0) return 0x6821c7264d1e78c51fbbe5a78132dcc69ef530818c986eae4099530aca7c5f95;
-            if (height == 1) return 0x917e6548c9d9b84a31bac593f9e337787e1304ad8200a732e4c0929c5a11af79;
-            if (height == 2) return 0xf0768132ac3e5d788e4f4cc0046f6f35c0624fcc8d5ab1394e8224dea506fda4;
-            if (height == 3) return 0x1c1340647dac1a37c0b4fcba7cb2621b24d10e0b55ec2bf86236a147909deda6;
-            if (height == 4) return 0xd2387070e25a62796179988e677c224a85c783f12c706b953fdfdd67068ae12d;
-            if (height == 5) return 0x7ac65fcb208eb6e546454519e6593e53eea68fa85c3451ec56cfabf1d092b28a;
-            if (height == 6) return 0x1a039a2f33ca608e145dcf6d2c40b7e9d2b6364c20de7a220aa147d113e8aa70;
-            if (height == 7) return 0xa57f45051be24c0358e294a40311d19891c595eca6e45014e71c475cbae44ef2;
-            if (height == 8) return 0x9572638b974f9ff6f476d453f120c4266d466345e0e9ccbd30dd4901fd411d29;
-            if (height == 9) return 0x27ee84a114007c1b086f3f021635f0dd5e0eddf3ce28f0947742da8e4c94f4bc;
-            return 0xab95dc6f08b82287db77d3adfb80df1bf9cf60baecc458446e4c6081afb17943;
+            if (height == 0) return 0x432d39d1800f18b61016b18160c33aa5be7ea50a363e23c7b39e279f7ad90813;
+            if (height == 1) return 0x187abb8e4e01a2af42ccd3e8f33b3436ea3807fa80bd0dc1ebef76e6b5afd549;
+            if (height == 2) return 0x1bf94ba27072b890a8e1a716aeade805a1747b96b278a4d67004ae2339a84835;
+            if (height == 3) return 0xfb5c5d206fec1495df297e918bfb2f832054b929800c4ff9b5c6da972e048e0b;
+            if (height == 4) return 0x411e5d9249dbc4864f4d8493ec03a49f0563c33dd6d17318c3f9a8159785ec2c;
+            if (height == 5) return 0x86021bbe8de8223faf93faf1915c32db89d18a09fc46fe709f6bd8ed35092e07;
+            if (height == 6) return 0x117cbd16a73d91a9d4b1844eccf96103f2254d56052a5694b549109c5f6a5de9;
+            if (height == 7) return 0x5f00bae419869754bd829d49c76b84658219813af8f84cd1a8471ddcac83e011;
+            if (height == 8) return 0x6337215578f0ebbc1d3da8ae55c06c514354cc11609208b6cb6f4fc98db49d44;
+            if (height == 9) return 0x4f19161c3534c5ef22ae176169fa67d8e509d74d38d7978396bef7af8969bdee;
+            return 0xb04771f96f338665e042882ff1b5df7c7921002e68f672134f6a8c4473cb35b7;
         } else {
-            if (height == 11) return 0xf1a7bce12cf8ee81e7a2e61bd6152b74918a840c7319f3cf90d5d30206073b47;
-            if (height == 12) return 0x3d9aa6ed000b65990b2ded5d777b50d2fae75005485213897cefadf22f2556ef;
-            if (height == 13) return 0xb5a45118b37f76abd6078d7b9b2b320f7062246a4868d9cc964a7d86507f61b9;
-            if (height == 14) return 0xba15ab98ebc8cbc999233ef81a5a0d60e1278b9206e43da5015c430b898e8f39;
-            if (height == 15) return 0x17064719ccfde2dca1360b707afc004b80f38ab8d2548ad90063326c0c6b37ac;
-            if (height == 16) return 0xa51a25c44405bc94b6bb4dcff6d433a9f43755674cc242d360210c56ed48733b;
-            if (height == 17) return 0x9413bd649bf7263266885735d7c7ef972e8b93269d672306ef744fb4cd8497d6;
-            if (height == 18) return 0x2851eab57251ac53ee92bc3ba3c71c5dc480337bfef4b049705ce4a63b7c7c56;
-            if (height == 19) return 0x26015b15e1fcb21de2da9c9a499ab788b6c7102d973980db66f97de8e1c5ddca;
-            if (height == 20) return 0xa873366af223ed1a84d4107120f24d2c68ca5eac503b0e5502f3b5f6123f1285;
+            if (height == 11) return 0xa54c45468c14af4e8d8e237925a2935fe93ebf4d7242aec43c6a0f5cf4809f59;
+            if (height == 12) return 0xdbfc80365ca65b7a318e8ffe337d76df31cf905d82b33212cedb8e1036972d9d;
+            if (height == 13) return 0x2834368b93375a3d076141ceb2e1a187211c098572964fde6581576f3745e367;
+            if (height == 14) return 0x12dd046087b45d5bd44f526da265183678af49f70de6ea6bfe89f1507a345039;
+            if (height == 15) return 0xe1f607c460298d572e5bb901eed1fec6a05abaaeda61471632eef590d1962fb7;
+            if (height == 16) return 0x5f312dab99e63ee0198f91530c0cfe3ab92c15c1354b3cd91a8010a8579ebfc5;
+            if (height == 17) return 0x06465b5a1d66cfe3832f851954292f2a088786da6240ab3ef01a21bba323ffbf;
+            if (height == 18) return 0x49cca45f89d442f8b2082ea84741c55dd71deec3e1d82f7c7fd4ab5a66fb611e;
+            if (height == 19) return 0x7789b52de5afede1651a2e2b53b65b3da3181d989281c218165cc47bda16a078;
+            if (height == 20) return 0x3c2f1b446e6861db3592ac3f2db2e6d8b6d4c14ce8a5061ad43596fdd8841b13;
             revert TreeTooHigh();
         }
     }
@@ -175,8 +175,8 @@ library HashLib {
     }
 
     /// @dev Computes the EIP-712 hash struct of a RateOffer (offer with `tick` replaced by `startRate`,
-    /// `expiryRate`, and `authorizedTaker`).
-    function hashRateOffer(Offer memory offer, uint256 startRate, uint256 expiryRate, address authorizedTaker)
+    /// `expiryRate`, and `onlyTaker`).
+    function hashRateOffer(Offer memory offer, uint256 startRate, uint256 expiryRate, address onlyTaker)
         internal
         pure
         returns (bytes32)
@@ -191,7 +191,7 @@ library HashLib {
                 offer.expiry,
                 startRate,
                 expiryRate,
-                authorizedTaker,
+                onlyTaker,
                 offer.group,
                 offer.callback,
                 keccak256(offer.callbackData),

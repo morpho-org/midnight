@@ -13,7 +13,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// no longer valid.
 /// @dev This ratifier checks that the offer has been signed by an authorized address in a Merkle tree of rate offers.
 /// To that end, it expects the ratifier data to contain the signature, the root of the tree, the leaf index of the
-/// offer, the proof of the offer in the tree, the start and expiry rate for the offer, and the authorized taker.
+/// offer, the proof of the offer in the tree, the start and expiry rate for the offer, and the offer's only taker.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each sibling's left/right position.
 /// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
@@ -48,19 +48,20 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
             bytes32[] memory proof,
             uint256 startRate,
             uint256 expiryRate,
-            address authorizedTaker
+            address onlyTaker
         ) = abi.decode(ratifierData, (Signature, bytes32, uint256, bytes32[], uint256, uint256, address));
+        require(onlyTaker == address(0) || taker == onlyTaker, UnauthorizedTaker());
         // to avoid returning an inconsistent price when not called from Midnight.
         require(block.timestamp <= offer.expiry, OfferExpired());
-        uint256 rate = startRate;
-        if (startRate != expiryRate) {
-            uint256 elapsed = block.timestamp - offer.start;
-            uint256 duration = offer.expiry - offer.start;
-            if (startRate > expiryRate) {
-                rate -= (startRate - expiryRate).mulDivDown(elapsed, duration);
-            } else {
-                rate += (expiryRate - startRate).mulDivDown(elapsed, duration);
-            }
+        uint256 rate;
+        if (startRate == expiryRate) {
+            rate = startRate;
+        } else {
+            rate = startRate > expiryRate
+                ? startRate
+                    - (startRate - expiryRate).mulDivDown(block.timestamp - offer.start, offer.expiry - offer.start)
+                : startRate
+                    + (expiryRate - startRate).mulDivDown(block.timestamp - offer.start, offer.expiry - offer.start);
         }
 
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
@@ -73,9 +74,7 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
 
         require(!isRootCanceled[offer.maker][root], RootCanceled());
         require(
-            HashLib.isLeaf(
-                root, HashLib.hashRateOffer(offer, startRate, expiryRate, authorizedTaker), leafIndex, proof
-            ),
+            HashLib.isLeaf(root, HashLib.hashRateOffer(offer, startRate, expiryRate, onlyTaker), leafIndex, proof),
             InvalidProof()
         );
         bytes32 structHash = keccak256(abi.encode(HashLib.rateOfferTreeTypeHash(proof.length), root));
@@ -85,11 +84,6 @@ contract EcrecoverRateRatifier is IEcrecoverRateRatifier {
         address _signer = ecrecover(digest, sig.v, sig.r, sig.s);
         require(_signer != address(0), InvalidSignature());
         require(_signer == offer.maker || IMidnight(MIDNIGHT).isAuthorized(offer.maker, _signer), Unauthorized());
-        require(
-            authorizedTaker == address(0) || taker == authorizedTaker
-                || IMidnight(MIDNIGHT).isAuthorized(authorizedTaker, taker),
-            UnauthorizedTaker()
-        );
         return CALLBACK_SUCCESS;
     }
 }

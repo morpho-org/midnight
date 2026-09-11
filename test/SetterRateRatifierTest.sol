@@ -350,28 +350,30 @@ contract SetterRateRatifierTest is BaseTest {
         assertEq(setterRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
     }
 
-    function testAuthorizedTaker() public {
+    function testOnlyTaker() public {
         Offer memory offer = makeOffer(lender, true);
         uint256 rate = rate10pct();
-        address authorizedTaker = borrower;
+        address onlyTaker = borrower;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, authorizedTaker);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, onlyTaker);
         vm.prank(lender);
         setterRateRatifier.setIsRootRatified(lender, _root, true);
 
-        bytes memory data = abi.encode(_root, uint256(0), new bytes32[](0), rate, rate, authorizedTaker);
+        bytes memory data = abi.encode(_root, uint256(0), new bytes32[](0), rate, rate, onlyTaker);
 
         vm.prank(address(midnight));
         vm.expectRevert(ISetterRateRatifier.UnauthorizedTaker.selector);
         setterRateRatifier.isRatified(offer, data, otherBorrower);
 
         vm.prank(address(midnight));
-        assertEq(setterRateRatifier.isRatified(offer, data, authorizedTaker), CALLBACK_SUCCESS);
+        assertEq(setterRateRatifier.isRatified(offer, data, onlyTaker), CALLBACK_SUCCESS);
 
-        vm.prank(authorizedTaker);
-        midnight.setIsAuthorized(otherBorrower, true, authorizedTaker);
+        // Being authorized by `onlyTaker` is not enough: the taker itself must be `onlyTaker`.
+        vm.prank(onlyTaker);
+        midnight.setIsAuthorized(otherBorrower, true, onlyTaker);
 
         vm.prank(address(midnight));
-        assertEq(setterRateRatifier.isRatified(offer, data, otherBorrower), CALLBACK_SUCCESS);
+        vm.expectRevert(ISetterRateRatifier.UnauthorizedTaker.selector);
+        setterRateRatifier.isRatified(offer, data, otherBorrower);
     }
 }
