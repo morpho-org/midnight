@@ -66,7 +66,7 @@ contract SetterRateRatifier is ISetterRateRatifier {
         require(_signer == maker || IMidnight(MIDNIGHT).isAuthorized(maker, _signer), Unauthorized());
         Ratification memory current = ratification[maker][root];
         if (nonce == current.nonce) {
-            ratification[maker][root] = Ratification(newIsRootRatified, nonce + 1);
+            ratification[maker][root] = Ratification({isRatified: newIsRootRatified, nonce: nonce + 1});
         } else {
             require(nonce < current.nonce, InvalidNonce());
             require(current.isRatified == newIsRootRatified, RatifiedStatusChanged());
