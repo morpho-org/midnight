@@ -5,8 +5,8 @@ pragma solidity >=0.5.0;
 import {IRatifier} from "../../interfaces/IRatifier.sol";
 
 struct Ratification {
-    bool isRatified;
-    uint128 nonce;
+    bool isRootRatified;
+    uint128 rootNonce;
 }
 
 /// @dev keccak256("SetIsRootRatified(address maker,bytes32 root,bool newIsRootRatified,uint128 nonce,uint256
@@ -61,5 +61,5 @@ interface ISetterRateRatifier is IRatifier {
     /// STORAGE GETTERS ///
     function MIDNIGHT() external view returns (address);
     function isRootRatified(address maker, bytes32 root) external view returns (bool);
-    function ratification(address maker, bytes32 root) external view returns (bool isRatified, uint128 nonce);
+    function ratification(address maker, bytes32 root) external view returns (bool isRootRatified, uint128 rootNonce);
 }

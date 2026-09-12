@@ -41,7 +41,7 @@ contract SetterRateRatifier is ISetterRateRatifier {
     /// tree might not be ratified or unratified by a single call to this function.
     function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
-        ratification[maker][root].isRatified = newIsRootRatified;
+        ratification[maker][root].isRootRatified = newIsRootRatified;
         emit SetIsRootRatified(msg.sender, maker, root, newIsRootRatified);
     }
 
@@ -65,13 +65,13 @@ contract SetterRateRatifier is ISetterRateRatifier {
         require(_signer != address(0), InvalidSignature());
         require(_signer == maker || IMidnight(MIDNIGHT).isAuthorized(maker, _signer), Unauthorized());
         Ratification memory current = ratification[maker][root];
-        if (nonce == current.nonce) {
-            ratification[maker][root] = Ratification({isRatified: newIsRootRatified, nonce: nonce + 1});
+        if (nonce == current.rootNonce) {
+            ratification[maker][root] = Ratification({isRootRatified: newIsRootRatified, rootNonce: nonce + 1});
         } else {
-            require(nonce < current.nonce, InvalidNonce());
-            require(current.isRatified == newIsRootRatified, RatifiedStatusChanged());
+            require(nonce < current.rootNonce, InvalidNonce());
+            require(current.isRootRatified == newIsRootRatified, RatifiedStatusChanged());
         }
-        emit SetIsRootRatifiedWithSig(_signer, maker, root, newIsRootRatified, nonce, current.nonce);
+        emit SetIsRootRatifiedWithSig(_signer, maker, root, newIsRootRatified, nonce, current.rootNonce);
     }
 
     /// forge-lint: disable-next-item(mixed-case-function)
@@ -80,7 +80,7 @@ contract SetterRateRatifier is ISetterRateRatifier {
     }
 
     function isRootRatified(address maker, bytes32 root) public view returns (bool) {
-        return ratification[maker][root].isRatified;
+        return ratification[maker][root].isRootRatified;
     }
 
     function isRatified(Offer memory offer, bytes memory ratifierData, address taker) external view returns (bytes32) {
@@ -118,7 +118,7 @@ contract SetterRateRatifier is ISetterRateRatifier {
             HashLib.isLeaf(root, HashLib.hashRateOffer(offer, startRate, expiryRate, allowedTaker), leafIndex, proof),
             InvalidProof()
         );
-        require(ratification[offer.maker][root].isRatified, NotRatified());
+        require(ratification[offer.maker][root].isRootRatified, NotRatified());
         return CALLBACK_SUCCESS;
     }
 }
