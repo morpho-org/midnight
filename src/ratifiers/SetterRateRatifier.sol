@@ -64,14 +64,14 @@ contract SetterRateRatifier is ISetterRateRatifier {
         address _signer = ecrecover(digest, v, r, s);
         require(_signer != address(0), InvalidSignature());
         require(_signer == maker || IMidnight(MIDNIGHT).isAuthorized(maker, _signer), Unauthorized());
-        Ratification memory current = ratification[maker][root];
-        if (nonce == current.rootNonce) {
+        Ratification memory currentRatification = ratification[maker][root];
+        if (nonce == currentRatification.rootNonce) {
             ratification[maker][root] = Ratification({isRootRatified: newIsRootRatified, rootNonce: nonce + 1});
         } else {
-            require(nonce < current.rootNonce, InvalidNonce());
-            require(current.isRootRatified == newIsRootRatified, RatifiedStatusChanged());
+            require(nonce < currentRatification.rootNonce, InvalidNonce());
+            require(currentRatification.isRootRatified == newIsRootRatified, RatifiedStatusChanged());
         }
-        emit SetIsRootRatifiedWithSig(_signer, maker, root, newIsRootRatified, nonce, current.rootNonce);
+        emit SetIsRootRatifiedWithSig(_signer, maker, root, newIsRootRatified, nonce, currentRatification.rootNonce);
     }
 
     /// forge-lint: disable-next-item(mixed-case-function)

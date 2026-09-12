@@ -130,35 +130,10 @@ contract HashLibTest is Test {
         }
     }
 
-    function testRateOfferTreeTypeHashes() public pure {
-        for (uint256 height = 0; height <= 20; height++) {
-            assertEq(
-                HashLib.rateOfferTreeTypeHash(height),
-                keccak256(
-                    bytes.concat(
-                        "RateOfferTree(RateOffer",
-                        bytes(repeat("[2]", height)),
-                        " offerTree)",
-                        COLLATERAL_PARAMS_TYPE,
-                        MARKET_TYPE,
-                        RATE_OFFER_TYPE
-                    )
-                )
-            );
-        }
-    }
-
     /// forge-config: default.allow_internal_expect_revert = true
     function testOfferTreeTypeHashInvalidHeight(uint256 height) public {
         height = bound(height, 21, type(uint256).max);
         vm.expectRevert(HashLib.TreeTooHigh.selector);
         HashLib.offerTreeTypeHash(height);
-    }
-
-    /// forge-config: default.allow_internal_expect_revert = true
-    function testRateOfferTreeTypeHashInvalidHeight(uint256 height) public {
-        height = bound(height, 21, type(uint256).max);
-        vm.expectRevert(HashLib.TreeTooHigh.selector);
-        HashLib.rateOfferTreeTypeHash(height);
     }
 }

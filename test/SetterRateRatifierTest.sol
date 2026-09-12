@@ -356,6 +356,192 @@ contract SetterRateRatifierTest is BaseTest {
         assertEq(setterRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
     }
 
+    function testIsRatifiedWorksForUnorderedTree() public {
+        uint256 rate = rate10pct();
+        Offer memory leftOffer = makeOffer(lender, true);
+        leftOffer.tick = 0;
+        Offer memory rightOffer = makeOffer(lender, true);
+        rightOffer.tick = 0;
+        rightOffer.expiry += 1;
+
+        bytes32 leftHash = HashLib.hashRateOffer(leftOffer, rate, rate, address(0));
+        bytes32 rightHash = HashLib.hashRateOffer(rightOffer, rate, rate, address(0));
+        if (leftHash < rightHash) {
+            (leftOffer, rightOffer) = (rightOffer, leftOffer);
+            (leftHash, rightHash) = (rightHash, leftHash);
+        }
+
+        bytes32 _root = HashLib.hashNode(leftHash, rightHash);
+        vm.prank(lender);
+        setterRateRatifier.setIsRootRatified(lender, _root, true);
+
+        bytes32[] memory proof = new bytes32[](1);
+        proof[0] = leftHash;
+        bytes memory data = abi.encode(_root, uint256(1), proof, rate, rate, address(0));
+
+        vm.prank(address(midnight));
+        assertEq(setterRateRatifier.isRatified(rightOffer, data, address(0)), CALLBACK_SUCCESS);
+    }
+
+    function testExpiryPastMaturityAcceptsWADPrice() public {
+        uint256 rate = rate10pct();
+        Offer memory offer = makeOffer(lender, true);
+        offer.market.maturity = vm.getBlockTimestamp() + 180 days;
+        offer.expiry = offer.market.maturity + 365 days;
+        offer.tick = MAX_TICK;
+
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
+        vm.prank(lender);
+        setterRateRatifier.setIsRootRatified(lender, _root, true);
+        bytes memory data = buildRatifierData(_root, rate, rate);
+
+        vm.warp(offer.market.maturity - 1 days);
+        vm.prank(address(midnight));
+        vm.expectRevert(ISetterRateRatifier.WorsePrice.selector);
+        setterRateRatifier.isRatified(offer, data, address(0));
+
+        vm.warp(offer.market.maturity + 1 days);
+        vm.prank(address(midnight));
+        assertEq(setterRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
+    }
+
+    function testPriceLimitIncrease() public {
+        Offer memory offer = makeOffer(lender, true);
+        uint256 rate = rate10pct();
+        // Tick price ~0.87e18 between priceLimitDown at t=0 (2yr TTM ~0.833e18) and at expiry (1yr TTM ~0.909e18).
+        offer.tick = TickLib.priceToTick(0.87e18, 1);
+
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
+        vm.prank(lender);
+        setterRateRatifier.setIsRootRatified(lender, _root, true);
+        bytes memory data = buildRatifierData(_root, rate, rate);
+
+        vm.prank(address(midnight));
+        vm.expectRevert(ISetterRateRatifier.WorsePrice.selector);
+        setterRateRatifier.isRatified(offer, data, address(0));
+
+        vm.warp(vm.getBlockTimestamp() + 365 days);
+        vm.prank(address(midnight));
+        assertEq(setterRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
+    }
+
+    function testReverseDutchAuctionRisingRateBuyer() public {
+        uint256 startRate = rate10pct();
+        uint256 expiryRate = 3 * rate10pct();
+
+        Offer memory offer = makeOffer(lender, true);
+        offer.start = vm.getBlockTimestamp();
+        offer.market.maturity = offer.expiry + 365 days;
+        // Tick price ~0.8e18 between priceLimitDown at expiry (3x rate ~0.769e18) and at t=0 (1x rate ~0.833e18).
+        offer.tick = TickLib.priceToTick(0.8e18, 1);
+
+        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
+        vm.prank(lender);
+        setterRateRatifier.setIsRootRatified(lender, _root, true);
+        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
+
+        vm.prank(address(midnight));
+        assertEq(setterRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
+
+        vm.warp(offer.start + (offer.expiry - offer.start) * 3 / 4);
+        vm.prank(address(midnight));
+        vm.expectRevert(ISetterRateRatifier.WorsePrice.selector);
+        setterRateRatifier.isRatified(offer, data, address(0));
+    }
+
+    function testReverseDutchAuctionFallingRateSeller() public {
+        uint256 startRate = 3 * rate10pct();
+        uint256 expiryRate = rate10pct();
+
+        Offer memory offer = makeOffer(borrower, false);
+        offer.start = vm.getBlockTimestamp();
+        // Tick price ~0.75e18 between priceLimitUp at t=0 (3x rate ~0.625e18) and at expiry (1x rate ~0.909e18).
+        offer.tick = TickLib.priceToTick(0.75e18, 1);
+
+        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
+        vm.prank(borrower);
+        setterRateRatifier.setIsRootRatified(borrower, _root, true);
+        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
+
+        vm.prank(address(midnight));
+        assertEq(setterRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
+
+        vm.warp(offer.start + (offer.expiry - offer.start) * 3 / 4);
+        vm.prank(address(midnight));
+        vm.expectRevert(ISetterRateRatifier.WorsePrice.selector);
+        setterRateRatifier.isRatified(offer, data, address(0));
+    }
+
+    function testDutchAuctionInterpolationApproxAtMidpoint() public {
+        uint256 startRate = 3 * rate10pct();
+        uint256 expiryRate = rate10pct();
+
+        Offer memory offer = makeOffer(lender, true);
+        offer.start = vm.getBlockTimestamp();
+        // Tick price ~0.75e18 between priceLimitDown at t=0 (3x rate ~0.625e18) and at midpoint (2x rate ~0.769e18).
+        offer.tick = TickLib.priceToTick(0.75e18, 1);
+
+        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
+        vm.prank(lender);
+        setterRateRatifier.setIsRootRatified(lender, _root, true);
+        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
+
+        vm.prank(address(midnight));
+        vm.expectRevert(ISetterRateRatifier.WorsePrice.selector);
+        setterRateRatifier.isRatified(offer, data, address(0));
+
+        vm.warp(offer.start + (offer.expiry - offer.start) / 2);
+        vm.prank(address(midnight));
+        assertEq(setterRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
+    }
+
+    function testDutchAuctionExactRateAtExpiry() public {
+        uint256 startRate = 3 * rate10pct();
+        uint256 expiryRate = rate10pct();
+        uint256 startTime = vm.getBlockTimestamp();
+        uint256 duration = 1 hours;
+
+        Offer memory offer = makeOffer(lender, true);
+        offer.start = startTime;
+        offer.expiry = startTime + duration;
+        // Tick price ~0.75e18 between priceLimitDown at midpoint (2x rate ~0.714e18) and at expiry (1x rate ~0.833e18).
+        offer.tick = TickLib.priceToTick(0.75e18, 1);
+
+        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
+        vm.prank(lender);
+        setterRateRatifier.setIsRootRatified(lender, _root, true);
+        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
+
+        vm.warp(startTime + duration / 2);
+        vm.prank(address(midnight));
+        vm.expectRevert(ISetterRateRatifier.WorsePrice.selector);
+        setterRateRatifier.isRatified(offer, data, address(0));
+
+        vm.warp(offer.expiry);
+        vm.prank(address(midnight));
+        assertEq(setterRateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
+    }
+
+    /// @dev start == expiry with startRate != expiryRate is nonsensical but we test that it correctly reverts.
+    function testDutchAuctionZeroDurationDifferentRatesReverts() public {
+        uint256 startRate = 3 * rate10pct();
+        uint256 expiryRate = rate10pct();
+
+        Offer memory offer = makeOffer(lender, true);
+        offer.start = vm.getBlockTimestamp();
+        offer.expiry = vm.getBlockTimestamp();
+        offer.tick = TickLib.priceToTick(0.75e18, 1);
+
+        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
+        vm.prank(lender);
+        setterRateRatifier.setIsRootRatified(lender, _root, true);
+        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
+
+        vm.prank(address(midnight));
+        vm.expectRevert();
+        setterRateRatifier.isRatified(offer, data, address(0));
+    }
+
     function testAllowedTaker() public {
         Offer memory offer = makeOffer(lender, true);
         uint256 rate = rate10pct();
