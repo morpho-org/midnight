@@ -2,7 +2,12 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {ISetterRateRatifier} from "./interfaces/ISetterRateRatifier.sol";
+import {
+    ISetterRateRatifier,
+    Ratification,
+    SET_IS_ROOT_RATIFIED_TYPEHASH,
+    EIP712_DOMAIN_TYPEHASH
+} from "./interfaces/ISetterRateRatifier.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS, WAD} from "../libraries/ConstantsLib.sol";
 import {TickLib} from "../libraries/TickLib.sol";
@@ -17,13 +22,16 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev The maker sets a start and expiry rate instead of a fixed price. Both are WAD-scaled per-second rates.
 /// At ratification, the rate is linearly interpolated over the offer lifetime and used as a price limit against
 /// the taker's set price.
+/// @dev A root can also be ratified with a signature.
+/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed
+/// ratifications are no longer valid.
 /// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
 contract SetterRateRatifier is ISetterRateRatifier {
     using UtilsLib for uint256;
 
     address public immutable MIDNIGHT;
 
-    mapping(address maker => mapping(bytes32 root => bool)) public isRootRatified;
+    mapping(address maker => mapping(bytes32 root => Ratification)) public ratification;
 
     constructor(address _midnight) {
         MIDNIGHT = _midnight;
@@ -33,8 +41,46 @@ contract SetterRateRatifier is ISetterRateRatifier {
     /// tree might not be ratified or unratified by a single call to this function.
     function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
-        isRootRatified[maker][root] = newIsRootRatified;
+        ratification[maker][root].isRootRatified = newIsRootRatified;
         emit SetIsRootRatified(msg.sender, maker, root, newIsRootRatified);
+    }
+
+    /// @dev Allows to batch setIsRootRatified without requiring a transaction from the maker.
+    function setIsRootRatifiedWithSig(
+        address maker,
+        bytes32 root,
+        bool newIsRootRatified,
+        uint128 nonce,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        require(deadline >= block.timestamp, DeadlineExpired());
+        bytes32 hashStruct =
+            keccak256(abi.encode(SET_IS_ROOT_RATIFIED_TYPEHASH, maker, root, newIsRootRatified, nonce, deadline));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", DOMAIN_SEPARATOR(), hashStruct));
+        // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
+        address _signer = ecrecover(digest, v, r, s);
+        require(_signer != address(0), InvalidSignature());
+        require(_signer == maker || IMidnight(MIDNIGHT).isAuthorized(maker, _signer), Unauthorized());
+        Ratification memory current = ratification[maker][root];
+        if (nonce == current.rootNonce) {
+            ratification[maker][root] = Ratification({isRootRatified: newIsRootRatified, rootNonce: nonce + 1});
+        } else {
+            require(nonce < current.rootNonce, InvalidNonce());
+            require(current.isRootRatified == newIsRootRatified, RatifiedStatusChanged());
+        }
+        emit SetIsRootRatifiedWithSig(_signer, maker, root, newIsRootRatified, nonce, current.rootNonce);
+    }
+
+    /// forge-lint: disable-next-item(mixed-case-function)
+    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+        return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
+    }
+
+    function isRootRatified(address maker, bytes32 root) public view returns (bool) {
+        return ratification[maker][root].isRootRatified;
     }
 
     function isRatified(Offer memory offer, bytes memory ratifierData, address taker) external view returns (bytes32) {
@@ -72,7 +118,7 @@ contract SetterRateRatifier is ISetterRateRatifier {
             HashLib.isLeaf(root, HashLib.hashRateOffer(offer, startRate, expiryRate, allowedTaker), leafIndex, proof),
             InvalidProof()
         );
-        require(isRootRatified[offer.maker][root], NotRatified());
+        require(ratification[offer.maker][root].isRootRatified, NotRatified());
         return CALLBACK_SUCCESS;
     }
 }
