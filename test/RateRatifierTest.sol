@@ -23,12 +23,12 @@ contract RateRatifierTest is BaseTest {
         midnight.setIsAuthorized(address(this), true, borrower);
     }
 
-    function makeOffer(address maker) internal view returns (Offer memory offer) {
+    function makeOffer(address maker, bool buy) internal view returns (Offer memory offer) {
         Market memory market;
         market.loanToken = address(loanToken);
         market.chainId = block.chainid;
         market.midnight = address(midnight);
-        market.maturity = vm.getBlockTimestamp() + 100;
+        market.maturity = vm.getBlockTimestamp() + 2 * 365 days;
         market.collateralParams = new CollateralParams[](1);
         market.collateralParams[0] = CollateralParams({
             token: address(collateralToken1),
@@ -38,20 +38,11 @@ contract RateRatifierTest is BaseTest {
         });
 
         offer.market = market;
-        offer.buy = true;
+        offer.buy = buy;
         offer.maker = maker;
         offer.ratifier = address(rateRatifier);
         offer.maxUnits = type(uint128).max;
-        offer.expiry = vm.getBlockTimestamp() + 200;
-        offer.tick = MAX_TICK;
-    }
-
-    function makeOffer(address maker, bool buy) internal view returns (Offer memory offer) {
-        offer.maker = maker;
-        offer.buy = buy;
-        offer.ratifier = address(rateRatifier);
         offer.expiry = vm.getBlockTimestamp() + 365 days;
-        offer.market.maturity = vm.getBlockTimestamp() + 2 * 365 days;
     }
 
     /// @dev Per-second WAD rate giving ~10% over 1 year via simple interest: rate = 0.1e18 / 365 days.
@@ -94,7 +85,8 @@ contract RateRatifierTest is BaseTest {
     }
 
     function testIsRatifiedAuthorizedSetterCanRatifyOnBehalf() public {
-        Offer memory offer = makeOffer(lender);
+        Offer memory offer = makeOffer(lender, true);
+        offer.tick = MAX_TICK;
         bytes32 _root = HashLib.hashRateOffer(offer, 0, 0, address(0));
 
         vm.prank(lender);
@@ -110,7 +102,8 @@ contract RateRatifierTest is BaseTest {
     }
 
     function testTakeAuthorizedSetterCanRatifyOnBehalf() public {
-        Offer memory offer = makeOffer(lender);
+        Offer memory offer = makeOffer(lender, true);
+        offer.tick = MAX_TICK;
         bytes32 _root = HashLib.hashRateOffer(offer, 0, 0, address(0));
 
         vm.prank(lender);
@@ -128,8 +121,10 @@ contract RateRatifierTest is BaseTest {
     }
 
     function testIsRatifiedUsesLeafIndex() public {
-        Offer memory leftOffer = makeOffer(lender);
-        Offer memory rightOffer = makeOffer(lender);
+        Offer memory leftOffer = makeOffer(lender, true);
+        leftOffer.tick = MAX_TICK;
+        Offer memory rightOffer = makeOffer(lender, true);
+        rightOffer.tick = MAX_TICK;
         rightOffer.expiry += 1;
 
         bytes32 _root = HashLib.hashNode(
