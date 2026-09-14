@@ -3,11 +3,11 @@
 pragma solidity 0.8.34;
 
 import {
-    IPriceRatifier,
+    IPriceRatifierV1,
     Ratification,
     SET_IS_ROOT_RATIFIED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
-} from "./interfaces/IPriceRatifier.sol";
+} from "./interfaces/IPriceRatifierV1.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS, SET_IS_ROOT_RATIFIED_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {HashLib} from "./libraries/HashLib.sol";
@@ -20,7 +20,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// ratifications are no longer valid.
 /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a
 /// tree might not be ratified or unratified by a single call to this function.
-contract PriceRatifier is IPriceRatifier {
+contract PriceRatifierV1 is IPriceRatifierV1 {
     address public immutable MIDNIGHT;
 
     mapping(address maker => mapping(bytes32 root => Ratification)) public ratification;

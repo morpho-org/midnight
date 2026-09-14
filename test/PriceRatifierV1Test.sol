@@ -3,19 +3,19 @@
 pragma solidity ^0.8.0;
 
 import {CollateralParams, Market, Offer} from "../src/interfaces/IMidnight.sol";
-import {PriceRatifier} from "../src/ratifiers/PriceRatifier.sol";
-import {IPriceRatifier} from "../src/ratifiers/interfaces/IPriceRatifier.sol";
+import {PriceRatifierV1} from "../src/ratifiers/PriceRatifierV1.sol";
+import {IPriceRatifierV1} from "../src/ratifiers/interfaces/IPriceRatifierV1.sol";
 import {CALLBACK_SUCCESS, SET_IS_ROOT_RATIFIED_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
-contract PriceRatifierTest is BaseTest {
-    PriceRatifier internal priceRatifier;
+contract PriceRatifierV1Test is BaseTest {
+    PriceRatifierV1 internal priceRatifier;
 
     function setUp() public override {
         super.setUp();
-        priceRatifier = new PriceRatifier(address(midnight));
+        priceRatifier = new PriceRatifierV1(address(midnight));
 
         vm.prank(lender);
         midnight.setIsAuthorized(address(this), true, lender);
@@ -56,7 +56,7 @@ contract PriceRatifierTest is BaseTest {
         bytes32 _root = keccak256("root");
 
         vm.expectEmit();
-        emit IPriceRatifier.SetIsRootRatified(lender, lender, _root, true);
+        emit IPriceRatifierV1.SetIsRootRatified(lender, lender, _root, true);
 
         vm.prank(lender);
         assertEq(priceRatifier.setIsRootRatified(lender, _root, true), SET_IS_ROOT_RATIFIED_SUCCESS);
@@ -108,7 +108,7 @@ contract PriceRatifierTest is BaseTest {
         priceRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
-        vm.expectRevert(IPriceRatifier.InvalidProof.selector);
+        vm.expectRevert(IPriceRatifierV1.InvalidProof.selector);
         priceRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof), address(0));
 
         vm.prank(address(midnight));
@@ -120,7 +120,7 @@ contract PriceRatifierTest is BaseTest {
         bytes32 _root = keccak256("root");
 
         vm.prank(borrower);
-        vm.expectRevert(IPriceRatifier.Unauthorized.selector);
+        vm.expectRevert(IPriceRatifierV1.Unauthorized.selector);
         priceRatifier.setIsRootRatified(lender, _root, true);
     }
 
@@ -157,7 +157,7 @@ contract PriceRatifierTest is BaseTest {
         midnight.setIsAuthorized(borrower, true, lender);
 
         vm.expectEmit();
-        emit IPriceRatifier.SetIsRootRatifiedWithSig(lender, lender, _root, true, 0, 0);
+        emit IPriceRatifierV1.SetIsRootRatifiedWithSig(lender, lender, _root, true, 0, 0);
 
         vm.prank(borrower);
         assertEq(
@@ -192,7 +192,7 @@ contract PriceRatifierTest is BaseTest {
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 
         vm.prank(otherBorrower);
-        vm.expectRevert(IPriceRatifier.Unauthorized.selector);
+        vm.expectRevert(IPriceRatifierV1.Unauthorized.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
     }
 
@@ -202,7 +202,7 @@ contract PriceRatifierTest is BaseTest {
         (uint8 v, bytes32 r, bytes32 s) =
             ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[borrower]);
 
-        vm.expectRevert(IPriceRatifier.Unauthorized.selector);
+        vm.expectRevert(IPriceRatifierV1.Unauthorized.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
     }
 
@@ -213,7 +213,7 @@ contract PriceRatifierTest is BaseTest {
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, deadline, privateKey[lender]);
 
         vm.warp(deadline + 1);
-        vm.expectRevert(IPriceRatifier.DeadlineExpired.selector);
+        vm.expectRevert(IPriceRatifierV1.DeadlineExpired.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, v, r, s);
     }
 
@@ -222,7 +222,7 @@ contract PriceRatifierTest is BaseTest {
 
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 1, vm.getBlockTimestamp(), privateKey[lender]);
 
-        vm.expectRevert(IPriceRatifier.InvalidNonce.selector);
+        vm.expectRevert(IPriceRatifierV1.InvalidNonce.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 1, vm.getBlockTimestamp(), v, r, s);
     }
 
@@ -251,7 +251,7 @@ contract PriceRatifierTest is BaseTest {
         vm.prank(lender);
         priceRatifier.setIsRootRatified(lender, _root, false);
 
-        vm.expectRevert(IPriceRatifier.RatifiedStatusChanged.selector);
+        vm.expectRevert(IPriceRatifierV1.RatifiedStatusChanged.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
         assertFalse(priceRatifier.isRootRatified(lender, _root));
     }
@@ -276,7 +276,7 @@ contract PriceRatifierTest is BaseTest {
         (, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, deadline, privateKey[lender]);
 
         // Valid v values are 27 and 28.
-        vm.expectRevert(IPriceRatifier.InvalidSignature.selector);
+        vm.expectRevert(IPriceRatifierV1.InvalidSignature.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, 0, r, s);
     }
 
@@ -288,12 +288,12 @@ contract PriceRatifierTest is BaseTest {
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, v, r, s);
 
         // Garbage signature.
-        vm.expectRevert(IPriceRatifier.InvalidSignature.selector);
+        vm.expectRevert(IPriceRatifierV1.InvalidSignature.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, 0, bytes32(0), bytes32(0));
 
         // Signature from an account the maker never authorized.
         (v, r, s) = ratifySig(lender, _root, true, 0, deadline, privateKey[borrower]);
-        vm.expectRevert(IPriceRatifier.Unauthorized.selector);
+        vm.expectRevert(IPriceRatifierV1.Unauthorized.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, v, r, s);
 
         assertTrue(priceRatifier.isRootRatified(lender, _root));
@@ -307,23 +307,23 @@ contract PriceRatifierTest is BaseTest {
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, deadline, privateKey[lender]);
 
         // Wrong maker.
-        vm.expectRevert(IPriceRatifier.Unauthorized.selector);
+        vm.expectRevert(IPriceRatifierV1.Unauthorized.selector);
         priceRatifier.setIsRootRatifiedWithSig(borrower, _root, true, 0, deadline, v, r, s);
 
         // Wrong root.
-        vm.expectRevert(IPriceRatifier.Unauthorized.selector);
+        vm.expectRevert(IPriceRatifierV1.Unauthorized.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, keccak256("other"), true, 0, deadline, v, r, s);
 
         // Wrong status.
-        vm.expectRevert(IPriceRatifier.Unauthorized.selector);
+        vm.expectRevert(IPriceRatifierV1.Unauthorized.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, false, 0, deadline, v, r, s);
 
         // Wrong nonce, checked after the signature so it does not surface as InvalidNonce.
-        vm.expectRevert(IPriceRatifier.Unauthorized.selector);
+        vm.expectRevert(IPriceRatifierV1.Unauthorized.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 1, deadline, v, r, s);
 
         // Wrong deadline.
-        vm.expectRevert(IPriceRatifier.Unauthorized.selector);
+        vm.expectRevert(IPriceRatifierV1.Unauthorized.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline + 1, v, r, s);
 
         assertFalse(priceRatifier.isRootRatified(lender, _root));
@@ -342,7 +342,7 @@ contract PriceRatifierTest is BaseTest {
         vm.prank(lender);
         midnight.setIsAuthorized(borrower, false, lender);
 
-        vm.expectRevert(IPriceRatifier.Unauthorized.selector);
+        vm.expectRevert(IPriceRatifierV1.Unauthorized.selector);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, v, r, s);
     }
 }

@@ -3,11 +3,11 @@
 pragma solidity 0.8.34;
 
 import {
-    IRateRatifier,
+    IRateRatifierV1,
     Ratification,
     SET_IS_ROOT_RATIFIED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
-} from "./interfaces/IRateRatifier.sol";
+} from "./interfaces/IRateRatifierV1.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS, SET_IS_ROOT_RATIFIED_SUCCESS, WAD} from "../libraries/ConstantsLib.sol";
 import {TickLib} from "../libraries/TickLib.sol";
@@ -28,7 +28,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
 /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a
 /// tree might not be ratified or unratified by a single call to this function.
-contract RateRatifier is IRateRatifier {
+contract RateRatifierV1 is IRateRatifierV1 {
     using UtilsLib for uint256;
 
     address public immutable MIDNIGHT;
