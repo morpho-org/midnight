@@ -61,7 +61,7 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
-    /// EXTERNAL CALLBACKS — prevent havoc of ghosts and variables in callbacks.
+    /// EXTERNAL CALLBACKS — assume callbacks do not reenter midnight. Prevents havoc of ghosts and variables
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => NONDET;
