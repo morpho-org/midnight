@@ -22,7 +22,6 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
 
     mapping(bool creditSide => address) public roleSetter;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelister;
-    /// @dev The nonce is per-whitelister, thus the whitelister needs to be part of the signed data.
     mapping(bool creditSide => mapping(address whitelister => mapping(address account => uint256))) public nonces;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelisted;
 
@@ -57,6 +56,7 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     }
 
     /// @dev Allows to batch setIsWhitelisted with the take, without requiring a transaction from the whitelister.
+    /// @dev The nonce is per-whitelister, thus the whitelister needs to be part of the signed data.
     function setIsWhitelistedWithSig(
         address whitelister,
         bool creditSide,
