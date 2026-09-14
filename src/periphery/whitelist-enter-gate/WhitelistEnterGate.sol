@@ -57,7 +57,6 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
 
     /// @dev Allows to batch setIsWhitelisted with the take, without requiring a transaction from the whitelister.
     function setIsWhitelistedWithSig(
-        address whitelister,
         bool creditSide,
         address account,
         bool newIsWhitelisted,
@@ -68,15 +67,12 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, DeadlineExpired());
-        bytes32 hashStruct = keccak256(
-            abi.encode(SET_IS_WHITELISTED_TYPEHASH, whitelister, creditSide, account, newIsWhitelisted, nonce, deadline)
-        );
+        bytes32 hashStruct =
+            keccak256(abi.encode(SET_IS_WHITELISTED_TYPEHASH, creditSide, account, newIsWhitelisted, nonce, deadline));
         bytes32 digest = keccak256(bytes.concat("\x19\x01", DOMAIN_SEPARATOR(), hashStruct));
         // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
-        address recovered = ecrecover(digest, v, r, s);
-        require(
-            recovered != address(0) && recovered == whitelister && isWhitelister[creditSide][recovered], InvalidSigner()
-        );
+        address whitelister = ecrecover(digest, v, r, s);
+        require(whitelister != address(0) && isWhitelister[creditSide][whitelister], InvalidSigner());
         uint256 currentNonce = nonces[creditSide][whitelister][account];
         if (nonce == currentNonce) {
             nonces[creditSide][whitelister][account] = currentNonce + 1;
@@ -85,7 +81,7 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
             require(nonce < currentNonce, InvalidNonce());
             require(isWhitelisted[creditSide][account] == newIsWhitelisted, WhitelistedStatusChanged());
         }
-        emit SetIsWhitelistedWithSig(recovered, creditSide, account, newIsWhitelisted, nonce, currentNonce);
+        emit SetIsWhitelistedWithSig(whitelister, creditSide, account, newIsWhitelisted, nonce, currentNonce);
     }
 
     /// GETTERS ///
