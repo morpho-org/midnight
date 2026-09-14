@@ -1,6 +1,26 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
 // Proves that loss-adjusted user credit plus continuousFeeCredit never exceeds totalUnits for each market.
+//
+// The loss-adjusted user credit is computed by updatePositionView as
+//     position.credit.mulDivDown(mapFactor(marketState[id].lossFactor), mapFactor(position.lastLossFactor))
+// where mapFactor(lossFactor) = type(uint128).max - lossFactor
+//
+// We pre-compute
+//
+//   sumPreciseCreditDivIndex[id] = sum position. position.credit.mulDivDown(PRECISION, mapFactor(position.lastLossFactor))
+//
+// with PRECISION large enough to avoid any rounding errors (possible in mathint which is unbounded).
+// The sum of all lender positions can then be computed by multiplying with the market's current lossFactor as
+//
+//   sumPreciseCreditDivIndex[id].mulDivDown(marketState[id].lossFactor, PRECISION)
+//
+// The global invariant we show is that this value is <= totalUnits - continuousFeeCredit, i.e. the lender positions are backed by
+// the sum of all debt and the withdrawable amount in the contract (see totalUnitsEqualsSumNegativeDebtPlusWithdrawable in Midnight.spec).
+//
+// To avoid division we state the invariant as:
+//   multiply(sumPreciseCreditDivIndex[id], mapFactor(lossFactor(id))) <= multiply(totalUnits(id), PRECISION) - multiply(continuousFeeCredit(id), PRECISION);
+
 import "MulDivAxioms.spec";
 
 methods {
@@ -216,9 +236,9 @@ function summaryUpdatePositionView(env e, bytes32 id, address user) returns (uin
 strong invariant preciseCreditCorrect(bytes32 id, address owner)
     checkCreditDivInvariant(id, owner);
 
-// Parametric coverage of the sum invariant for all methods EXCEPT withdraw and
-// take, which are handled by their dedicated rules (sumOfCreditsLeTotalUnits_withdraw
-// here, and the SumOfCreditsSummaryTake.spec split for take).
+// Parametric coverage of the sum invariant for all methods EXCEPT liquidate and
+// take, which are handled by their dedicated rules (sumOfCreditsLeTotalUnitsPreservedByLiquidate
+// and sumOfCreditsLeTotalUnitsPreservedByTake).
 strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
     sumOfCreditsBody(id)
     filtered { f -> f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
@@ -252,7 +272,7 @@ rule sumOfCreditsLeTotalUnitsPreservedByLiquidate(bytes32 id, env e, Midnight.Ma
 
     // Liquidate never calls _updatePosition or touches any user's credit; `sum` is unchanged.
     // Instead the lossFactor rescales:
-    //     lossFactor = mapLossFactor(mulDivDown(mapFactor(lossFactor), totalUnits - badDebt, totalUnits))
+    //     lossFactor = mapFactor(mulDivDown(mapFactor(lossFactor), totalUnits - badDebt, totalUnits))
     //     continuousFeeCredit = mulDivDown(contnuousFeeCredit, mapFactor(new), mapFactor(old))
     //     totalUnits = totalUnits - badDebt
 
