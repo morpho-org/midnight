@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-
+// Proves that loss-adjusted user credit plus continuousFeeCredit never exceeds totalUnits for each market.
 import "MulDivAxioms.spec";
 
 methods {
