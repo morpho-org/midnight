@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {CollateralParams, Market, Offer} from "../src/interfaces/IMidnight.sol";
 import {RateRatifier} from "../src/ratifiers/RateRatifier.sol";
 import {IRateRatifier} from "../src/ratifiers/interfaces/IRateRatifier.sol";
-import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {CALLBACK_SUCCESS, SET_IS_ROOT_RATIFIED_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
@@ -79,7 +79,7 @@ contract RateRatifierTest is BaseTest {
         emit IRateRatifier.SetIsRootRatified(lender, lender, _root, true);
 
         vm.prank(lender);
-        rateRatifier.setIsRootRatified(lender, _root, true);
+        assertEq(rateRatifier.setIsRootRatified(lender, _root, true), SET_IS_ROOT_RATIFIED_SUCCESS);
 
         assertTrue(rateRatifier.isRootRatified(lender, _root));
     }
@@ -600,7 +600,10 @@ contract RateRatifierTest is BaseTest {
         emit IRateRatifier.SetIsRootRatifiedWithSig(lender, lender, _root, true, 0, 0);
 
         vm.prank(borrower);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
+        assertEq(
+            rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s),
+            SET_IS_ROOT_RATIFIED_SUCCESS
+        );
 
         assertTrue(rateRatifier.isRootRatified(lender, _root));
         assertEq(rootNonce(lender, _root), 1);

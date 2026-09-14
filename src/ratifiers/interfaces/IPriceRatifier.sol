@@ -41,7 +41,7 @@ interface IPriceRatifier is IRatifier {
     );
 
     /// FUNCTIONS ///
-    function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external;
+    function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external returns (bytes32);
     function setIsRootRatifiedWithSig(
         address maker,
         bytes32 root,
@@ -51,7 +51,7 @@ interface IPriceRatifier is IRatifier {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external;
+    ) external returns (bytes32);
 
     /// GETTERS ///
     function DOMAIN_SEPARATOR() external view returns (bytes32);

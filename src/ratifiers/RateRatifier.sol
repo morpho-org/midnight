@@ -9,7 +9,7 @@ import {
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IRateRatifier.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
-import {CALLBACK_SUCCESS, WAD} from "../libraries/ConstantsLib.sol";
+import {CALLBACK_SUCCESS, SET_IS_ROOT_RATIFIED_SUCCESS, WAD} from "../libraries/ConstantsLib.sol";
 import {TickLib} from "../libraries/TickLib.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {HashLib} from "./libraries/HashLib.sol";
@@ -26,6 +26,8 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed
 /// ratifications are no longer valid.
 /// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
+/// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a
+/// tree might not be ratified or unratified by a single call to this function.
 contract RateRatifier is IRateRatifier {
     using UtilsLib for uint256;
 
@@ -37,15 +39,18 @@ contract RateRatifier is IRateRatifier {
         MIDNIGHT = _midnight;
     }
 
-    /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a
-    /// tree might not be ratified or unratified by a single call to this function.
-    function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external {
+    function isRootRatified(address maker, bytes32 root) public view returns (bool) {
+        return ratification[maker][root].isRootRatified;
+    }
+
+    function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external returns (bytes32) {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         ratification[maker][root].isRootRatified = newIsRootRatified;
         emit SetIsRootRatified(msg.sender, maker, root, newIsRootRatified);
+        return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 
-    /// @dev Allows to batch setIsRootRatified without requiring a transaction from the maker.
+    /// @dev Allows clear signing of the root through EIP712.
     /// @dev Permissioned to not let any arbitrary actor to submit the signed ratification.
     function setIsRootRatifiedWithSig(
         address maker,
@@ -56,7 +61,7 @@ contract RateRatifier is IRateRatifier {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external {
+    ) external returns (bytes32) {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         require(deadline >= block.timestamp, DeadlineExpired());
         bytes32 hashStruct =
@@ -74,15 +79,12 @@ contract RateRatifier is IRateRatifier {
             require(currentRatification.isRootRatified == newIsRootRatified, RatifiedStatusChanged());
         }
         emit SetIsRootRatifiedWithSig(_signer, maker, root, newIsRootRatified, nonce, currentRatification.rootNonce);
+        return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 
     /// forge-lint: disable-next-item(mixed-case-function)
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
-    }
-
-    function isRootRatified(address maker, bytes32 root) public view returns (bool) {
-        return ratification[maker][root].isRootRatified;
     }
 
     function isRatified(Offer memory offer, bytes memory ratifierData, address taker) external view returns (bytes32) {
