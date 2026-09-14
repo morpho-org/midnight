@@ -22,6 +22,7 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
 
     mapping(bool creditSide => address) public roleSetter;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelister;
+    /// @dev The nonce is per-whitelister, thus the whitelister needs to be part of the signed data.
     mapping(bool creditSide => mapping(address whitelister => mapping(address account => uint256))) public nonces;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelisted;
 
