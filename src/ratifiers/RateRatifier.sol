@@ -3,11 +3,11 @@
 pragma solidity 0.8.34;
 
 import {
-    ISetterRateRatifier,
+    IRateRatifier,
     Ratification,
     SET_IS_ROOT_RATIFIED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
-} from "./interfaces/ISetterRateRatifier.sol";
+} from "./interfaces/IRateRatifier.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS, WAD} from "../libraries/ConstantsLib.sol";
 import {TickLib} from "../libraries/TickLib.sol";
@@ -26,7 +26,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed
 /// ratifications are no longer valid.
 /// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
-contract SetterRateRatifier is ISetterRateRatifier {
+contract RateRatifier is IRateRatifier {
     using UtilsLib for uint256;
 
     address public immutable MIDNIGHT;
