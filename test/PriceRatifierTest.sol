@@ -16,6 +16,11 @@ contract PriceRatifierTest is BaseTest {
     function setUp() public override {
         super.setUp();
         priceRatifier = new PriceRatifier(address(midnight));
+
+        vm.prank(lender);
+        midnight.setIsAuthorized(address(this), true, lender);
+        vm.prank(borrower);
+        midnight.setIsAuthorized(address(this), true, borrower);
     }
 
     function makeOffer(address maker) internal view returns (Offer memory offer) {
@@ -148,10 +153,12 @@ contract PriceRatifierTest is BaseTest {
 
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 
+        vm.prank(lender);
+        midnight.setIsAuthorized(borrower, true, lender);
+
         vm.expectEmit();
         emit IPriceRatifier.SetIsRootRatifiedWithSig(lender, lender, _root, true, 0, 0);
 
-        // Anyone can submit the maker's signature.
         vm.prank(borrower);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
 
@@ -171,10 +178,19 @@ contract PriceRatifierTest is BaseTest {
         (uint8 v, bytes32 r, bytes32 s) =
             ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[borrower]);
 
-        vm.prank(otherBorrower);
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
 
         assertTrue(priceRatifier.isRootRatified(lender, _root));
+    }
+
+    function testSetIsRootRatifiedWithSigUnauthorizedCaller() public {
+        bytes32 _root = keccak256("root");
+
+        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
+
+        vm.prank(otherBorrower);
+        vm.expectRevert(IPriceRatifier.Unauthorized.selector);
+        priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
     }
 
     function testSetIsRootRatifiedWithSigUnauthorizedSigner() public {

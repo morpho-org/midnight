@@ -46,6 +46,7 @@ contract RateRatifier is IRateRatifier {
     }
 
     /// @dev Allows to batch setIsRootRatified without requiring a transaction from the maker.
+    /// @dev Permissioned to not let any arbitrary actor to submit the signed ratification.
     function setIsRootRatifiedWithSig(
         address maker,
         bytes32 root,
@@ -56,6 +57,7 @@ contract RateRatifier is IRateRatifier {
         bytes32 r,
         bytes32 s
     ) external {
+        require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         require(deadline >= block.timestamp, DeadlineExpired());
         bytes32 hashStruct =
             keccak256(abi.encode(SET_IS_ROOT_RATIFIED_TYPEHASH, maker, root, newIsRootRatified, nonce, deadline));
