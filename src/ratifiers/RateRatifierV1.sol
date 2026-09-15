@@ -21,14 +21,14 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// offer's allowed taker.
 /// @dev The leaf index determines each sibling's left/right position during Merkle proof verification.
 /// @dev The maker sets a start and expiry rate instead of a fixed price. Both are WAD-scaled per-second rates.
-/// At ratification, the rate is linearly interpolated over the offer lifetime and used as a price limit against
-/// the taker's set price.
+/// When isRatified is called, the rate is linearly interpolated over the offer lifetime, rounded towards
+/// the start rate, and converted to a price limit using the remaining time to maturity.
 /// @dev A root can also be ratified with a signature.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed
 /// ratifications are no longer valid.
 /// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
 /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a
-/// tree might not be ratified or unratified by a single call to this function.
+/// tree might not be ratified or unratified by a single call to either root setter.
 contract RateRatifierV1 is IRateRatifierV1 {
     using UtilsLib for uint256;
 
@@ -51,7 +51,7 @@ contract RateRatifierV1 is IRateRatifierV1 {
         return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 
-    /// @dev Allows clear signing of the root through EIP712.
+    /// @dev Allows clear signing of the root through EIP-712.
     /// @dev Permissioned to not let any arbitrary actor to submit the signed ratification.
     function setIsRootRatifiedWithSig(
         address maker,
@@ -98,7 +98,7 @@ contract RateRatifierV1 is IRateRatifierV1 {
             address allowedTaker
         ) = abi.decode(ratifierData, (bytes32, uint256, bytes32[], uint256, uint256, address));
         require(allowedTaker == address(0) || taker == allowedTaker, UnauthorizedTaker());
-        // to avoid returning an inconsistent price when not called from Midnight.
+        // Reject expired offers even when called outside Midnight.
         require(block.timestamp <= offer.expiry, OfferExpired());
         uint256 rate;
         if (startRate == expiryRate) {
