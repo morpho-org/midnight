@@ -17,12 +17,10 @@ import {HashLib} from "./libraries/HashLib.sol";
 
 /// @dev This ratifier checks that an authorized address has ratified the root of a Merkle tree of rate offers, and
 /// that the offer is a leaf in that tree.
-/// @dev The ratifier data must contain the root, the leaf index, the Merkle proof, the start and expiry rates and the
-/// offer's allowed taker.
+/// @dev The ratifier data must contain the root, the leaf index, the Merkle proof and the offer's allowed taker.
 /// @dev The leaf index determines each sibling's left/right position during Merkle proof verification.
-/// @dev The maker sets a start and expiry rate instead of a fixed price. Both are WAD-scaled per-second rates.
-/// When isRatified is called, the rate is linearly interpolated over the offer lifetime, rounded towards
-/// the start rate, and converted to a price limit using the remaining time to maturity.
+/// @dev The maker sets a rate instead of a fixed price. It is a WAD-scaled per-second rate. When isRatified is
+/// called, the rate is converted to a price limit using the remaining time to maturity.
 /// @dev A root can also be ratified with a signature.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed
 /// ratifications are no longer valid.
@@ -89,27 +87,11 @@ contract RateRatifierV1 is IRateRatifierV1 {
     }
 
     function isRatified(Offer memory offer, bytes memory ratifierData, address taker) external view returns (bytes32) {
-        (
-            bytes32 root,
-            uint256 leafIndex,
-            bytes32[] memory proof,
-            uint256 startRate,
-            uint256 expiryRate,
-            address allowedTaker
-        ) = abi.decode(ratifierData, (bytes32, uint256, bytes32[], uint256, uint256, address));
+        (bytes32 root, uint256 leafIndex, bytes32[] memory proof, uint256 rate, address allowedTaker) =
+            abi.decode(ratifierData, (bytes32, uint256, bytes32[], uint256, address));
         require(allowedTaker == address(0) || taker == allowedTaker, UnauthorizedTaker());
         // Reject expired offers even when called outside Midnight.
         require(block.timestamp <= offer.expiry, OfferExpired());
-        uint256 rate;
-        if (startRate == expiryRate) {
-            rate = startRate;
-        } else {
-            rate = startRate > expiryRate
-                ? startRate
-                    - (startRate - expiryRate).mulDivDown(block.timestamp - offer.start, offer.expiry - offer.start)
-                : startRate
-                    + (expiryRate - startRate).mulDivDown(block.timestamp - offer.start, offer.expiry - offer.start);
-        }
 
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
@@ -120,8 +102,7 @@ contract RateRatifierV1 is IRateRatifierV1 {
         }
 
         require(
-            HashLib.isLeaf(root, HashLib.hashRateOffer(offer, startRate, expiryRate, allowedTaker), leafIndex, proof),
-            InvalidProof()
+            HashLib.isLeaf(root, HashLib.hashRateOffer(offer, rate, allowedTaker), leafIndex, proof), InvalidProof()
         );
         require(ratification[offer.maker][root].isRootRatified, NotRatified());
         return CALLBACK_SUCCESS;

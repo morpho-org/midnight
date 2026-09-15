@@ -51,20 +51,12 @@ contract RateRatifierV1Test is BaseTest {
         return uint256(0.1e18) / 365 days;
     }
 
-    function buildRatifierData(bytes32 root, uint256 startRate, uint256 expiryRate)
-        internal
-        pure
-        returns (bytes memory)
-    {
-        return abi.encode(root, uint256(0), new bytes32[](0), startRate, expiryRate, address(0));
+    function buildRatifierData(bytes32 root, uint256 rate) internal pure returns (bytes memory) {
+        return abi.encode(root, uint256(0), new bytes32[](0), rate, address(0));
     }
 
-    function buildRatifierData(Offer memory offer, uint256 startRate, uint256 expiryRate)
-        internal
-        pure
-        returns (bytes memory)
-    {
-        return buildRatifierData(HashLib.hashRateOffer(offer, startRate, expiryRate, address(0)), startRate, expiryRate);
+    function buildRatifierData(Offer memory offer, uint256 rate) internal pure returns (bytes memory) {
+        return buildRatifierData(HashLib.hashRateOffer(offer, rate, address(0)), rate);
     }
 
     /// @dev The generated getter returns the Ratification struct fields as a tuple.
@@ -88,7 +80,7 @@ contract RateRatifierV1Test is BaseTest {
     function testIsRatifiedAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = MAX_TICK;
-        bytes32 _root = HashLib.hashRateOffer(offer, 0, 0, address(0));
+        bytes32 _root = HashLib.hashRateOffer(offer, 0, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(borrower, true, lender);
@@ -98,14 +90,14 @@ contract RateRatifierV1Test is BaseTest {
 
         vm.prank(address(midnight));
         bytes32 result =
-            rateRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0), 0, 0, address(0)), address(0));
+            rateRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0), 0, address(0)), address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
     function testTakeAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = MAX_TICK;
-        bytes32 _root = HashLib.hashRateOffer(offer, 0, 0, address(0));
+        bytes32 _root = HashLib.hashRateOffer(offer, 0, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(address(rateRatifier), true, lender);
@@ -117,7 +109,7 @@ contract RateRatifierV1Test is BaseTest {
 
         vm.prank(borrower);
         midnight.take(
-            offer, abi.encode(_root, 0, new bytes32[](0), 0, 0, address(0)), 0, borrower, borrower, address(0), hex""
+            offer, abi.encode(_root, 0, new bytes32[](0), 0, address(0)), 0, borrower, borrower, address(0), hex""
         );
     }
 
@@ -129,20 +121,20 @@ contract RateRatifierV1Test is BaseTest {
         rightOffer.expiry += 1;
 
         bytes32 _root = HashLib.hashNode(
-            HashLib.hashRateOffer(leftOffer, 0, 0, address(0)), HashLib.hashRateOffer(rightOffer, 0, 0, address(0))
+            HashLib.hashRateOffer(leftOffer, 0, address(0)), HashLib.hashRateOffer(rightOffer, 0, address(0))
         );
         bytes32[] memory proof = new bytes32[](1);
-        proof[0] = HashLib.hashRateOffer(leftOffer, 0, 0, address(0));
+        proof[0] = HashLib.hashRateOffer(leftOffer, 0, address(0));
 
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
         vm.expectRevert(IRateRatifierV1.InvalidProof.selector);
-        rateRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof, 0, 0, address(0)), address(0));
+        rateRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof, 0, address(0)), address(0));
 
         vm.prank(address(midnight));
-        bytes32 result = rateRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof, 0, 0, address(0)), address(0));
+        bytes32 result = rateRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof, 0, address(0)), address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -158,8 +150,8 @@ contract RateRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = 0;
         uint256 rate = rate10pct();
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
-        bytes memory data = buildRatifierData(_root, rate, rate);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
+        bytes memory data = buildRatifierData(_root, rate);
 
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
@@ -180,12 +172,12 @@ contract RateRatifierV1Test is BaseTest {
         uint256 rate = rate10pct();
         offer.tick = 0;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
-        assertEq(rateRatifier.isRatified(offer, buildRatifierData(_root, rate, rate), address(0)), CALLBACK_SUCCESS);
+        assertEq(rateRatifier.isRatified(offer, buildRatifierData(_root, rate), address(0)), CALLBACK_SUCCESS);
     }
 
     function testIsRatifiedSeller() public {
@@ -193,12 +185,12 @@ contract RateRatifierV1Test is BaseTest {
         uint256 rate = rate10pct();
         offer.tick = MAX_TICK;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
         vm.prank(borrower);
         rateRatifier.setIsRootRatified(borrower, _root, true);
 
         vm.prank(address(midnight));
-        assertEq(rateRatifier.isRatified(offer, buildRatifierData(_root, rate, rate), address(0)), CALLBACK_SUCCESS);
+        assertEq(rateRatifier.isRatified(offer, buildRatifierData(_root, rate), address(0)), CALLBACK_SUCCESS);
     }
 
     function testNotRatified() public {
@@ -208,7 +200,7 @@ contract RateRatifierV1Test is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(IRateRatifierV1.NotRatified.selector);
-        rateRatifier.isRatified(offer, buildRatifierData(offer, rate, rate), address(0));
+        rateRatifier.isRatified(offer, buildRatifierData(offer, rate), address(0));
     }
 
     function testIsRatifiedWrongRoot() public {
@@ -222,7 +214,7 @@ contract RateRatifierV1Test is BaseTest {
 
         vm.prank(address(midnight));
         vm.expectRevert(IRateRatifierV1.InvalidProof.selector);
-        rateRatifier.isRatified(offer, buildRatifierData(wrongRoot, rate, rate), address(0));
+        rateRatifier.isRatified(offer, buildRatifierData(wrongRoot, rate), address(0));
     }
 
     function testTamperedRateInRatifierData() public {
@@ -230,22 +222,16 @@ contract RateRatifierV1Test is BaseTest {
         offer.tick = 0;
         uint256 rate = rate10pct();
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
 
-        bytes memory data = abi.encode(_root, uint256(0), new bytes32[](0), rate, rate, address(0));
-        bytes memory tamperedDataStartRate = abi.encode(_root, uint256(0), new bytes32[](0), rate * 2, rate, address(0));
-        bytes memory tamperedDataExpiryRate =
-            abi.encode(_root, uint256(0), new bytes32[](0), rate, rate * 2, address(0));
+        bytes memory data = abi.encode(_root, uint256(0), new bytes32[](0), rate, address(0));
+        bytes memory tamperedData = abi.encode(_root, uint256(0), new bytes32[](0), rate * 2, address(0));
 
         vm.prank(address(midnight));
         vm.expectRevert(IRateRatifierV1.InvalidProof.selector);
-        rateRatifier.isRatified(offer, tamperedDataStartRate, address(0));
-
-        vm.prank(address(midnight));
-        vm.expectRevert(IRateRatifierV1.InvalidProof.selector);
-        rateRatifier.isRatified(offer, tamperedDataExpiryRate, address(0));
+        rateRatifier.isRatified(offer, tamperedData, address(0));
 
         vm.prank(address(midnight));
         assertEq(rateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
@@ -253,10 +239,10 @@ contract RateRatifierV1Test is BaseTest {
 
     function testOfferExpired() public {
         Offer memory offer = makeOffer(lender, true);
-        bytes memory data = buildRatifierData(offer, rate10pct(), rate10pct());
+        bytes memory data = buildRatifierData(offer, rate10pct());
 
         vm.prank(lender);
-        rateRatifier.setIsRootRatified(lender, HashLib.hashRateOffer(offer, rate10pct(), rate10pct(), address(0)), true);
+        rateRatifier.setIsRootRatified(lender, HashLib.hashRateOffer(offer, rate10pct(), address(0)), true);
 
         vm.warp(offer.expiry);
         vm.prank(address(midnight));
@@ -272,7 +258,7 @@ contract RateRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         uint256 rate = rate10pct();
         offer.tick = MAX_TICK;
-        bytes memory data = buildRatifierData(offer, rate, rate);
+        bytes memory data = buildRatifierData(offer, rate);
 
         vm.prank(address(midnight));
         vm.expectRevert(IRateRatifierV1.WorsePrice.selector);
@@ -283,7 +269,7 @@ contract RateRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(borrower, false);
         uint256 rate = rate10pct();
         offer.tick = 0;
-        bytes memory data = buildRatifierData(offer, rate, rate);
+        bytes memory data = buildRatifierData(offer, rate);
 
         vm.prank(address(midnight));
         vm.expectRevert(IRateRatifierV1.WorsePrice.selector);
@@ -294,60 +280,12 @@ contract RateRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = MAX_TICK;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, 0, 0, address(0));
+        bytes32 _root = HashLib.hashRateOffer(offer, 0, address(0));
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
-        assertEq(rateRatifier.isRatified(offer, buildRatifierData(_root, 0, 0), address(0)), CALLBACK_SUCCESS);
-    }
-
-    function testDutchAuctionFallingRateBuyer() public {
-        uint256 startRate = 3 * rate10pct();
-        uint256 expiryRate = rate10pct();
-
-        Offer memory offer = makeOffer(lender, true);
-        offer.start = block.timestamp;
-        // Tick price ~0.75e18 between priceLimitDown at t=0 (3x rate ~0.625e18) and at expiry (1x rate ~0.909e18).
-        offer.tick = TickLib.priceToTick(0.75e18, 1);
-
-        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
-        vm.prank(lender);
-        rateRatifier.setIsRootRatified(lender, _root, true);
-
-        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
-
-        vm.prank(address(midnight));
-        vm.expectRevert(IRateRatifierV1.WorsePrice.selector);
-        rateRatifier.isRatified(offer, data, address(0));
-
-        vm.warp(offer.start + (offer.expiry - offer.start) * 3 / 4);
-        vm.prank(address(midnight));
-        assertEq(rateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
-    }
-
-    function testDutchAuctionRisingRateSeller() public {
-        uint256 startRate = rate10pct();
-        uint256 expiryRate = 3 * rate10pct();
-
-        Offer memory offer = makeOffer(borrower, false);
-        offer.start = block.timestamp;
-        // Tick price ~0.8e18 between priceLimitUp at expiry (3x rate ~0.769e18) and at t=0 (1x rate ~0.833e18).
-        offer.tick = TickLib.priceToTick(0.8e18, 1);
-
-        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
-        vm.prank(borrower);
-        rateRatifier.setIsRootRatified(borrower, _root, true);
-
-        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
-
-        vm.prank(address(midnight));
-        vm.expectRevert(IRateRatifierV1.WorsePrice.selector);
-        rateRatifier.isRatified(offer, data, address(0));
-
-        vm.warp(offer.start + (offer.expiry - offer.start) * 3 / 4);
-        vm.prank(address(midnight));
-        assertEq(rateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
+        assertEq(rateRatifier.isRatified(offer, buildRatifierData(_root, 0), address(0)), CALLBACK_SUCCESS);
     }
 
     function testIsRatifiedWorksForUnorderedTree() public {
@@ -358,8 +296,8 @@ contract RateRatifierV1Test is BaseTest {
         rightOffer.tick = 0;
         rightOffer.expiry += 1;
 
-        bytes32 leftHash = HashLib.hashRateOffer(leftOffer, rate, rate, address(0));
-        bytes32 rightHash = HashLib.hashRateOffer(rightOffer, rate, rate, address(0));
+        bytes32 leftHash = HashLib.hashRateOffer(leftOffer, rate, address(0));
+        bytes32 rightHash = HashLib.hashRateOffer(rightOffer, rate, address(0));
         if (leftHash < rightHash) {
             (leftOffer, rightOffer) = (rightOffer, leftOffer);
             (leftHash, rightHash) = (rightHash, leftHash);
@@ -371,7 +309,7 @@ contract RateRatifierV1Test is BaseTest {
 
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = leftHash;
-        bytes memory data = abi.encode(_root, uint256(1), proof, rate, rate, address(0));
+        bytes memory data = abi.encode(_root, uint256(1), proof, rate, address(0));
 
         vm.prank(address(midnight));
         assertEq(rateRatifier.isRatified(rightOffer, data, address(0)), CALLBACK_SUCCESS);
@@ -384,10 +322,10 @@ contract RateRatifierV1Test is BaseTest {
         offer.expiry = offer.market.maturity + 365 days;
         offer.tick = MAX_TICK;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
-        bytes memory data = buildRatifierData(_root, rate, rate);
+        bytes memory data = buildRatifierData(_root, rate);
 
         vm.warp(offer.market.maturity - 1 days);
         vm.prank(address(midnight));
@@ -405,10 +343,10 @@ contract RateRatifierV1Test is BaseTest {
         // Tick price ~0.87e18 between priceLimitDown at t=0 (2yr TTM ~0.833e18) and at expiry (1yr TTM ~0.909e18).
         offer.tick = TickLib.priceToTick(0.87e18, 1);
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
-        bytes memory data = buildRatifierData(_root, rate, rate);
+        bytes memory data = buildRatifierData(_root, rate);
 
         vm.prank(address(midnight));
         vm.expectRevert(IRateRatifierV1.WorsePrice.selector);
@@ -419,133 +357,16 @@ contract RateRatifierV1Test is BaseTest {
         assertEq(rateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
     }
 
-    function testReverseDutchAuctionRisingRateBuyer() public {
-        uint256 startRate = rate10pct();
-        uint256 expiryRate = 3 * rate10pct();
-
-        Offer memory offer = makeOffer(lender, true);
-        offer.start = vm.getBlockTimestamp();
-        offer.market.maturity = offer.expiry + 365 days;
-        // Tick price ~0.8e18 between priceLimitDown at expiry (3x rate ~0.769e18) and at t=0 (1x rate ~0.833e18).
-        offer.tick = TickLib.priceToTick(0.8e18, 1);
-
-        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
-        vm.prank(lender);
-        rateRatifier.setIsRootRatified(lender, _root, true);
-        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
-
-        vm.prank(address(midnight));
-        assertEq(rateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
-
-        vm.warp(offer.start + (offer.expiry - offer.start) * 3 / 4);
-        vm.prank(address(midnight));
-        vm.expectRevert(IRateRatifierV1.WorsePrice.selector);
-        rateRatifier.isRatified(offer, data, address(0));
-    }
-
-    function testReverseDutchAuctionFallingRateSeller() public {
-        uint256 startRate = 3 * rate10pct();
-        uint256 expiryRate = rate10pct();
-
-        Offer memory offer = makeOffer(borrower, false);
-        offer.start = vm.getBlockTimestamp();
-        // Tick price ~0.75e18 between priceLimitUp at t=0 (3x rate ~0.625e18) and at expiry (1x rate ~0.909e18).
-        offer.tick = TickLib.priceToTick(0.75e18, 1);
-
-        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
-        vm.prank(borrower);
-        rateRatifier.setIsRootRatified(borrower, _root, true);
-        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
-
-        vm.prank(address(midnight));
-        assertEq(rateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
-
-        vm.warp(offer.start + (offer.expiry - offer.start) * 3 / 4);
-        vm.prank(address(midnight));
-        vm.expectRevert(IRateRatifierV1.WorsePrice.selector);
-        rateRatifier.isRatified(offer, data, address(0));
-    }
-
-    function testDutchAuctionInterpolationApproxAtMidpoint() public {
-        uint256 startRate = 3 * rate10pct();
-        uint256 expiryRate = rate10pct();
-
-        Offer memory offer = makeOffer(lender, true);
-        offer.start = vm.getBlockTimestamp();
-        // Tick price ~0.75e18 between priceLimitDown at t=0 (3x rate ~0.625e18) and at midpoint (2x rate ~0.769e18).
-        offer.tick = TickLib.priceToTick(0.75e18, 1);
-
-        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
-        vm.prank(lender);
-        rateRatifier.setIsRootRatified(lender, _root, true);
-        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
-
-        vm.prank(address(midnight));
-        vm.expectRevert(IRateRatifierV1.WorsePrice.selector);
-        rateRatifier.isRatified(offer, data, address(0));
-
-        vm.warp(offer.start + (offer.expiry - offer.start) / 2);
-        vm.prank(address(midnight));
-        assertEq(rateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
-    }
-
-    function testDutchAuctionExactRateAtExpiry() public {
-        uint256 startRate = 3 * rate10pct();
-        uint256 expiryRate = rate10pct();
-        uint256 startTime = vm.getBlockTimestamp();
-        uint256 duration = 1 hours;
-
-        Offer memory offer = makeOffer(lender, true);
-        offer.start = startTime;
-        offer.expiry = startTime + duration;
-        // Tick price ~0.75e18 between priceLimitDown at midpoint (2x rate ~0.714e18) and at expiry (1x rate ~0.833e18).
-        offer.tick = TickLib.priceToTick(0.75e18, 1);
-
-        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
-        vm.prank(lender);
-        rateRatifier.setIsRootRatified(lender, _root, true);
-        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
-
-        vm.warp(startTime + duration / 2);
-        vm.prank(address(midnight));
-        vm.expectRevert(IRateRatifierV1.WorsePrice.selector);
-        rateRatifier.isRatified(offer, data, address(0));
-
-        vm.warp(offer.expiry);
-        vm.prank(address(midnight));
-        assertEq(rateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
-    }
-
-    /// @dev start == expiry with startRate != expiryRate is nonsensical but we test that it correctly reverts.
-    function testDutchAuctionZeroDurationDifferentRatesReverts() public {
-        uint256 startRate = 3 * rate10pct();
-        uint256 expiryRate = rate10pct();
-
-        Offer memory offer = makeOffer(lender, true);
-        offer.start = vm.getBlockTimestamp();
-        offer.expiry = vm.getBlockTimestamp();
-        offer.tick = TickLib.priceToTick(0.75e18, 1);
-
-        bytes32 _root = HashLib.hashRateOffer(offer, startRate, expiryRate, address(0));
-        vm.prank(lender);
-        rateRatifier.setIsRootRatified(lender, _root, true);
-        bytes memory data = buildRatifierData(_root, startRate, expiryRate);
-
-        vm.prank(address(midnight));
-        vm.expectRevert();
-        rateRatifier.isRatified(offer, data, address(0));
-    }
-
     function testAllowedTaker() public {
         Offer memory offer = makeOffer(lender, true);
         uint256 rate = rate10pct();
         address allowedTaker = borrower;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, allowedTaker);
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, allowedTaker);
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
 
-        bytes memory data = abi.encode(_root, uint256(0), new bytes32[](0), rate, rate, allowedTaker);
+        bytes memory data = abi.encode(_root, uint256(0), new bytes32[](0), rate, allowedTaker);
 
         vm.prank(address(midnight));
         vm.expectRevert(IRateRatifierV1.UnauthorizedTaker.selector);
@@ -590,7 +411,7 @@ contract RateRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = 0;
         uint256 rate = rate10pct();
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, rate, address(0));
+        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
 
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 
@@ -610,7 +431,7 @@ contract RateRatifierV1Test is BaseTest {
         assertEq(rootNonce(lender, _root), 1);
 
         vm.prank(address(midnight));
-        assertEq(rateRatifier.isRatified(offer, buildRatifierData(_root, rate, rate), address(0)), CALLBACK_SUCCESS);
+        assertEq(rateRatifier.isRatified(offer, buildRatifierData(_root, rate), address(0)), CALLBACK_SUCCESS);
     }
 
     function testSetIsRootRatifiedWithSigAuthorizedSigner() public {
