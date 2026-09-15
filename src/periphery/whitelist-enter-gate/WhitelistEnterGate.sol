@@ -56,7 +56,7 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     }
 
     /// @dev Allows to batch setIsWhitelisted with the take, without requiring a transaction from the whitelister.
-    /// @dev The nonce is per-whitelister, thus the whitelister needs to be part of the signed data.
+    /// @dev The whitelister is part of the signed data to avoid Nick's method use.
     function setIsWhitelistedWithSig(
         address whitelister,
         bool creditSide,
