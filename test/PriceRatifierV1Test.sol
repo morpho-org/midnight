@@ -46,7 +46,7 @@ contract PriceRatifierV1Test is BaseTest {
         offer.tick = MAX_TICK;
     }
 
-    /// @dev The status and the nonce share a slot, so they come back as a tuple from the generated getter.
+    /// @dev The generated getter returns the Ratification struct fields as a tuple.
     function rootNonce(address maker, bytes32 root) internal view returns (uint128) {
         (, uint128 nonce) = priceRatifier.ratification(maker, root);
         return nonce;

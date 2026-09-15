@@ -13,14 +13,16 @@ import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {HashLib} from "./libraries/HashLib.sol";
 
-/// @dev This ratifier checks that the offer has been ratified by an authorized address in a Merkle tree of offers.
-/// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
-/// @dev The leaf index determines each hash order during merkle proof verification.
-/// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
+/// @dev This ratifier checks that an authorized address has ratified the root of a Merkle tree of offers, and
+/// that the offer is a leaf in that tree.
+/// @dev The ratifier data must contain the root, the leaf index and the Merkle proof.
+/// @dev The leaf index determines each sibling's left/right position during Merkle proof verification.
+/// @dev A root can also be ratified with a signature.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed
 /// ratifications are no longer valid.
+/// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
 /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a
-/// tree might not be ratified or unratified by a single call to this function.
+/// tree might not be ratified or unratified by a single call to either root setter.
 contract PriceRatifierV1 is IPriceRatifierV1 {
     address public immutable MIDNIGHT;
 
@@ -41,8 +43,9 @@ contract PriceRatifierV1 is IPriceRatifierV1 {
         return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 
-    /// @dev Allows clear signing of the root through EIP712.
-    /// @dev Permissioned to not let any arbitrary actor to submit the signed ratification.
+    /// @dev Allows clear signing of the root through EIP-712.
+    /// @dev Permissioned to prevent arbitrary actors from extracting and independently submitting
+    /// a ratification signature intended for a bundle.
     function setIsRootRatifiedWithSig(
         address maker,
         bytes32 root,

@@ -66,7 +66,7 @@ contract RateRatifierV1Test is BaseTest {
         return buildRatifierData(HashLib.hashRateOffer(offer, startRate, expiryRate, address(0)), startRate, expiryRate);
     }
 
-    /// @dev The status and the nonce share a slot, so they come back as a tuple from the generated getter.
+    /// @dev The generated getter returns the Ratification struct fields as a tuple.
     function rootNonce(address maker, bytes32 root) internal view returns (uint128) {
         (, uint128 nonce) = rateRatifier.ratification(maker, root);
         return nonce;
