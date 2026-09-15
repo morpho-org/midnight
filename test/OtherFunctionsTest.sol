@@ -357,7 +357,7 @@ contract OtherFunctionsTest is BaseTest {
 
     function testToIdStableAcrossHardfork(Market memory _market, Market memory otherMarket, uint64 newChainId) public {
         vm.assume(_market.collateralParams.length > 0);
-        vm.assume(newChainId != block.chainid);
+        vm.assume(newChainId != vm.getChainId());
         _market = validMarket(_market);
 
         bytes32 idBefore = midnight.touchMarket(_market);
