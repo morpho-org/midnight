@@ -25,6 +25,7 @@ interface IPriceRatifierV1 is ISetterRatifierV1 {
     error NotRatified();
     error RatifiedStatusChanged();
     error Unauthorized();
+    error UnauthorizedTaker();
 
     /// EVENTS ///
     event SetIsRootRatified(

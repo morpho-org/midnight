@@ -67,7 +67,7 @@ contract PriceRatifierV1Test is BaseTest {
 
     function testIsRatifiedAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashOffer(offer);
+        bytes32 _root = HashLib.hashPriceOffer(offer, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(borrower, true, lender);
@@ -76,13 +76,13 @@ contract PriceRatifierV1Test is BaseTest {
         priceRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
-        bytes32 result = priceRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0)), address(0));
+        bytes32 result = priceRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0), address(0)), address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
     function testTakeAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashOffer(offer);
+        bytes32 _root = HashLib.hashPriceOffer(offer, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(address(priceRatifier), true, lender);
@@ -93,7 +93,9 @@ contract PriceRatifierV1Test is BaseTest {
         priceRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(borrower);
-        midnight.take(offer, abi.encode(_root, 0, new bytes32[](0)), 0, borrower, borrower, address(0), hex"");
+        midnight.take(
+            offer, abi.encode(_root, 0, new bytes32[](0), address(0)), 0, borrower, borrower, address(0), hex""
+        );
     }
 
     function testIsRatifiedUsesLeafIndex() public {
@@ -101,19 +103,21 @@ contract PriceRatifierV1Test is BaseTest {
         Offer memory rightOffer = makeOffer(lender);
         rightOffer.expiry += 1;
 
-        bytes32 _root = HashLib.hashNode(HashLib.hashOffer(leftOffer), HashLib.hashOffer(rightOffer));
+        bytes32 _root = HashLib.hashNode(
+            HashLib.hashPriceOffer(leftOffer, address(0)), HashLib.hashPriceOffer(rightOffer, address(0))
+        );
         bytes32[] memory proof = new bytes32[](1);
-        proof[0] = HashLib.hashOffer(leftOffer);
+        proof[0] = HashLib.hashPriceOffer(leftOffer, address(0));
 
         vm.prank(lender);
         priceRatifier.setIsRootRatified(lender, _root, true);
 
         vm.prank(address(midnight));
         vm.expectRevert(IPriceRatifierV1.InvalidProof.selector);
-        priceRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof), address(0));
+        priceRatifier.isRatified(rightOffer, abi.encode(_root, 0, proof, address(0)), address(0));
 
         vm.prank(address(midnight));
-        bytes32 result = priceRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof), address(0));
+        bytes32 result = priceRatifier.isRatified(rightOffer, abi.encode(_root, 1, proof, address(0)), address(0));
         assertEq(result, CALLBACK_SUCCESS);
     }
 
@@ -123,6 +127,51 @@ contract PriceRatifierV1Test is BaseTest {
         vm.prank(borrower);
         vm.expectRevert(IPriceRatifierV1.Unauthorized.selector);
         priceRatifier.setIsRootRatified(lender, _root, true);
+    }
+
+    function testAllowedTaker() public {
+        Offer memory offer = makeOffer(lender);
+        address allowedTaker = borrower;
+
+        bytes32 _root = HashLib.hashPriceOffer(offer, allowedTaker);
+        vm.prank(lender);
+        priceRatifier.setIsRootRatified(lender, _root, true);
+
+        bytes memory data = abi.encode(_root, uint256(0), new bytes32[](0), allowedTaker);
+
+        vm.prank(address(midnight));
+        vm.expectRevert(IPriceRatifierV1.UnauthorizedTaker.selector);
+        priceRatifier.isRatified(offer, data, otherBorrower);
+
+        vm.prank(address(midnight));
+        assertEq(priceRatifier.isRatified(offer, data, allowedTaker), CALLBACK_SUCCESS);
+
+        // Being authorized by `allowedTaker` is not enough: the taker itself must be `allowedTaker`.
+        vm.prank(allowedTaker);
+        midnight.setIsAuthorized(otherBorrower, true, allowedTaker);
+
+        vm.prank(address(midnight));
+        vm.expectRevert(IPriceRatifierV1.UnauthorizedTaker.selector);
+        priceRatifier.isRatified(offer, data, otherBorrower);
+    }
+
+    function testTamperedAllowedTakerInRatifierData() public {
+        Offer memory offer = makeOffer(lender);
+        address allowedTaker = borrower;
+
+        bytes32 _root = HashLib.hashPriceOffer(offer, allowedTaker);
+        vm.prank(lender);
+        priceRatifier.setIsRootRatified(lender, _root, true);
+
+        bytes memory data = abi.encode(_root, uint256(0), new bytes32[](0), allowedTaker);
+        bytes memory tamperedData = abi.encode(_root, uint256(0), new bytes32[](0), address(0));
+
+        vm.prank(address(midnight));
+        vm.expectRevert(IPriceRatifierV1.InvalidProof.selector);
+        priceRatifier.isRatified(offer, tamperedData, otherBorrower);
+
+        vm.prank(address(midnight));
+        assertEq(priceRatifier.isRatified(offer, data, allowedTaker), CALLBACK_SUCCESS);
     }
 
     function ratifySig(
@@ -150,7 +199,7 @@ contract PriceRatifierV1Test is BaseTest {
 
     function testSetIsRootRatifiedWithSig() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashOffer(offer);
+        bytes32 _root = HashLib.hashPriceOffer(offer, address(0));
 
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 
@@ -170,7 +219,10 @@ contract PriceRatifierV1Test is BaseTest {
         assertEq(rootNonce(lender, _root), 1);
 
         vm.prank(address(midnight));
-        assertEq(priceRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0)), address(0)), CALLBACK_SUCCESS);
+        assertEq(
+            priceRatifier.isRatified(offer, abi.encode(_root, 0, new bytes32[](0), address(0)), address(0)),
+            CALLBACK_SUCCESS
+        );
     }
 
     function testSetIsRootRatifiedWithSigAuthorizedSigner() public {
