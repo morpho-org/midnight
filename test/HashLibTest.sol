@@ -149,4 +149,54 @@ contract HashLibTest is Test {
         vm.expectRevert(HashLib.TreeTooHigh.selector);
         HashLib.offerTreeTypeHash(height);
     }
+
+    function testPriceRatifierV1OfferTreeTypeHashes() public pure {
+        for (uint256 height = 0; height <= 20; height++) {
+            assertEq(
+                HashLib.priceRatifierV1OfferTreeTypeHash(height),
+                keccak256(
+                    bytes.concat(
+                        "SetIsRootRatified(address maker,PriceRatifierV1Offer",
+                        bytes(repeat("[2]", height)),
+                        " offerTree,bool newIsRootRatified,uint128 nonce,uint256 deadline)",
+                        COLLATERAL_PARAMS_TYPE,
+                        MARKET_TYPE,
+                        PRICE_RATIFIER_V1_OFFER_TYPE
+                    )
+                )
+            );
+        }
+    }
+
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testPriceRatifierV1OfferTreeTypeHashInvalidHeight(uint256 height) public {
+        height = bound(height, 21, type(uint256).max);
+        vm.expectRevert(HashLib.TreeTooHigh.selector);
+        HashLib.priceRatifierV1OfferTreeTypeHash(height);
+    }
+
+    function testRateRatifierV1OfferTreeTypeHashes() public pure {
+        for (uint256 height = 0; height <= 20; height++) {
+            assertEq(
+                HashLib.rateRatifierV1OfferTreeTypeHash(height),
+                keccak256(
+                    bytes.concat(
+                        "SetIsRootRatified(address maker,RateRatifierV1Offer",
+                        bytes(repeat("[2]", height)),
+                        " offerTree,bool newIsRootRatified,uint128 nonce,uint256 deadline)",
+                        COLLATERAL_PARAMS_TYPE,
+                        MARKET_TYPE,
+                        RATE_RATIFIER_V1_OFFER_TYPE
+                    )
+                )
+            );
+        }
+    }
+
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testRateRatifierV1OfferTreeTypeHashInvalidHeight(uint256 height) public {
+        height = bound(height, 21, type(uint256).max);
+        vm.expectRevert(HashLib.TreeTooHigh.selector);
+        HashLib.rateRatifierV1OfferTreeTypeHash(height);
+    }
 }

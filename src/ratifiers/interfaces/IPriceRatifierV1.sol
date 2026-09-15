@@ -9,10 +9,6 @@ struct Ratification {
     uint128 rootNonce;
 }
 
-/// @dev keccak256("SetIsRootRatified(address maker,bytes32 root,bool newIsRootRatified,uint128 nonce,uint256
-/// deadline)").
-bytes32 constant SET_IS_ROOT_RATIFIED_TYPEHASH = 0x90eef64d3dc1bb270295c48dc2b436bf38642d8089bea6374e8e612e17061bda;
-
 /// @dev keccak256("EIP712Domain(uint256 chainId,address verifyingContract)").
 bytes32 constant EIP712_DOMAIN_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
 
@@ -36,6 +32,7 @@ interface IPriceRatifierV1 is IRatifiersV1Common {
         address indexed signer,
         address indexed maker,
         bytes32 indexed root,
+        uint256 height,
         bool newIsRootRatified,
         uint128 nonce,
         uint128 currentNonce
