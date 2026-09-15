@@ -2,12 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {
-    IRateRatifierV1,
-    Ratification,
-    SET_IS_ROOT_RATIFIED_TYPEHASH,
-    EIP712_DOMAIN_TYPEHASH
-} from "./interfaces/IRateRatifierV1.sol";
+import {IRateRatifierV1, Ratification, EIP712_DOMAIN_TYPEHASH} from "./interfaces/IRateRatifierV1.sol";
 import {SET_IS_ROOT_RATIFIED_SUCCESS} from "./interfaces/IRatifiersV1Common.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS, WAD} from "../libraries/ConstantsLib.sol";
@@ -25,6 +20,8 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev The rate is quoted as simple interest using the money market quoting method. Compounding is not taken into
 /// account.
 /// @dev A root can also be ratified with a signature.
+/// @dev Hashing offers as in EIP-712, which allows clear signing of the tree in setIsRootRatifiedWithSig, credits
+/// to Seaport for this mechanism.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed
 /// ratifications are no longer valid.
 /// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
@@ -56,11 +53,11 @@ contract RateRatifierV1 is IRateRatifierV1 {
         return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 
-    /// @dev Allows clear signing of the root through EIP-712.
     /// @dev Permissioned to not let any arbitrary actor to submit the signed ratification.
     function setIsRootRatifiedWithSig(
         address maker,
         bytes32 root,
+        uint256 height,
         bool newIsRootRatified,
         uint128 nonce,
         uint256 deadline,
@@ -70,8 +67,9 @@ contract RateRatifierV1 is IRateRatifierV1 {
     ) external returns (bytes32) {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         require(deadline >= block.timestamp, DeadlineExpired());
-        bytes32 hashStruct =
-            keccak256(abi.encode(SET_IS_ROOT_RATIFIED_TYPEHASH, maker, root, newIsRootRatified, nonce, deadline));
+        bytes32 hashStruct = keccak256(
+            abi.encode(HashLib.rateRatifierV1OfferTreeTypeHash(height), maker, root, newIsRootRatified, nonce, deadline)
+        );
         bytes32 digest = keccak256(bytes.concat("\x19\x01", DOMAIN_SEPARATOR(), hashStruct));
         // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
         address _signer = ecrecover(digest, v, r, s);
@@ -84,7 +82,9 @@ contract RateRatifierV1 is IRateRatifierV1 {
             require(nonce < currentRatification.rootNonce, InvalidNonce());
             require(currentRatification.isRootRatified == newIsRootRatified, RatifiedStatusChanged());
         }
-        emit SetIsRootRatifiedWithSig(_signer, maker, root, newIsRootRatified, nonce, currentRatification.rootNonce);
+        emit SetIsRootRatifiedWithSig(
+            _signer, maker, root, height, newIsRootRatified, nonce, currentRatification.rootNonce
+        );
         return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 

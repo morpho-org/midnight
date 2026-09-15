@@ -362,7 +362,26 @@ contract RateRatifierV1Test is BaseTest {
         rateRatifier.isRatified(offer, data, otherBorrower);
     }
 
+    /// @dev The signed typehash depends on the height of the offer tree the root commits to.
     function ratifySig(
+        address maker,
+        bytes32 _root,
+        uint256 height,
+        bool newIsRootRatified,
+        uint128 nonce,
+        uint256 deadline,
+        uint256 _privateKey
+    ) internal view returns (uint8 v, bytes32 r, bytes32 s) {
+        bytes32 hashStruct = keccak256(
+            abi.encode(
+                HashLib.rateRatifierV1OfferTreeTypeHash(height), maker, _root, newIsRootRatified, nonce, deadline
+            )
+        );
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(address(rateRatifier)), hashStruct));
+        (v, r, s) = vm.sign(_privateKey, digest);
+    }
+
+    function ratifySigSingleOffer(
         address maker,
         bytes32 _root,
         bool newIsRootRatified,
@@ -370,12 +389,7 @@ contract RateRatifierV1Test is BaseTest {
         uint256 deadline,
         uint256 _privateKey
     ) internal view returns (uint8 v, bytes32 r, bytes32 s) {
-        bytes32 hashStruct = vm.eip712HashStruct(
-            "SetIsRootRatified(address maker,bytes32 root,bool newIsRootRatified,uint128 nonce,uint256 deadline)",
-            abi.encode(maker, _root, newIsRootRatified, nonce, deadline)
-        );
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator(address(rateRatifier)), hashStruct));
-        (v, r, s) = vm.sign(_privateKey, digest);
+        return ratifySig(maker, _root, 0, newIsRootRatified, nonce, deadline, _privateKey);
     }
 
     function testDomainSeparator() public view {
@@ -391,17 +405,18 @@ contract RateRatifierV1Test is BaseTest {
         uint256 rate = rate10pct();
         bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, rate, address(0));
 
-        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
+        (uint8 v, bytes32 r, bytes32 s) =
+            ratifySigSingleOffer(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 
         vm.prank(lender);
         midnight.setIsAuthorized(borrower, true, lender);
 
         vm.expectEmit();
-        emit IRateRatifierV1.SetIsRootRatifiedWithSig(lender, lender, _root, true, 0, 0);
+        emit IRateRatifierV1.SetIsRootRatifiedWithSig(lender, lender, _root, 0, true, 0, 0);
 
         vm.prank(borrower);
         assertEq(
-            rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s),
+            rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, vm.getBlockTimestamp(), v, r, s),
             SET_IS_ROOT_RATIFIED_SUCCESS
         );
 
@@ -419,9 +434,9 @@ contract RateRatifierV1Test is BaseTest {
         midnight.setIsAuthorized(borrower, true, lender);
 
         (uint8 v, bytes32 r, bytes32 s) =
-            ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[borrower]);
+            ratifySigSingleOffer(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[borrower]);
 
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, vm.getBlockTimestamp(), v, r, s);
 
         assertTrue(rateRatifier.isRootRatified(lender, _root));
     }
@@ -429,41 +444,43 @@ contract RateRatifierV1Test is BaseTest {
     function testSetIsRootRatifiedWithSigUnauthorizedCaller() public {
         bytes32 _root = keccak256("root");
 
-        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
+        (uint8 v, bytes32 r, bytes32 s) =
+            ratifySigSingleOffer(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 
         vm.prank(otherBorrower);
         vm.expectRevert(IRateRatifierV1.Unauthorized.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, vm.getBlockTimestamp(), v, r, s);
     }
 
     function testSetIsRootRatifiedWithSigUnauthorizedSigner() public {
         bytes32 _root = keccak256("root");
 
         (uint8 v, bytes32 r, bytes32 s) =
-            ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[borrower]);
+            ratifySigSingleOffer(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[borrower]);
 
         vm.expectRevert(IRateRatifierV1.Unauthorized.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, vm.getBlockTimestamp(), v, r, s);
     }
 
     function testSetIsRootRatifiedWithSigDeadlineExpired() public {
         bytes32 _root = keccak256("root");
         uint256 deadline = vm.getBlockTimestamp();
 
-        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, deadline, privateKey[lender]);
+        (uint8 v, bytes32 r, bytes32 s) = ratifySigSingleOffer(lender, _root, true, 0, deadline, privateKey[lender]);
 
         vm.warp(deadline + 1);
         vm.expectRevert(IRateRatifierV1.DeadlineExpired.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, deadline, v, r, s);
     }
 
     function testSetIsRootRatifiedWithSigNonceTooHigh() public {
         bytes32 _root = keccak256("root");
 
-        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 1, vm.getBlockTimestamp(), privateKey[lender]);
+        (uint8 v, bytes32 r, bytes32 s) =
+            ratifySigSingleOffer(lender, _root, true, 1, vm.getBlockTimestamp(), privateKey[lender]);
 
         vm.expectRevert(IRateRatifierV1.InvalidNonce.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 1, vm.getBlockTimestamp(), v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 1, vm.getBlockTimestamp(), v, r, s);
     }
 
     /// @dev Replaying a consumed signature is a no-op while the status it carries still holds, so that a bundle
@@ -471,12 +488,13 @@ contract RateRatifierV1Test is BaseTest {
     function testSetIsRootRatifiedWithSigReplayNoOp() public {
         bytes32 _root = keccak256("root");
 
-        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
+        (uint8 v, bytes32 r, bytes32 s) =
+            ratifySigSingleOffer(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, vm.getBlockTimestamp(), v, r, s);
         assertEq(rateRatifier.rootNonce(lender, _root), 1);
 
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, vm.getBlockTimestamp(), v, r, s);
         assertTrue(rateRatifier.isRootRatified(lender, _root));
         assertEq(rateRatifier.rootNonce(lender, _root), 1, "nonce must not advance twice");
     }
@@ -485,25 +503,27 @@ contract RateRatifierV1Test is BaseTest {
     function testSetIsRootRatifiedWithSigReplayAfterStatusChange() public {
         bytes32 _root = keccak256("root");
 
-        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
+        (uint8 v, bytes32 r, bytes32 s) =
+            ratifySigSingleOffer(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, vm.getBlockTimestamp(), v, r, s);
 
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, false);
 
         vm.expectRevert(IRateRatifierV1.RatifiedStatusChanged.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, vm.getBlockTimestamp(), v, r, s);
         assertFalse(rateRatifier.isRootRatified(lender, _root));
     }
 
     function testSetIsRootRatifiedWithSigCanUnratify() public {
         bytes32 _root = keccak256("root");
 
-        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
+        (uint8 v, bytes32 r, bytes32 s) =
+            ratifySigSingleOffer(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, vm.getBlockTimestamp(), v, r, s);
 
-        (v, r, s) = ratifySig(lender, _root, false, 1, vm.getBlockTimestamp(), privateKey[lender]);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, false, 1, vm.getBlockTimestamp(), v, r, s);
+        (v, r, s) = ratifySigSingleOffer(lender, _root, false, 1, vm.getBlockTimestamp(), privateKey[lender]);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, false, 1, vm.getBlockTimestamp(), v, r, s);
 
         assertFalse(rateRatifier.isRootRatified(lender, _root));
         assertEq(rateRatifier.rootNonce(lender, _root), 2);
@@ -513,28 +533,28 @@ contract RateRatifierV1Test is BaseTest {
         bytes32 _root = keccak256("root");
         uint256 deadline = vm.getBlockTimestamp();
 
-        (, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, deadline, privateKey[lender]);
+        (, bytes32 r, bytes32 s) = ratifySigSingleOffer(lender, _root, true, 0, deadline, privateKey[lender]);
 
         // Valid v values are 27 and 28.
         vm.expectRevert(IRateRatifierV1.InvalidSignature.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, 0, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, deadline, 0, r, s);
     }
 
     function testSetIsRootRatifiedWithSigStaleNonceChecksSignature() public {
         bytes32 _root = keccak256("root");
         uint256 deadline = vm.getBlockTimestamp();
 
-        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, deadline, privateKey[lender]);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, v, r, s);
+        (uint8 v, bytes32 r, bytes32 s) = ratifySigSingleOffer(lender, _root, true, 0, deadline, privateKey[lender]);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, deadline, v, r, s);
 
         // Garbage signature.
         vm.expectRevert(IRateRatifierV1.InvalidSignature.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, 0, bytes32(0), bytes32(0));
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, deadline, 0, bytes32(0), bytes32(0));
 
         // Signature from an account the maker never authorized.
-        (v, r, s) = ratifySig(lender, _root, true, 0, deadline, privateKey[borrower]);
+        (v, r, s) = ratifySigSingleOffer(lender, _root, true, 0, deadline, privateKey[borrower]);
         vm.expectRevert(IRateRatifierV1.Unauthorized.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, deadline, v, r, s);
 
         assertTrue(rateRatifier.isRootRatified(lender, _root));
         assertEq(rateRatifier.rootNonce(lender, _root), 1);
@@ -544,27 +564,27 @@ contract RateRatifierV1Test is BaseTest {
         bytes32 _root = keccak256("root");
         uint256 deadline = vm.getBlockTimestamp();
 
-        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, deadline, privateKey[lender]);
+        (uint8 v, bytes32 r, bytes32 s) = ratifySigSingleOffer(lender, _root, true, 0, deadline, privateKey[lender]);
 
         // Wrong maker.
         vm.expectRevert(IRateRatifierV1.Unauthorized.selector);
-        rateRatifier.setIsRootRatifiedWithSig(borrower, _root, true, 0, deadline, v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(borrower, _root, 0, true, 0, deadline, v, r, s);
 
         // Wrong root.
         vm.expectRevert(IRateRatifierV1.Unauthorized.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, keccak256("other"), true, 0, deadline, v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, keccak256("other"), 0, true, 0, deadline, v, r, s);
 
         // Wrong status.
         vm.expectRevert(IRateRatifierV1.Unauthorized.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, false, 0, deadline, v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, false, 0, deadline, v, r, s);
 
         // Wrong nonce, checked after the signature so it does not surface as InvalidNonce.
         vm.expectRevert(IRateRatifierV1.Unauthorized.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 1, deadline, v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 1, deadline, v, r, s);
 
         // Wrong deadline.
         vm.expectRevert(IRateRatifierV1.Unauthorized.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline + 1, v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, deadline + 1, v, r, s);
 
         assertFalse(rateRatifier.isRootRatified(lender, _root));
         assertEq(rateRatifier.rootNonce(lender, _root), 0);
@@ -577,12 +597,62 @@ contract RateRatifierV1Test is BaseTest {
         vm.prank(lender);
         midnight.setIsAuthorized(borrower, true, lender);
 
-        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, deadline, privateKey[borrower]);
+        (uint8 v, bytes32 r, bytes32 s) = ratifySigSingleOffer(lender, _root, true, 0, deadline, privateKey[borrower]);
 
         vm.prank(lender);
         midnight.setIsAuthorized(borrower, false, lender);
 
         vm.expectRevert(IRateRatifierV1.Unauthorized.selector);
-        rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, v, r, s);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 0, deadline, v, r, s);
+    }
+
+    function testSetIsRootRatifiedWithSigWrongHeight() public {
+        bytes32 _root = keccak256("root");
+        uint256 deadline = vm.getBlockTimestamp();
+
+        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, 1, true, 0, deadline, privateKey[lender]);
+
+        // The height is committed to by the signature, so another one recovers an unrelated signer.
+        vm.expectRevert(IRateRatifierV1.Unauthorized.selector);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 2, true, 0, deadline, v, r, s);
+
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 1, true, 0, deadline, v, r, s);
+        assertTrue(rateRatifier.isRootRatified(lender, _root));
+    }
+
+    function testSetIsRootRatifiedWithSigHeightTooHigh() public {
+        bytes32 _root = keccak256("root");
+        uint256 deadline = vm.getBlockTimestamp();
+
+        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, 20, true, 0, deadline, privateKey[lender]);
+
+        vm.expectRevert(HashLib.TreeTooHigh.selector);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 21, true, 0, deadline, v, r, s);
+    }
+
+    /// @dev Ratifying by signature a tree whose leaves are rate offers, then taking one of them.
+    function testSetIsRootRatifiedWithSigOfferTree() public {
+        uint256 rate = rate10pct();
+        Offer memory leftOffer = makeOffer(lender, true);
+        leftOffer.tick = 0;
+        Offer memory rightOffer = makeOffer(lender, true);
+        rightOffer.tick = 0;
+        rightOffer.expiry += 1;
+
+        bytes32 leftHash = HashLib.hashRateRatifierV1Offer(leftOffer, rate, address(0));
+        bytes32 rightHash = HashLib.hashRateRatifierV1Offer(rightOffer, rate, address(0));
+        bytes32 _root = HashLib.hashNode(leftHash, rightHash);
+
+        uint256 deadline = vm.getBlockTimestamp();
+        (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, 1, true, 0, deadline, privateKey[lender]);
+        rateRatifier.setIsRootRatifiedWithSig(lender, _root, 1, true, 0, deadline, v, r, s);
+
+        bytes32[] memory proof = new bytes32[](1);
+        proof[0] = rightHash;
+
+        vm.prank(address(midnight));
+        bytes32 result =
+            rateRatifier.isRatified(leftOffer, abi.encode(_root, uint256(0), proof, rate, address(0)), address(0));
+        assertEq(result, CALLBACK_SUCCESS);
     }
 }

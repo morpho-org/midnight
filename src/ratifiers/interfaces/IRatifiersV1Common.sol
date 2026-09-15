@@ -11,6 +11,7 @@ interface IRatifiersV1Common is IRatifier {
     function setIsRootRatifiedWithSig(
         address maker,
         bytes32 root,
+        uint256 height,
         bool newIsRootRatified,
         uint128 nonce,
         uint256 deadline,
