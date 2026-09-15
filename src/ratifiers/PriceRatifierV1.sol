@@ -8,7 +8,7 @@ import {
     SET_IS_ROOT_RATIFIED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IPriceRatifierV1.sol";
-import {SET_IS_ROOT_RATIFIED_SUCCESS} from "./interfaces/ISetterRatifierV1.sol";
+import {SET_IS_ROOT_RATIFIED_SUCCESS} from "./interfaces/IRatifiersV1Common.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {HashLib} from "./libraries/HashLib.sol";

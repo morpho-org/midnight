@@ -6,7 +6,7 @@ import {IRatifier} from "../../interfaces/IRatifier.sol";
 
 bytes32 constant SET_IS_ROOT_RATIFIED_SUCCESS = keccak256("morpho.midnight.setIsRootRatifiedSuccess");
 
-interface ISetterRatifierV1 is IRatifier {
+interface IRatifiersV1Common is IRatifier {
     function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external returns (bytes32);
     function setIsRootRatifiedWithSig(
         address maker,
