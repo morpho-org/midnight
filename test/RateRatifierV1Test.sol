@@ -237,23 +237,6 @@ contract RateRatifierV1Test is BaseTest {
         assertEq(rateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
     }
 
-    function testOfferExpired() public {
-        Offer memory offer = makeOffer(lender, true);
-        bytes memory data = buildRatifierData(offer, rate10pct());
-
-        vm.prank(lender);
-        rateRatifier.setIsRootRatified(lender, HashLib.hashRateOffer(offer, rate10pct(), address(0)), true);
-
-        vm.warp(offer.expiry);
-        vm.prank(address(midnight));
-        assertEq(rateRatifier.isRatified(offer, data, address(0)), CALLBACK_SUCCESS);
-
-        vm.warp(offer.expiry + 1);
-        vm.prank(address(midnight));
-        vm.expectRevert(IRateRatifierV1.OfferExpired.selector);
-        rateRatifier.isRatified(offer, data, address(0));
-    }
-
     function testWorsePriceBuyer() public {
         Offer memory offer = makeOffer(lender, true);
         uint256 rate = rate10pct();

@@ -90,8 +90,6 @@ contract RateRatifierV1 is IRateRatifierV1 {
         (bytes32 root, uint256 leafIndex, bytes32[] memory proof, uint256 rate, address allowedTaker) =
             abi.decode(ratifierData, (bytes32, uint256, bytes32[], uint256, address));
         require(allowedTaker == address(0) || taker == allowedTaker, UnauthorizedTaker());
-        // Reject expired offers even when called outside Midnight.
-        require(block.timestamp <= offer.expiry, OfferExpired());
 
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);

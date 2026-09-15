@@ -23,7 +23,6 @@ interface IRateRatifierV1 is ISetterRatifierV1 {
     error InvalidProof();
     error InvalidSignature();
     error NotRatified();
-    error OfferExpired();
     error RatifiedStatusChanged();
     error Unauthorized();
     error UnauthorizedTaker();
