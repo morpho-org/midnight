@@ -22,6 +22,8 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev The leaf index determines each sibling's left/right position during Merkle proof verification.
 /// @dev The maker sets a rate instead of a fixed price. It is a WAD-scaled per-second rate. When isRatified is
 /// called, the rate is converted to a price limit using the remaining time to maturity.
+/// @dev The rate is quoted as simple interest using the money market quoting method. Compounding is not taken into
+/// account.
 /// @dev A root can also be ratified with a signature.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed
 /// ratifications are no longer valid.
