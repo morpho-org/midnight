@@ -56,7 +56,7 @@ contract RateRatifierV1Test is BaseTest {
     }
 
     function buildRatifierData(Offer memory offer, uint256 rate) internal pure returns (bytes memory) {
-        return buildRatifierData(HashLib.hashRateOffer(offer, rate, address(0)), rate);
+        return buildRatifierData(HashLib.hashRateRatifierV1Offer(offer, rate, address(0)), rate);
     }
 
     function testSetIsRootRatifiedMaker() public {
@@ -74,7 +74,7 @@ contract RateRatifierV1Test is BaseTest {
     function testIsRatifiedAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = MAX_TICK;
-        bytes32 _root = HashLib.hashRateOffer(offer, 0, address(0));
+        bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, 0, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(borrower, true, lender);
@@ -91,7 +91,7 @@ contract RateRatifierV1Test is BaseTest {
     function testTakeAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = MAX_TICK;
-        bytes32 _root = HashLib.hashRateOffer(offer, 0, address(0));
+        bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, 0, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(address(rateRatifier), true, lender);
@@ -115,10 +115,11 @@ contract RateRatifierV1Test is BaseTest {
         rightOffer.expiry += 1;
 
         bytes32 _root = HashLib.hashNode(
-            HashLib.hashRateOffer(leftOffer, 0, address(0)), HashLib.hashRateOffer(rightOffer, 0, address(0))
+            HashLib.hashRateRatifierV1Offer(leftOffer, 0, address(0)),
+            HashLib.hashRateRatifierV1Offer(rightOffer, 0, address(0))
         );
         bytes32[] memory proof = new bytes32[](1);
-        proof[0] = HashLib.hashRateOffer(leftOffer, 0, address(0));
+        proof[0] = HashLib.hashRateRatifierV1Offer(leftOffer, 0, address(0));
 
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
@@ -144,7 +145,7 @@ contract RateRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = 0;
         uint256 rate = rate10pct();
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
+        bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, rate, address(0));
         bytes memory data = buildRatifierData(_root, rate);
 
         vm.prank(lender);
@@ -166,7 +167,7 @@ contract RateRatifierV1Test is BaseTest {
         uint256 rate = rate10pct();
         offer.tick = 0;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
+        bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, rate, address(0));
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
 
@@ -179,7 +180,7 @@ contract RateRatifierV1Test is BaseTest {
         uint256 rate = rate10pct();
         offer.tick = MAX_TICK;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
+        bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, rate, address(0));
         vm.prank(borrower);
         rateRatifier.setIsRootRatified(borrower, _root, true);
 
@@ -216,7 +217,7 @@ contract RateRatifierV1Test is BaseTest {
         offer.tick = 0;
         uint256 rate = rate10pct();
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
+        bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, rate, address(0));
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
 
@@ -257,7 +258,7 @@ contract RateRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = MAX_TICK;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, 0, address(0));
+        bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, 0, address(0));
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
 
@@ -273,8 +274,8 @@ contract RateRatifierV1Test is BaseTest {
         rightOffer.tick = 0;
         rightOffer.expiry += 1;
 
-        bytes32 leftHash = HashLib.hashRateOffer(leftOffer, rate, address(0));
-        bytes32 rightHash = HashLib.hashRateOffer(rightOffer, rate, address(0));
+        bytes32 leftHash = HashLib.hashRateRatifierV1Offer(leftOffer, rate, address(0));
+        bytes32 rightHash = HashLib.hashRateRatifierV1Offer(rightOffer, rate, address(0));
         if (leftHash < rightHash) {
             (leftOffer, rightOffer) = (rightOffer, leftOffer);
             (leftHash, rightHash) = (rightHash, leftHash);
@@ -299,7 +300,7 @@ contract RateRatifierV1Test is BaseTest {
         offer.expiry = offer.market.maturity + 365 days;
         offer.tick = MAX_TICK;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
+        bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, rate, address(0));
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
         bytes memory data = buildRatifierData(_root, rate);
@@ -320,7 +321,7 @@ contract RateRatifierV1Test is BaseTest {
         // Tick price ~0.87e18 between priceLimitDown at t=0 (2yr TTM ~0.833e18) and at expiry (1yr TTM ~0.909e18).
         offer.tick = TickLib.priceToTick(0.87e18, 1);
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
+        bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, rate, address(0));
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
         bytes memory data = buildRatifierData(_root, rate);
@@ -339,7 +340,7 @@ contract RateRatifierV1Test is BaseTest {
         uint256 rate = rate10pct();
         address allowedTaker = borrower;
 
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, allowedTaker);
+        bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, rate, allowedTaker);
         vm.prank(lender);
         rateRatifier.setIsRootRatified(lender, _root, true);
 
@@ -388,7 +389,7 @@ contract RateRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(lender, true);
         offer.tick = 0;
         uint256 rate = rate10pct();
-        bytes32 _root = HashLib.hashRateOffer(offer, rate, address(0));
+        bytes32 _root = HashLib.hashRateRatifierV1Offer(offer, rate, address(0));
 
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 

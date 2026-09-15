@@ -10,10 +10,10 @@ bytes32 constant COLLATERAL_PARAMS_TYPEHASH = 0x39ed3f928d24fd00574b1a02aba9c248
 bytes32 constant MARKET_TYPEHASH = 0x510b3862f3816a109c9340b76972e8a30984246be06e034ae12ed2934220391a;
 /// @dev keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
 bytes32 constant OFFER_TYPEHASH = 0x9905214264a9fb7b6cc1b0e33db7a04687c6e4185a84755d29914314aa9d8906;
-/// @dev keccak256(bytes.concat(RATE_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
-bytes32 constant RATE_OFFER_TYPEHASH = 0x59cd56381b7b90c5a0e5e2c69716c85a290dd143c31f34545afbae9a541dba19;
-/// @dev keccak256(bytes.concat(GATED_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
-bytes32 constant GATED_OFFER_TYPEHASH = 0xc88894686d916e0511033b92c259009d701b9263074f3153826016c9e6aa8c31;
+/// @dev keccak256(bytes.concat(RATE_RATIFIER_V1_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
+bytes32 constant RATE_RATIFIER_V1_OFFER_TYPEHASH = 0x8e0f9c17bf7e919b5f22e8c6c4e787905f45864a4be441067bbd2e65b35c3de1;
+/// @dev keccak256(bytes.concat(PRICE_RATIFIER_V1_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
+bytes32 constant PRICE_RATIFIER_V1_OFFER_TYPEHASH = 0x62a94097fbcb9b56e3cf7b4f7bb075b49540b1364815434ff4b16bc4decb303d;
 
 library HashLib {
     error LeafIndexOutOfRange();
@@ -143,11 +143,11 @@ library HashLib {
         );
     }
 
-    /// @dev Computes the EIP-712 hash struct of a GatedOffer (offer with an additional `allowedTaker`).
-    function hashGatedOffer(Offer memory offer, address allowedTaker) internal pure returns (bytes32) {
+    /// @dev Computes the EIP-712 hash struct of a PriceRatifierV1Offer (offer with an additional `allowedTaker`).
+    function hashPriceRatifierV1Offer(Offer memory offer, address allowedTaker) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
-                GATED_OFFER_TYPEHASH,
+                PRICE_RATIFIER_V1_OFFER_TYPEHASH,
                 hashMarket(offer.market),
                 offer.buy,
                 offer.maker,
@@ -168,12 +168,16 @@ library HashLib {
         );
     }
 
-    /// @dev Computes the EIP-712 hash struct of a RateOffer (offer with `tick` replaced by `rate` and
+    /// @dev Computes the EIP-712 hash struct of a RateRatifierV1Offer (offer with `tick` replaced by `rate` and
     /// `allowedTaker`).
-    function hashRateOffer(Offer memory offer, uint256 rate, address allowedTaker) internal pure returns (bytes32) {
+    function hashRateRatifierV1Offer(Offer memory offer, uint256 rate, address allowedTaker)
+        internal
+        pure
+        returns (bytes32)
+    {
         return keccak256(
             abi.encode(
-                RATE_OFFER_TYPEHASH,
+                RATE_RATIFIER_V1_OFFER_TYPEHASH,
                 hashMarket(offer.market),
                 offer.buy,
                 offer.maker,

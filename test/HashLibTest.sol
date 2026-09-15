@@ -7,8 +7,8 @@ import {
     COLLATERAL_PARAMS_TYPEHASH,
     MARKET_TYPEHASH,
     OFFER_TYPEHASH,
-    RATE_OFFER_TYPEHASH,
-    GATED_OFFER_TYPEHASH
+    RATE_RATIFIER_V1_OFFER_TYPEHASH,
+    PRICE_RATIFIER_V1_OFFER_TYPEHASH
 } from "../src/ratifiers/libraries/HashLib.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
 
@@ -18,10 +18,10 @@ bytes constant MARKET_TYPE =
     "Market(uint256 chainId,address midnight,address loanToken,CollateralParams[] collateralParams,uint256 maturity,uint256 rcfThreshold,address enterGate,address liquidatorGate)";
 bytes constant OFFER_TYPE =
     "Offer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint128 maxUnits,uint128 maxAssets,uint256 continuousFeeCap)";
-bytes constant RATE_OFFER_TYPE =
-    "RateOffer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 rate,address allowedTaker,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint128 maxUnits,uint128 maxAssets,uint256 continuousFeeCap)";
-bytes constant GATED_OFFER_TYPE =
-    "GatedOffer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,address allowedTaker,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint128 maxUnits,uint128 maxAssets,uint256 continuousFeeCap)";
+bytes constant RATE_RATIFIER_V1_OFFER_TYPE =
+    "RateRatifierV1Offer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 rate,address allowedTaker,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint128 maxUnits,uint128 maxAssets,uint256 continuousFeeCap)";
+bytes constant PRICE_RATIFIER_V1_OFFER_TYPE =
+    "PriceRatifierV1Offer(Market market,bool buy,address maker,uint256 start,uint256 expiry,uint256 tick,address allowedTaker,bytes32 group,address callback,bytes callbackData,address receiverIfMakerIsSeller,address ratifier,bool reduceOnly,uint128 maxUnits,uint128 maxAssets,uint256 continuousFeeCap)";
 
 contract HashLibTest is Test {
     function testCollateralParamsTypeHash() public pure {
@@ -36,12 +36,18 @@ contract HashLibTest is Test {
         assertEq(OFFER_TYPEHASH, keccak256(bytes.concat(OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)));
     }
 
-    function testRateOfferTypeHash() public pure {
-        assertEq(RATE_OFFER_TYPEHASH, keccak256(bytes.concat(RATE_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)));
+    function testRateRatifierV1OfferTypeHash() public pure {
+        assertEq(
+            RATE_RATIFIER_V1_OFFER_TYPEHASH,
+            keccak256(bytes.concat(RATE_RATIFIER_V1_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE))
+        );
     }
 
-    function testGatedOfferTypeHash() public pure {
-        assertEq(GATED_OFFER_TYPEHASH, keccak256(bytes.concat(GATED_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)));
+    function testPriceRatifierV1OfferTypeHash() public pure {
+        assertEq(
+            PRICE_RATIFIER_V1_OFFER_TYPEHASH,
+            keccak256(bytes.concat(PRICE_RATIFIER_V1_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE))
+        );
     }
 
     function testHashMarketMatchesReference(Market memory market) public pure {

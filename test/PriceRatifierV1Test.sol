@@ -61,7 +61,7 @@ contract PriceRatifierV1Test is BaseTest {
 
     function testIsRatifiedAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashGatedOffer(offer, address(0));
+        bytes32 _root = HashLib.hashPriceRatifierV1Offer(offer, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(borrower, true, lender);
@@ -76,7 +76,7 @@ contract PriceRatifierV1Test is BaseTest {
 
     function testTakeAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashGatedOffer(offer, address(0));
+        bytes32 _root = HashLib.hashPriceRatifierV1Offer(offer, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(address(priceRatifier), true, lender);
@@ -98,10 +98,11 @@ contract PriceRatifierV1Test is BaseTest {
         rightOffer.expiry += 1;
 
         bytes32 _root = HashLib.hashNode(
-            HashLib.hashGatedOffer(leftOffer, address(0)), HashLib.hashGatedOffer(rightOffer, address(0))
+            HashLib.hashPriceRatifierV1Offer(leftOffer, address(0)),
+            HashLib.hashPriceRatifierV1Offer(rightOffer, address(0))
         );
         bytes32[] memory proof = new bytes32[](1);
-        proof[0] = HashLib.hashGatedOffer(leftOffer, address(0));
+        proof[0] = HashLib.hashPriceRatifierV1Offer(leftOffer, address(0));
 
         vm.prank(lender);
         priceRatifier.setIsRootRatified(lender, _root, true);
@@ -127,7 +128,7 @@ contract PriceRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(lender);
         address allowedTaker = borrower;
 
-        bytes32 _root = HashLib.hashGatedOffer(offer, allowedTaker);
+        bytes32 _root = HashLib.hashPriceRatifierV1Offer(offer, allowedTaker);
         vm.prank(lender);
         priceRatifier.setIsRootRatified(lender, _root, true);
 
@@ -153,7 +154,7 @@ contract PriceRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(lender);
         address allowedTaker = borrower;
 
-        bytes32 _root = HashLib.hashGatedOffer(offer, allowedTaker);
+        bytes32 _root = HashLib.hashPriceRatifierV1Offer(offer, allowedTaker);
         vm.prank(lender);
         priceRatifier.setIsRootRatified(lender, _root, true);
 
@@ -193,7 +194,7 @@ contract PriceRatifierV1Test is BaseTest {
 
     function testSetIsRootRatifiedWithSig() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashGatedOffer(offer, address(0));
+        bytes32 _root = HashLib.hashPriceRatifierV1Offer(offer, address(0));
 
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 

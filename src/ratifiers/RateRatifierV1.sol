@@ -103,7 +103,8 @@ contract RateRatifierV1 is IRateRatifierV1 {
         else require(offerPrice >= WAD.mulDivUp(WAD, WAD + rate * timeToMaturity), WorsePrice());
 
         require(
-            HashLib.isLeaf(root, HashLib.hashRateOffer(offer, rate, allowedTaker), leafIndex, proof), InvalidProof()
+            HashLib.isLeaf(root, HashLib.hashRateRatifierV1Offer(offer, rate, allowedTaker), leafIndex, proof),
+            InvalidProof()
         );
         require(ratification[offer.maker][root].isRootRatified, NotRatified());
         return CALLBACK_SUCCESS;

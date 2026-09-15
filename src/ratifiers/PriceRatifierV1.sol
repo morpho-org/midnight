@@ -89,7 +89,10 @@ contract PriceRatifierV1 is IPriceRatifierV1 {
         (bytes32 root, uint256 leafIndex, bytes32[] memory proof, address allowedTaker) =
             abi.decode(ratifierData, (bytes32, uint256, bytes32[], address));
         require(allowedTaker == address(0) || taker == allowedTaker, UnauthorizedTaker());
-        require(HashLib.isLeaf(root, HashLib.hashGatedOffer(offer, allowedTaker), leafIndex, proof), InvalidProof());
+        require(
+            HashLib.isLeaf(root, HashLib.hashPriceRatifierV1Offer(offer, allowedTaker), leafIndex, proof),
+            InvalidProof()
+        );
         require(ratification[offer.maker][root].isRootRatified, NotRatified());
         return CALLBACK_SUCCESS;
     }
