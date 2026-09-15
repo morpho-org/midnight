@@ -15,7 +15,8 @@ import {HashLib} from "./libraries/HashLib.sol";
 
 /// @dev This ratifier checks that an authorized address has ratified the root of a Merkle tree of offers, and
 /// that the offer is a leaf in that tree.
-/// @dev The ratifier data must contain the root, the leaf index, the Merkle proof and the offer's allowed taker.
+/// @dev The ratifier data must contain the root, the leaf index, the Merkle proof and the offer's allowed taker (or
+/// address(0)).
 /// @dev The leaf index determines each sibling's left/right position during Merkle proof verification.
 /// @dev A root can also be ratified with a signature.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed
@@ -34,6 +35,10 @@ contract PriceRatifierV1 is IPriceRatifierV1 {
 
     function isRootRatified(address maker, bytes32 root) public view returns (bool) {
         return ratification[maker][root].isRootRatified;
+    }
+
+    function rootNonce(address maker, bytes32 root) public view returns (uint128) {
+        return ratification[maker][root].rootNonce;
     }
 
     function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external returns (bytes32) {
@@ -84,7 +89,7 @@ contract PriceRatifierV1 is IPriceRatifierV1 {
         (bytes32 root, uint256 leafIndex, bytes32[] memory proof, address allowedTaker) =
             abi.decode(ratifierData, (bytes32, uint256, bytes32[], address));
         require(allowedTaker == address(0) || taker == allowedTaker, UnauthorizedTaker());
-        require(HashLib.isLeaf(root, HashLib.hashPriceOffer(offer, allowedTaker), leafIndex, proof), InvalidProof());
+        require(HashLib.isLeaf(root, HashLib.hashGatedOffer(offer, allowedTaker), leafIndex, proof), InvalidProof());
         require(ratification[offer.maker][root].isRootRatified, NotRatified());
         return CALLBACK_SUCCESS;
     }

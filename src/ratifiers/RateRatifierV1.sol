@@ -18,7 +18,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev This ratifier checks that an authorized address has ratified the root of a Merkle tree of rate offers, and
 /// that the offer is a leaf in that tree.
 /// @dev The ratifier data must contain the root, the leaf index, the Merkle proof and the offer's rate and allowed
-/// taker.
+/// taker (or address(0)).
 /// @dev The leaf index determines each sibling's left/right position during Merkle proof verification.
 /// @dev The maker sets a rate instead of a fixed price. It is a WAD-scaled per-second rate. When isRatified is
 /// called, the rate is converted to a price limit using the remaining time to maturity.
@@ -41,6 +41,10 @@ contract RateRatifierV1 is IRateRatifierV1 {
 
     function isRootRatified(address maker, bytes32 root) public view returns (bool) {
         return ratification[maker][root].isRootRatified;
+    }
+
+    function rootNonce(address maker, bytes32 root) public view returns (uint128) {
+        return ratification[maker][root].rootNonce;
     }
 
     function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external returns (bytes32) {
@@ -94,11 +98,9 @@ contract RateRatifierV1 is IRateRatifierV1 {
 
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-        if (offer.buy) {
-            require(offerPrice <= WAD.mulDivDown(WAD, WAD + rate * timeToMaturity), WorsePrice());
-        } else {
-            require(offerPrice >= WAD.mulDivUp(WAD, WAD + rate * timeToMaturity), WorsePrice());
-        }
+
+        if (offer.buy) require(offerPrice <= WAD.mulDivDown(WAD, WAD + rate * timeToMaturity), WorsePrice());
+        else require(offerPrice >= WAD.mulDivUp(WAD, WAD + rate * timeToMaturity), WorsePrice());
 
         require(
             HashLib.isLeaf(root, HashLib.hashRateOffer(offer, rate, allowedTaker), leafIndex, proof), InvalidProof()

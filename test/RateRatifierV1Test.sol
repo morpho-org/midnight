@@ -59,12 +59,6 @@ contract RateRatifierV1Test is BaseTest {
         return buildRatifierData(HashLib.hashRateOffer(offer, rate, address(0)), rate);
     }
 
-    /// @dev The generated getter returns the Ratification struct fields as a tuple.
-    function rootNonce(address maker, bytes32 root) internal view returns (uint128) {
-        (, uint128 nonce) = rateRatifier.ratification(maker, root);
-        return nonce;
-    }
-
     function testSetIsRootRatifiedMaker() public {
         bytes32 _root = keccak256("root");
 
@@ -411,7 +405,7 @@ contract RateRatifierV1Test is BaseTest {
         );
 
         assertTrue(rateRatifier.isRootRatified(lender, _root));
-        assertEq(rootNonce(lender, _root), 1);
+        assertEq(rateRatifier.rootNonce(lender, _root), 1);
 
         vm.prank(address(midnight));
         assertEq(rateRatifier.isRatified(offer, buildRatifierData(_root, rate), address(0)), CALLBACK_SUCCESS);
@@ -479,11 +473,11 @@ contract RateRatifierV1Test is BaseTest {
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 
         rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
-        assertEq(rootNonce(lender, _root), 1);
+        assertEq(rateRatifier.rootNonce(lender, _root), 1);
 
         rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
         assertTrue(rateRatifier.isRootRatified(lender, _root));
-        assertEq(rootNonce(lender, _root), 1, "nonce must not advance twice");
+        assertEq(rateRatifier.rootNonce(lender, _root), 1, "nonce must not advance twice");
     }
 
     /// @dev But a consumed signature cannot resurrect a status the maker has since changed.
@@ -511,7 +505,7 @@ contract RateRatifierV1Test is BaseTest {
         rateRatifier.setIsRootRatifiedWithSig(lender, _root, false, 1, vm.getBlockTimestamp(), v, r, s);
 
         assertFalse(rateRatifier.isRootRatified(lender, _root));
-        assertEq(rootNonce(lender, _root), 2);
+        assertEq(rateRatifier.rootNonce(lender, _root), 2);
     }
 
     function testSetIsRootRatifiedWithSigEcrecoverReturnsZero() public {
@@ -542,7 +536,7 @@ contract RateRatifierV1Test is BaseTest {
         rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, v, r, s);
 
         assertTrue(rateRatifier.isRootRatified(lender, _root));
-        assertEq(rootNonce(lender, _root), 1);
+        assertEq(rateRatifier.rootNonce(lender, _root), 1);
     }
 
     function testSetIsRootRatifiedWithSigRejectsTampering() public {
@@ -572,7 +566,7 @@ contract RateRatifierV1Test is BaseTest {
         rateRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline + 1, v, r, s);
 
         assertFalse(rateRatifier.isRootRatified(lender, _root));
-        assertEq(rootNonce(lender, _root), 0);
+        assertEq(rateRatifier.rootNonce(lender, _root), 0);
     }
 
     function testSetIsRootRatifiedWithSigRejectsRevokedAuthorization() public {

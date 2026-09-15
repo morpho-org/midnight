@@ -47,12 +47,6 @@ contract PriceRatifierV1Test is BaseTest {
         offer.tick = MAX_TICK;
     }
 
-    /// @dev The generated getter returns the Ratification struct fields as a tuple.
-    function rootNonce(address maker, bytes32 root) internal view returns (uint128) {
-        (, uint128 nonce) = priceRatifier.ratification(maker, root);
-        return nonce;
-    }
-
     function testSetIsRootRatifiedMaker() public {
         bytes32 _root = keccak256("root");
 
@@ -67,7 +61,7 @@ contract PriceRatifierV1Test is BaseTest {
 
     function testIsRatifiedAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashPriceOffer(offer, address(0));
+        bytes32 _root = HashLib.hashGatedOffer(offer, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(borrower, true, lender);
@@ -82,7 +76,7 @@ contract PriceRatifierV1Test is BaseTest {
 
     function testTakeAuthorizedSetterCanRatifyOnBehalf() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashPriceOffer(offer, address(0));
+        bytes32 _root = HashLib.hashGatedOffer(offer, address(0));
 
         vm.prank(lender);
         midnight.setIsAuthorized(address(priceRatifier), true, lender);
@@ -104,10 +98,10 @@ contract PriceRatifierV1Test is BaseTest {
         rightOffer.expiry += 1;
 
         bytes32 _root = HashLib.hashNode(
-            HashLib.hashPriceOffer(leftOffer, address(0)), HashLib.hashPriceOffer(rightOffer, address(0))
+            HashLib.hashGatedOffer(leftOffer, address(0)), HashLib.hashGatedOffer(rightOffer, address(0))
         );
         bytes32[] memory proof = new bytes32[](1);
-        proof[0] = HashLib.hashPriceOffer(leftOffer, address(0));
+        proof[0] = HashLib.hashGatedOffer(leftOffer, address(0));
 
         vm.prank(lender);
         priceRatifier.setIsRootRatified(lender, _root, true);
@@ -133,7 +127,7 @@ contract PriceRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(lender);
         address allowedTaker = borrower;
 
-        bytes32 _root = HashLib.hashPriceOffer(offer, allowedTaker);
+        bytes32 _root = HashLib.hashGatedOffer(offer, allowedTaker);
         vm.prank(lender);
         priceRatifier.setIsRootRatified(lender, _root, true);
 
@@ -159,7 +153,7 @@ contract PriceRatifierV1Test is BaseTest {
         Offer memory offer = makeOffer(lender);
         address allowedTaker = borrower;
 
-        bytes32 _root = HashLib.hashPriceOffer(offer, allowedTaker);
+        bytes32 _root = HashLib.hashGatedOffer(offer, allowedTaker);
         vm.prank(lender);
         priceRatifier.setIsRootRatified(lender, _root, true);
 
@@ -199,7 +193,7 @@ contract PriceRatifierV1Test is BaseTest {
 
     function testSetIsRootRatifiedWithSig() public {
         Offer memory offer = makeOffer(lender);
-        bytes32 _root = HashLib.hashPriceOffer(offer, address(0));
+        bytes32 _root = HashLib.hashGatedOffer(offer, address(0));
 
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 
@@ -216,7 +210,7 @@ contract PriceRatifierV1Test is BaseTest {
         );
 
         assertTrue(priceRatifier.isRootRatified(lender, _root));
-        assertEq(rootNonce(lender, _root), 1);
+        assertEq(priceRatifier.rootNonce(lender, _root), 1);
 
         vm.prank(address(midnight));
         assertEq(
@@ -287,11 +281,11 @@ contract PriceRatifierV1Test is BaseTest {
         (uint8 v, bytes32 r, bytes32 s) = ratifySig(lender, _root, true, 0, vm.getBlockTimestamp(), privateKey[lender]);
 
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
-        assertEq(rootNonce(lender, _root), 1);
+        assertEq(priceRatifier.rootNonce(lender, _root), 1);
 
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, vm.getBlockTimestamp(), v, r, s);
         assertTrue(priceRatifier.isRootRatified(lender, _root));
-        assertEq(rootNonce(lender, _root), 1, "nonce must not advance twice");
+        assertEq(priceRatifier.rootNonce(lender, _root), 1, "nonce must not advance twice");
     }
 
     /// @dev But a consumed signature cannot resurrect a status the maker has since changed.
@@ -319,7 +313,7 @@ contract PriceRatifierV1Test is BaseTest {
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, false, 1, vm.getBlockTimestamp(), v, r, s);
 
         assertFalse(priceRatifier.isRootRatified(lender, _root));
-        assertEq(rootNonce(lender, _root), 2);
+        assertEq(priceRatifier.rootNonce(lender, _root), 2);
     }
 
     function testSetIsRootRatifiedWithSigEcrecoverReturnsZero() public {
@@ -350,7 +344,7 @@ contract PriceRatifierV1Test is BaseTest {
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline, v, r, s);
 
         assertTrue(priceRatifier.isRootRatified(lender, _root));
-        assertEq(rootNonce(lender, _root), 1);
+        assertEq(priceRatifier.rootNonce(lender, _root), 1);
     }
 
     function testSetIsRootRatifiedWithSigRejectsTampering() public {
@@ -380,7 +374,7 @@ contract PriceRatifierV1Test is BaseTest {
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, true, 0, deadline + 1, v, r, s);
 
         assertFalse(priceRatifier.isRootRatified(lender, _root));
-        assertEq(rootNonce(lender, _root), 0);
+        assertEq(priceRatifier.rootNonce(lender, _root), 0);
     }
 
     function testSetIsRootRatifiedWithSigRejectsRevokedAuthorization() public {

@@ -20,4 +20,5 @@ interface ISetterRatifierV1 is IRatifier {
     ) external returns (bytes32);
 
     function isRootRatified(address maker, bytes32 root) external view returns (bool);
+    function rootNonce(address maker, bytes32 root) external view returns (uint128);
 }

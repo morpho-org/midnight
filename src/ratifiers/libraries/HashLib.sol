@@ -12,8 +12,8 @@ bytes32 constant MARKET_TYPEHASH = 0x510b3862f3816a109c9340b76972e8a30984246be06
 bytes32 constant OFFER_TYPEHASH = 0x9905214264a9fb7b6cc1b0e33db7a04687c6e4185a84755d29914314aa9d8906;
 /// @dev keccak256(bytes.concat(RATE_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
 bytes32 constant RATE_OFFER_TYPEHASH = 0x59cd56381b7b90c5a0e5e2c69716c85a290dd143c31f34545afbae9a541dba19;
-/// @dev keccak256(bytes.concat(PRICE_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
-bytes32 constant PRICE_OFFER_TYPEHASH = 0xaa34f96080e8132d67fc72df6d09df4bcdfe61d46b0f1c5289dc07ed55bc4237;
+/// @dev keccak256(bytes.concat(GATED_OFFER_TYPE, COLLATERAL_PARAMS_TYPE, MARKET_TYPE)).
+bytes32 constant GATED_OFFER_TYPEHASH = 0xc88894686d916e0511033b92c259009d701b9263074f3153826016c9e6aa8c31;
 
 library HashLib {
     error LeafIndexOutOfRange();
@@ -143,11 +143,11 @@ library HashLib {
         );
     }
 
-    /// @dev Computes the EIP-712 hash struct of a PriceOffer (offer with an additional `allowedTaker`).
-    function hashPriceOffer(Offer memory offer, address allowedTaker) internal pure returns (bytes32) {
+    /// @dev Computes the EIP-712 hash struct of a GatedOffer (offer with an additional `allowedTaker`).
+    function hashGatedOffer(Offer memory offer, address allowedTaker) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
-                PRICE_OFFER_TYPEHASH,
+                GATED_OFFER_TYPEHASH,
                 hashMarket(offer.market),
                 offer.buy,
                 offer.maker,
