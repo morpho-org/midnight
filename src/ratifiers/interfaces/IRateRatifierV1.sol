@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity >=0.5.0;
 
-import {IRatifier} from "../../interfaces/IRatifier.sol";
+import {ISetterRatifierV1} from "./ISetterRatifierV1.sol";
 
 struct Ratification {
     bool isRootRatified;
@@ -16,9 +16,7 @@ bytes32 constant SET_IS_ROOT_RATIFIED_TYPEHASH = 0x90eef64d3dc1bb270295c48dc2b43
 /// @dev keccak256("EIP712Domain(uint256 chainId,address verifyingContract)").
 bytes32 constant EIP712_DOMAIN_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
 
-bytes32 constant SET_IS_ROOT_RATIFIED_SUCCESS = keccak256("morpho.midnight.setIsRootRatifiedSuccess");
-
-interface IRateRatifierV1 is IRatifier {
+interface IRateRatifierV1 is ISetterRatifierV1 {
     /// ERRORS ///
     error DeadlineExpired();
     error InvalidNonce();
@@ -44,24 +42,10 @@ interface IRateRatifierV1 is IRatifier {
         uint128 currentNonce
     );
 
-    /// FUNCTIONS ///
-    function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external returns (bytes32);
-    function setIsRootRatifiedWithSig(
-        address maker,
-        bytes32 root,
-        bool newIsRootRatified,
-        uint128 nonce,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external returns (bytes32);
-
     /// GETTERS ///
     function DOMAIN_SEPARATOR() external view returns (bytes32);
 
     /// STORAGE GETTERS ///
     function MIDNIGHT() external view returns (address);
-    function isRootRatified(address maker, bytes32 root) external view returns (bool);
     function ratification(address maker, bytes32 root) external view returns (bool isRootRatified, uint128 rootNonce);
 }

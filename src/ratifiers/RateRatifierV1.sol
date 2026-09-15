@@ -6,9 +6,9 @@ import {
     IRateRatifierV1,
     Ratification,
     SET_IS_ROOT_RATIFIED_TYPEHASH,
-    SET_IS_ROOT_RATIFIED_SUCCESS,
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IRateRatifierV1.sol";
+import {SET_IS_ROOT_RATIFIED_SUCCESS} from "./interfaces/ISetterRatifierV1.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS, WAD} from "../libraries/ConstantsLib.sol";
 import {TickLib} from "../libraries/TickLib.sol";
