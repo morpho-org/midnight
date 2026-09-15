@@ -44,8 +44,7 @@ contract PriceRatifierV1 is IPriceRatifierV1 {
     }
 
     /// @dev Allows clear signing of the root through EIP-712.
-    /// @dev Permissioned to prevent arbitrary actors from extracting and independently submitting
-    /// a ratification signature intended for a bundle.
+    /// @dev Permissioned to not let any arbitrary actor to submit the signed ratification.
     function setIsRootRatifiedWithSig(
         address maker,
         bytes32 root,
