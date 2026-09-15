@@ -21,7 +21,6 @@ uint256 constant MAX_COLLATERALS = 128;
 uint256 constant MAX_COLLATERALS_PER_BORROWER = 16;
 uint256 constant LIQUIDATION_LOCK_SLOT = uint256(keccak256("morpho.midnight.liquidationLocked"));
 bytes32 constant CALLBACK_SUCCESS = keccak256("morpho.midnight.callbackSuccess");
-bytes32 constant SET_IS_ROOT_RATIFIED_SUCCESS = keccak256("morpho.midnight.setIsRootRatifiedSuccess");
 uint8 constant DEFAULT_TICK_SPACING = 4;
 
 /// @dev Returns the max settlement fee for the given index.

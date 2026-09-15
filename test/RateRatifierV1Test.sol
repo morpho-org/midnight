@@ -4,8 +4,8 @@ pragma solidity ^0.8.0;
 
 import {CollateralParams, Market, Offer} from "../src/interfaces/IMidnight.sol";
 import {RateRatifierV1} from "../src/ratifiers/RateRatifierV1.sol";
-import {IRateRatifierV1} from "../src/ratifiers/interfaces/IRateRatifierV1.sol";
-import {CALLBACK_SUCCESS, SET_IS_ROOT_RATIFIED_SUCCESS} from "../src/libraries/ConstantsLib.sol";
+import {IRateRatifierV1, SET_IS_ROOT_RATIFIED_SUCCESS} from "../src/ratifiers/interfaces/IRateRatifierV1.sol";
+import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
 import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";

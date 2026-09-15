@@ -6,10 +6,11 @@ import {
     IPriceRatifierV1,
     Ratification,
     SET_IS_ROOT_RATIFIED_TYPEHASH,
+    SET_IS_ROOT_RATIFIED_SUCCESS,
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IPriceRatifierV1.sol";
 import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
-import {CALLBACK_SUCCESS, SET_IS_ROOT_RATIFIED_SUCCESS} from "../libraries/ConstantsLib.sol";
+import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {HashLib} from "./libraries/HashLib.sol";
 
 /// @dev This ratifier checks that the offer has been ratified by an authorized address in a Merkle tree of offers.
