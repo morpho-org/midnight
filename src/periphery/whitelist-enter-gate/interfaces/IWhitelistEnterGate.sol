@@ -4,9 +4,9 @@ pragma solidity >=0.5.0;
 
 import {IEnterGate} from "../../../interfaces/IGate.sol";
 
-/// @dev keccak256("SetIsWhitelisted(address whitelister,bool creditSide,address account,bool newIsWhitelisted,uint256
-/// nonce,uint256 deadline)").
-bytes32 constant SET_IS_WHITELISTED_TYPEHASH = 0xafcd80c394b848db7e286546e6489c656b2de05d7187f276e11c4212d9a5e6b7;
+/// @dev keccak256("SetIsWhitelisted(bool creditSide,address account,bool newIsWhitelisted,uint256 nonce,uint256
+/// deadline)").
+bytes32 constant SET_IS_WHITELISTED_TYPEHASH = 0xa19ec4634ebb855ea0b75237f7a684a4cb96e8cdae8536e4128409e9ea8d4982;
 
 /// @dev keccak256("EIP712Domain(uint256 chainId,address verifyingContract)").
 bytes32 constant EIP712_DOMAIN_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
@@ -49,7 +49,6 @@ interface IWhitelistEnterGate is IEnterGate {
     function setIsWhitelister(bool creditSide, address account, bool newIsWhitelister) external;
     function setIsWhitelisted(bool creditSide, address account, bool newIsWhitelisted) external;
     function setIsWhitelistedWithSig(
-        address whitelister,
         bool creditSide,
         address account,
         bool newIsWhitelisted,
