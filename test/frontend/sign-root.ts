@@ -12,7 +12,6 @@ declare global {
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 const ZERO_B32 = "0x" + "00".repeat(32);
 const RATIFIER = "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB";
-/** The offer types of both V1 ratifiers gate takes on this address, so it is signed as part of each leaf. */
 const ALLOWED_TAKER = "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa";
 const PRICE_RATIFIER = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
 const RATE_RATIFIER = "0xDDdDddDdDdddDDddDDddDDDDdDdDDdDDdDDDDDDd";
@@ -46,7 +45,6 @@ const COMMON_TYPES = {
   ],
 };
 
-/** The offer fields shared by every offer type, in order, split around the pricing fields. */
 const OFFER_HEAD = [
   { name: "market", type: "Market" },
   { name: "buy", type: "bool" },
@@ -97,8 +95,6 @@ function defaultOffer(number: string, offerType: keyof typeof OFFER_TYPES, accou
       enterGate: ZERO_ADDR,
       liquidatorGate: ZERO_ADDR,
     },
-    // The V1 ratifiers look their ratification up under offer.maker, and RateRatifierV1 checks the offer's price
-    // against its rate, so their offers are the maker's own and priced to be takeable.
     buy: offerType !== "Offer",
     maker: offerType === "Offer" ? ZERO_ADDR : account,
     start: "0",
@@ -135,11 +131,9 @@ const DEADLINE = String(2 ** 32);
 
 type Mode = {
   label: string;
-  /** The ratifier verifying the signature, and so the EIP-712 domain's verifyingContract. */
   verifyingContract: string;
   offerType: keyof typeof OFFER_TYPES;
   primaryType: string;
-  /** Solidity constant prefix, so each mode pastes into its own block of FrontendSignatureTest.sol. */
   prefix: string;
   types(account: string): Record<string, { name: string; type: string }[]>;
   message(account: string, offerTree: unknown): Record<string, unknown>;
