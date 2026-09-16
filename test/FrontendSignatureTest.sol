@@ -57,6 +57,12 @@ contract FrontendSignatureTest is Test {
         offer.ratifier = RATIFIER;
     }
 
+    function defaultV1Offer(uint8 number) internal pure returns (Offer memory offer) {
+        offer = defaultOffer(number);
+        offer.maker = ACCOUNT;
+        offer.buy = true;
+    }
+
     function testFrontendSignatureVerification() public view {
         Offer[4] memory offers;
         offers[0] = defaultOffer(1);
@@ -97,19 +103,11 @@ contract FrontendSignatureTest is Test {
         assertEq(result, CALLBACK_SUCCESS);
     }
 
-    /// @dev The V1 ratifiers look their ratification up under offer.maker, and RateRatifierV1 checks the offer's
-    /// price against its rate, so their offers are the maker's own and priced to be takeable.
-    function v1Offer(uint8 number) internal pure returns (Offer memory offer) {
-        offer = defaultOffer(number);
-        offer.maker = ACCOUNT;
-        offer.buy = true;
-    }
-
     function testFrontendSignaturePriceRatifierV1() public {
-        bytes32 h0 = HashLib.hashPriceRatifierV1Offer(v1Offer(1), ALLOWED_TAKER);
-        bytes32 h1 = HashLib.hashPriceRatifierV1Offer(v1Offer(2), ALLOWED_TAKER);
-        bytes32 h2 = HashLib.hashPriceRatifierV1Offer(v1Offer(3), ALLOWED_TAKER);
-        bytes32 h3 = HashLib.hashPriceRatifierV1Offer(v1Offer(4), ALLOWED_TAKER);
+        bytes32 h0 = HashLib.hashPriceRatifierV1Offer(defaultV1Offer(1), ALLOWED_TAKER);
+        bytes32 h1 = HashLib.hashPriceRatifierV1Offer(defaultV1Offer(2), ALLOWED_TAKER);
+        bytes32 h2 = HashLib.hashPriceRatifierV1Offer(defaultV1Offer(3), ALLOWED_TAKER);
+        bytes32 h3 = HashLib.hashPriceRatifierV1Offer(defaultV1Offer(4), ALLOWED_TAKER);
         bytes32 left = HashLib.hashNode(h0, h1);
         bytes32 right = HashLib.hashNode(h2, h3);
         bytes32 _root = HashLib.hashNode(left, right);
@@ -141,14 +139,16 @@ contract FrontendSignatureTest is Test {
         proof[0] = h1;
         proof[1] = right;
         bytes memory ratifierData = abi.encode(_root, uint256(0), proof, ALLOWED_TAKER);
-        assertEq(PriceRatifierV1(PRICE_RATIFIER).isRatified(v1Offer(1), ratifierData, ALLOWED_TAKER), CALLBACK_SUCCESS);
+        assertEq(
+            PriceRatifierV1(PRICE_RATIFIER).isRatified(defaultV1Offer(1), ratifierData, ALLOWED_TAKER), CALLBACK_SUCCESS
+        );
     }
 
     function testFrontendSignatureRateRatifierV1() public {
-        bytes32 h0 = HashLib.hashRateRatifierV1Offer(v1Offer(1), 0, ALLOWED_TAKER);
-        bytes32 h1 = HashLib.hashRateRatifierV1Offer(v1Offer(2), 0, ALLOWED_TAKER);
-        bytes32 h2 = HashLib.hashRateRatifierV1Offer(v1Offer(3), 0, ALLOWED_TAKER);
-        bytes32 h3 = HashLib.hashRateRatifierV1Offer(v1Offer(4), 0, ALLOWED_TAKER);
+        bytes32 h0 = HashLib.hashRateRatifierV1Offer(defaultV1Offer(1), 0, ALLOWED_TAKER);
+        bytes32 h1 = HashLib.hashRateRatifierV1Offer(defaultV1Offer(2), 0, ALLOWED_TAKER);
+        bytes32 h2 = HashLib.hashRateRatifierV1Offer(defaultV1Offer(3), 0, ALLOWED_TAKER);
+        bytes32 h3 = HashLib.hashRateRatifierV1Offer(defaultV1Offer(4), 0, ALLOWED_TAKER);
         bytes32 left = HashLib.hashNode(h0, h1);
         bytes32 right = HashLib.hashNode(h2, h3);
         bytes32 _root = HashLib.hashNode(left, right);
@@ -178,7 +178,9 @@ contract FrontendSignatureTest is Test {
         proof[0] = h1;
         proof[1] = right;
         bytes memory ratifierData = abi.encode(_root, uint256(0), proof, uint256(0), ALLOWED_TAKER);
-        assertEq(RateRatifierV1(RATE_RATIFIER).isRatified(v1Offer(1), ratifierData, ALLOWED_TAKER), CALLBACK_SUCCESS);
+        assertEq(
+            RateRatifierV1(RATE_RATIFIER).isRatified(defaultV1Offer(1), ratifierData, ALLOWED_TAKER), CALLBACK_SUCCESS
+        );
     }
 
     // Trick to ensure isRatified checks that the signer is the maker, without having the offers depend on the maker.
