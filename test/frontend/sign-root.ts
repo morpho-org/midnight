@@ -283,7 +283,7 @@ async function main() {
       const v = parseInt(sig.slice(130, 132), 16);
 
       resultEl.textContent = [
-        `address constant ACCOUNT = ${account};`,
+        `address constant ACCOUNT = address(bytes20(hex"${account.slice(2)}"));`,
         `uint8 constant ${mode.prefix}SIG_V = ${v};`,
         `bytes32 constant ${mode.prefix}SIG_R = ${r};`,
         `bytes32 constant ${mode.prefix}SIG_S = ${s};`,
