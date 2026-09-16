@@ -30,9 +30,6 @@ bytes32 constant RATE_SIG_S = 0x47f8edf014b66502c8c532353128bccc986cfcf82a5be766
 address constant RATIFIER = 0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB;
 address constant PRICE_RATIFIER = 0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC;
 address constant RATE_RATIFIER = 0xDDdDddDdDdddDDddDDddDDDDdDdDDdDDdDDDDDDd;
-
-// The tree the frontend signs, and the nonce and deadline of the SetIsRootRatified signatures.
-// The allowed taker signed into every leaf of the two V1 offer trees.
 address constant ALLOWED_TAKER = 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa;
 
 uint256 constant HEIGHT = 2;
