@@ -34,8 +34,8 @@ interface IPriceRatifierV1 is IRatifiersV1Common {
         bytes32 indexed root,
         uint256 height,
         bool newIsRootRatified,
-        uint128 nonce,
-        uint128 currentNonce
+        uint128 signatureNonce,
+        uint128 previousNonce
     );
 
     /// GETTERS ///
