@@ -111,7 +111,8 @@ function defaultOffer(number: string, offerType: keyof typeof OFFER_TYPES, accou
     callback: ZERO_ADDR,
     callbackData: "0x",
     receiverIfMakerIsSeller: ZERO_ADDR,
-    ratifier: RATIFIER,
+    ratifier:
+      offerType === "Offer" ? RATIFIER : offerType === "PriceRatifierV1Offer" ? PRICE_RATIFIER : RATE_RATIFIER,
     reduceOnly: false,
     maxUnits: "0",
     maxAssets: "0",
