@@ -17,9 +17,9 @@ const PRICE_RATIFIER = "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC";
 const RATE_RATIFIER = "0xDDdDddDdDdddDDddDDddDDDDdDdDDdDDdDDDDDDd";
 const HEIGHT = 2;
 
-// The signed message commits to the tree's height, so it is part of the type: Offer[2][2] for HEIGHT = 2.
-function arraySuffix(height: number) {
-  return "[2]".repeat(height);
+// The signed message commits to the tree's height, so it is part of the type: Offer[2][2] for a height of 2.
+function offerTreeType(offerType: keyof typeof OFFER_TYPES, height: number) {
+  return offerType + "[2]".repeat(height);
 }
 
 const COMMON_TYPES = {
@@ -148,7 +148,7 @@ const MODES: Record<string, Mode> = {
     prefix: "",
     types: () => ({
       ...COMMON_TYPES,
-      OfferTree: [{ name: "offerTree", type: "Offer" + arraySuffix(HEIGHT) }],
+      OfferTree: [{ name: "offerTree", type: offerTreeType("Offer", HEIGHT) }],
       Offer: OFFER_TYPES.Offer,
     }),
     message: (_account, offerTree) => ({ offerTree }),
@@ -163,7 +163,7 @@ const MODES: Record<string, Mode> = {
       ...COMMON_TYPES,
       SetIsRootRatified: [
         { name: "maker", type: "address" },
-        { name: "offerTree", type: "PriceRatifierV1Offer" + arraySuffix(HEIGHT) },
+        { name: "offerTree", type: offerTreeType("PriceRatifierV1Offer", HEIGHT) },
         { name: "newIsRootRatified", type: "bool" },
         { name: "nonce", type: "uint128" },
         { name: "deadline", type: "uint256" },
@@ -188,7 +188,7 @@ const MODES: Record<string, Mode> = {
       ...COMMON_TYPES,
       SetIsRootRatified: [
         { name: "maker", type: "address" },
-        { name: "offerTree", type: "RateRatifierV1Offer" + arraySuffix(HEIGHT) },
+        { name: "offerTree", type: offerTreeType("RateRatifierV1Offer", HEIGHT) },
         { name: "newIsRootRatified", type: "bool" },
         { name: "nonce", type: "uint128" },
         { name: "deadline", type: "uint256" },
