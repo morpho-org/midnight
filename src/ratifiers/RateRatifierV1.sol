@@ -75,16 +75,14 @@ contract RateRatifierV1 is IRateRatifierV1 {
         address _signer = ecrecover(digest, v, r, s);
         require(_signer != address(0), InvalidSignature());
         require(_signer == maker || IMidnight(MIDNIGHT).isAuthorized(maker, _signer), Unauthorized());
-        Ratification memory currentRatification = ratification[maker][root];
-        if (nonce == currentRatification.rootNonce) {
+        Ratification memory _ratification = ratification[maker][root];
+        if (nonce == _ratification.rootNonce) {
             ratification[maker][root] = Ratification({isRootRatified: newIsRootRatified, rootNonce: nonce + 1});
         } else {
-            require(nonce < currentRatification.rootNonce, InvalidNonce());
-            require(currentRatification.isRootRatified == newIsRootRatified, RatifiedStatusChanged());
+            require(nonce < _ratification.rootNonce, InvalidNonce());
+            require(_ratification.isRootRatified == newIsRootRatified, RatifiedStatusChanged());
         }
-        emit SetIsRootRatifiedWithSig(
-            _signer, maker, root, height, newIsRootRatified, nonce, currentRatification.rootNonce
-        );
+        emit SetIsRootRatifiedWithSig(_signer, maker, root, height, newIsRootRatified, nonce, _ratification.rootNonce);
         return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 
