@@ -212,7 +212,7 @@ library HashLib {
         );
     }
 
-    /// @dev Computes the EIP-712 hash struct of a PriceRatifierV1Offer (offer with an additional `allowedTaker`).
+    /// @dev Computes the EIP-712 hash struct of a PriceRatifierV1Offer (Offer with an additional `allowedTaker`).
     function hashPriceRatifierV1Offer(Offer memory offer, address allowedTaker) internal pure returns (bytes32) {
         return keccak256(
             abi.encode(
@@ -237,7 +237,7 @@ library HashLib {
         );
     }
 
-    /// @dev Computes the EIP-712 hash struct of a RateRatifierV1Offer (offer with `tick` replaced by `rate` and
+    /// @dev Computes the EIP-712 hash struct of a RateRatifierV1Offer (Offer with `tick` replaced by `rate` and
     /// `allowedTaker`).
     function hashRateRatifierV1Offer(Offer memory offer, uint256 rate, address allowedTaker)
         internal
