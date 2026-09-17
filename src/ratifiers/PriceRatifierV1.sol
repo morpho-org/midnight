@@ -45,7 +45,8 @@ contract PriceRatifierV1 is IPriceRatifierV1 {
         return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 
-    /// @dev Permissioned to not let an arbitrary actor submit the signed ratification.
+    /// @dev Permissioned to not let people extract the signature of a batch and start taking before or take even though
+    /// the batch reverted.
     function setIsRootRatifiedWithSig(
         address maker,
         bytes32 root,
