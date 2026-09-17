@@ -76,7 +76,9 @@ contract PriceRatifierV1 is IPriceRatifierV1 {
             require(nonce < _ratification.rootNonce, InvalidNonce());
             require(_ratification.isRootRatified == newIsRootRatified, RatifiedStatusChanged());
         }
-        emit SetIsRootRatifiedWithSig(_signer, maker, root, height, newIsRootRatified, nonce, _ratification.rootNonce);
+        emit SetIsRootRatifiedWithSig(
+            msg.sender, _signer, maker, root, height, newIsRootRatified, nonce, _ratification.rootNonce
+        );
         return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 

@@ -29,6 +29,7 @@ interface IRateRatifierV1 is IRatifiersV1Common {
         address indexed caller, address indexed maker, bytes32 indexed root, bool newIsRootRatified
     );
     event SetIsRootRatifiedWithSig(
+        address caller,
         address indexed signer,
         address indexed maker,
         bytes32 indexed root,

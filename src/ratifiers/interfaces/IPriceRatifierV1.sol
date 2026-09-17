@@ -29,6 +29,7 @@ interface IPriceRatifierV1 is IRatifiersV1Common {
     );
 
     event SetIsRootRatifiedWithSig(
+        address caller,
         address indexed signer,
         address indexed maker,
         bytes32 indexed root,

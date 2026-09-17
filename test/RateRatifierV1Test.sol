@@ -412,7 +412,7 @@ contract RateRatifierV1Test is BaseTest {
         midnight.setIsAuthorized(borrower, true, lender);
 
         vm.expectEmit();
-        emit IRateRatifierV1.SetIsRootRatifiedWithSig(lender, lender, _root, 0, true, 0, 0);
+        emit IRateRatifierV1.SetIsRootRatifiedWithSig(borrower, lender, lender, _root, 0, true, 0, 0);
 
         vm.prank(borrower);
         assertEq(
