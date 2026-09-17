@@ -33,8 +33,8 @@ interface IWhitelistEnterGate is IEnterGate {
         bool creditSide,
         address indexed account,
         bool newIsWhitelisted,
-        uint256 nonce,
-        uint256 currentNonce
+        uint256 signatureNonce,
+        uint256 previousNonce
     );
 
     /// STORAGE GETTERS ///
