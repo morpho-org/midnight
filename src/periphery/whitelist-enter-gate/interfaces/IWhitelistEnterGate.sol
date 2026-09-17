@@ -22,8 +22,8 @@ interface IWhitelistEnterGate is IEnterGate {
 
     /// EVENTS ///
     event Constructor(address indexed creditRoleSetter, address indexed debtRoleSetter, bool creditOpen, bool debtOpen);
-    event SetRoleSetter(address caller, bool creditSide, address indexed newRoleSetter);
-    event SetIsWhitelister(address caller, bool creditSide, address indexed account, bool newIsWhitelister);
+    event SetRoleSetter(bool creditSide, address indexed newRoleSetter);
+    event SetIsWhitelister(bool creditSide, address indexed account, bool newIsWhitelister);
     event SetIsWhitelisted(
         address indexed whitelister, bool creditSide, address indexed account, bool newIsWhitelisted
     );

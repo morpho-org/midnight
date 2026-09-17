@@ -86,7 +86,7 @@ contract WhitelistEnterGateTest is Test {
 
     function testSetRoleSetter(bool creditSide, address newRoleSetter) public {
         vm.expectEmit();
-        emit IWhitelistEnterGate.SetRoleSetter(_roleSetter(creditSide), creditSide, newRoleSetter);
+        emit IWhitelistEnterGate.SetRoleSetter(creditSide, newRoleSetter);
         vm.prank(_roleSetter(creditSide));
         gate.setRoleSetter(creditSide, newRoleSetter);
         assertEq(gate.roleSetter(creditSide), newRoleSetter);
@@ -110,7 +110,7 @@ contract WhitelistEnterGateTest is Test {
     function testSetIsWhitelister(bool creditSide, address account, bool isWhitelister_) public {
         vm.assume(account != whitelister);
         vm.expectEmit();
-        emit IWhitelistEnterGate.SetIsWhitelister(_roleSetter(creditSide), creditSide, account, isWhitelister_);
+        emit IWhitelistEnterGate.SetIsWhitelister(creditSide, account, isWhitelister_);
         vm.prank(_roleSetter(creditSide));
         gate.setIsWhitelister(creditSide, account, isWhitelister_);
         assertEq(gate.isWhitelister(creditSide, account), isWhitelister_);
