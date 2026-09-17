@@ -40,13 +40,13 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     function setRoleSetter(bool creditSide, address newRoleSetter) external {
         require(msg.sender == roleSetter[creditSide], NotRoleSetter());
         roleSetter[creditSide] = newRoleSetter;
-        emit SetRoleSetter(creditSide, newRoleSetter);
+        emit SetRoleSetter(msg.sender, creditSide, newRoleSetter);
     }
 
     function setIsWhitelister(bool creditSide, address account, bool newIsWhitelister) external {
         require(msg.sender == roleSetter[creditSide], NotRoleSetter());
         isWhitelister[creditSide][account] = newIsWhitelister;
-        emit SetIsWhitelister(creditSide, account, newIsWhitelister);
+        emit SetIsWhitelister(msg.sender, creditSide, account, newIsWhitelister);
     }
 
     function setIsWhitelisted(bool creditSide, address account, bool newIsWhitelisted) external {
@@ -81,7 +81,9 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
             require(nonce < currentNonce, InvalidNonce());
             require(isWhitelisted[creditSide][account] == newIsWhitelisted, WhitelistedStatusChanged());
         }
-        emit SetIsWhitelistedWithSig(whitelister, creditSide, account, newIsWhitelisted, nonce, currentNonce);
+        emit SetIsWhitelistedWithSig(
+            msg.sender, whitelister, creditSide, account, newIsWhitelisted, nonce, currentNonce
+        );
     }
 
     /// GETTERS ///
