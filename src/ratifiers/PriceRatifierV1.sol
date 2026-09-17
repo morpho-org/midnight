@@ -14,6 +14,8 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// address(0)).
 /// @dev The leaf index determines each sibling's left/right position during Merkle proof verification.
 /// @dev A root can also be ratified with a signature.
+/// @dev The nonce is per (maker, root) and shared by all the maker's authorized signers, instead of being per
+/// signer, so that a ratification stays within a single storage slot.
 /// @dev Hashing offers as in EIP-712, which allows clear signing of the tree in setIsRootRatifiedWithSig, credits
 /// to Seaport for this mechanism.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed
