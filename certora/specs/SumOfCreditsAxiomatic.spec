@@ -85,7 +85,7 @@ ghost mapping(bytes32 => mapping(address => mathint)) preciseCreditDivIndex {
     axiom forall bytes32 id. forall address user. preciseCreditDivIndex[id][user] >= 0;
 }
 
-// Instead of using the builtin `*`, which requires unstable non-linear arithemetic, we
+// Instead of using the builtin `*`, which requires unstable non-linear arithmetic, we
 // use the uninterpreted function `multiply` and only instantiate those axioms we need for proving.
 // `multiply(a, b)` IS the product `a * b` declared as an uninterpreted function.
 persistent ghost multiply(mathint, mathint) returns mathint {
