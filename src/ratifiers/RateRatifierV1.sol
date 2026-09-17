@@ -53,7 +53,7 @@ contract RateRatifierV1 is IRateRatifierV1 {
         return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 
-    /// @dev Permissioned to not let an arbitrary actor submit the signed ratification.
+    /// @dev Permissioned to not let people extract the signature of a batch and start taking before or take even though the batch reverted.
     function setIsRootRatifiedWithSig(
         address maker,
         bytes32 root,
@@ -97,13 +97,10 @@ contract RateRatifierV1 is IRateRatifierV1 {
         (bytes32 root, uint256 leafIndex, bytes32[] memory proof, uint256 rate, address allowedTaker) =
             abi.decode(ratifierData, (bytes32, uint256, bytes32[], uint256, address));
         require(allowedTaker == address(0) || taker == allowedTaker, UnauthorizedTaker());
-
         uint256 timeToMaturity = UtilsLib.zeroFloorSub(offer.market.maturity, block.timestamp);
         uint256 offerPrice = TickLib.tickToPrice(offer.tick);
-
         if (offer.buy) require(offerPrice <= WAD.mulDivDown(WAD, WAD + rate * timeToMaturity), WorsePrice());
         else require(offerPrice >= WAD.mulDivUp(WAD, WAD + rate * timeToMaturity), WorsePrice());
-
         require(
             HashLib.isLeaf(root, HashLib.hashRateRatifierV1Offer(offer, rate, allowedTaker), leafIndex, proof),
             InvalidProof()
