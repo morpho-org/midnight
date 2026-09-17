@@ -81,7 +81,9 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
             require(nonce < previousNonce, InvalidNonce());
             require(isWhitelisted[creditSide][account] == newIsWhitelisted, WhitelistedStatusChanged());
         }
-        emit SetIsWhitelistedWithSig(whitelister, creditSide, account, newIsWhitelisted, nonce, previousNonce);
+        emit SetIsWhitelistedWithSig(
+            msg.sender, whitelister, creditSide, account, newIsWhitelisted, nonce, previousNonce
+        );
     }
 
     /// GETTERS ///
