@@ -73,15 +73,15 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
         // forge-lint: disable-next-item(ecrecover) malleability is ok thanks to the nonce.
         address whitelister = ecrecover(digest, v, r, s);
         require(whitelister != address(0) && isWhitelister[creditSide][whitelister], InvalidSigner());
-        uint256 currentNonce = nonces[creditSide][whitelister][account];
-        if (nonce == currentNonce) {
-            nonces[creditSide][whitelister][account] = currentNonce + 1;
+        uint256 previousNonce = nonces[creditSide][whitelister][account];
+        if (nonce == previousNonce) {
+            nonces[creditSide][whitelister][account] = previousNonce + 1;
             isWhitelisted[creditSide][account] = newIsWhitelisted;
         } else {
-            require(nonce < currentNonce, InvalidNonce());
+            require(nonce < previousNonce, InvalidNonce());
             require(isWhitelisted[creditSide][account] == newIsWhitelisted, WhitelistedStatusChanged());
         }
-        emit SetIsWhitelistedWithSig(whitelister, creditSide, account, newIsWhitelisted, nonce, currentNonce);
+        emit SetIsWhitelistedWithSig(whitelister, creditSide, account, newIsWhitelisted, nonce, previousNonce);
     }
 
     /// GETTERS ///
