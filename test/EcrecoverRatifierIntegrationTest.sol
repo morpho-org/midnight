@@ -327,6 +327,9 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
 
     function testTakeOfferValidSignature(uint256 makerSecretKey, address sender) public {
         vm.assume(sender != address(0));
+        // The fuzzed address must not be the market's SStore2 blob address: creating the market
+        // CREATE2-deploys there, and CREATE2 fails against an account that is not empty.
+        vm.assume(sender != address(uint160(uint256(toId(market)))));
         makerSecretKey = boundPrivateKey(makerSecretKey);
         privateKey[vm.addr(makerSecretKey)] = makerSecretKey;
         lenderOffer.maker = vm.addr(makerSecretKey);
@@ -338,6 +341,9 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
     }
 
     function testOfferAuthorization(uint256 makerSecretKey, address sender, uint256 otherSecretKey) public {
+        // The fuzzed address must not be the market's SStore2 blob address: creating the market
+        // CREATE2-deploys there, and CREATE2 fails against an account that is not empty.
+        vm.assume(sender != address(uint160(uint256(toId(market)))));
         makerSecretKey = boundPrivateKey(makerSecretKey);
         otherSecretKey = boundPrivateKey(otherSecretKey);
         vm.assume(otherSecretKey != makerSecretKey);
@@ -365,6 +371,9 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         public
     {
         vm.assume(sender != address(0));
+        // The fuzzed address must not be the market's SStore2 blob address: creating the market
+        // CREATE2-deploys there, and CREATE2 fails against an account that is not empty.
+        vm.assume(sender != address(uint160(uint256(toId(market)))));
         makerSecretKey = boundPrivateKey(makerSecretKey);
         otherSecretKey = boundPrivateKey(otherSecretKey);
         vm.assume(otherSecretKey != makerSecretKey);

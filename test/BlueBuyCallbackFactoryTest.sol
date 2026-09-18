@@ -29,6 +29,7 @@ contract BlueBuyCallbackFactoryTest is Test {
         vm.prank(owner);
         address callbackAddress = factory.createBlueBuyCallback(owner, salt);
         BlueBuyCallback callback = BlueBuyCallback(callbackAddress);
+        // forge-lint: disable-next-item(encode-packed-collision)
         bytes32 initCodeHash =
             keccak256(abi.encodePacked(type(BlueBuyCallback).creationCode, abi.encode(owner, midnight, address(blue))));
 

@@ -4,6 +4,7 @@ pragma solidity 0.8.34;
 
 uint256 constant MAX_DATA_LENGTH = 1_000_000;
 
+// forge-lint: disable-next-item(locked-ether) the contract is not meant to receive value.
 contract Log {
     event Data(bytes data);
 

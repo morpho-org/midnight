@@ -31,18 +31,22 @@ Global invariants on positions, markets and accounting.
 - [`PostMaturityDebt.spec`](specs/PostMaturityDebt.spec) checks that a position's debt can never increase after its market's maturity.
 - [`Reentrancy.spec`](specs/Reentrancy.spec) and [`ReentrancyView.spec`](specs/ReentrancyView.spec) check that within a single entry point, external calls, respectively external view calls, only happen before the first storage write or after the last one, so no external call observes an intermediate state.
   The writes of `touchMarket` and `_updatePosition` are ignored, as they leave the state valid, and `Reentrancy.spec` also ignores the transient `LIQUIDATION_LOCK` writes of `UtilsLib.tExchange`, which deliberately happen after the external calls.
+- [`SumOfCreditsAxiomatic.spec`](specs/SumOfCreditsAxiomatic.spec) checks that the sum of all lender's credit values (rescaled according to the math in UpdatePosition to the current loss factor) plus the continuous fee are backed by totalUnits (which is the sum of all recorded debts plus the withdrawable amount).
 
 ## Positions health and liquidation
 
 Healthy positions stay healthy, and liquidations only touch liquidatable positions within the incentive bound.
 
 - [`Healthiness.spec`](specs/Healthiness.spec) checks that after any action (except oracle update) a healthy borrower is still healthy, or is liquidation-locked: a transient state that cannot be liquidated and that is always cleared by the end of the transaction.
+- [`MaxRepaidHealthy.spec`](specs/MaxRepaidHealthy.spec) checks that an unhealthy borrower liquidated in normal mode is healthy again once the liquidator has repaid `maxRepaid`, the recovery close factor cap.
+  `maxRepaid` is rounded up so that repaying up to it always suffices, the roundings of the seized collateral and of the resulting max debt included.
 - [`Liquidate.spec`](specs/Liquidate.spec) checks that `liquidate` can only act on a liquidatable position, leaves credit unchanged, and can only decrease the borrower's debt and the seized collateral.
 - [`LiquidationProfitability.spec`](specs/LiquidationProfitability.spec) shows that the liquidation is profitable.
 - [`LiquidationBoundedByLIF.spec`](specs/LiquidationBoundedByLIF.spec) checks the upper side: liquidation profit is bounded by `maxLif`.
 - [`NoDebtWithoutCollateral.spec`](specs/NoDebtWithoutCollateral.spec) checks that a position with an empty collateral bitmap has no debt, unless it is under the transient liquidation lock, together with the lemmas that the lock is clear at every transaction boundary and left unchanged by external calls.
 - [`RealizableBadDebt.spec`](specs/RealizableBadDebt.spec) checks that no function other than `liquidate` can increase the realizable bad debt of a position that is not under the liquidation lock, and that `liquidate` decreases the market's total units by exactly the bad debt it realizes.
 - [`RealizableBadDebtLiquidate.spec`](specs/RealizableBadDebtLiquidate.spec) checks the `liquidate` side: a liquidated position has no realizable bad debt left, and liquidating one position never increases the realizable bad debt of another.
+- [`PostDropRealizableBadDebt.spec`](specs/PostDropRealizableBadDebt.spec) checks that liquidating a position at the current price cannot increase the realizable bad debt measured after an oracle price drop, for both of `liquidate`'s input branches (seized and repaid).
 
 ## Offers and consumption
 

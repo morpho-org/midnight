@@ -173,7 +173,10 @@ contract TakeTest is BaseTest {
         offer.group = group;
         offer.tick = tick;
 
-        stdstoreFinder.target(address(midnight)).sig("consumed(address,bytes32)").with_key(maker).with_key(group)
+        stdstoreFinder.target(address(midnight))
+            .sig("consumed(address,bytes32)")
+            .with_key(maker)
+            .with_key(group)
             .checked_write(existingConsumed);
 
         deal(address(loanToken), address(payerCallback), buyerAssets);
@@ -1386,7 +1389,7 @@ contract TakeTest is BaseTest {
         assertTrue(callback.reentered());
         assertFalse(callback.liquidateSucceeded());
         assertEq(callback.liquidateErrorSelector(), IMidnight.NotLiquidatable.selector);
-        assertTrue(midnight.liquidationLocked(id, borrower) == false);
+        assertFalse(midnight.liquidationLocked(id, borrower));
         assertEq(midnight.debt(id, borrower), 2 * units);
         assertEq(midnight.collateral(id, borrower, 0), 2 * collateral);
     }

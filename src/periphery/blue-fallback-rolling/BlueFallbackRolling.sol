@@ -15,13 +15,16 @@ import {SafeApproveLib} from "../libraries/SafeApproveLib.sol";
 /// @dev Users must authorize this contract on both Midnight and Blue before their debt can be rolled.
 /// @dev Users must make sure that the oracle and the LLTV of the Blue market are appropriate; otherwise, their
 /// position on Blue could be left close to liquidation.
-/// @dev The rolling incentive corresponds to the percentage of the debt repaid on Midnight that is given as incentive
+/// @dev The rolling incentive corresponds to the share of the debt repaid on Midnight that is given as incentive
 /// equivalent to added interest on Blue.
 /// @dev The rolling incentive cap at 100% is arbitrary from a technical POV.
 /// @dev The source position can move before it is rolled, notably if the borrower has outstanding sell offers, in
 /// which case the destination position debt and collateral can be difficult to predict.
 /// @dev Contrary to Midnight, Blue positions can be liquidated because of interest accrual, which should be taken into
 /// account when deciding/approving the rolling configuration.
+/// @dev Partial rolls leaving the Midnight position unhealthy fail.
+/// @dev Nothing prevents rollers from leaving a small amount of debt on Midnight that would be unprofitable to roll.
+/// @dev Inherits the token safety requirements of Midnight and Blue.
 contract BlueFallbackRolling is IBlueFallbackRolling {
     using MarketParamsLib for MarketParams;
     using UtilsLib for uint128;
@@ -110,9 +113,9 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
         uint256 collateralAssets =
             IMidnight(MIDNIGHT).collateral(midnightId, user, collateralIndex).mulDivDown(assets, debtAssets);
         // Round against the roller.
-        uint256 incentiveFactor = incentiveAtStart
+        uint256 incentive = incentiveAtStart
             + UtilsLib.mulDivDown(incentiveAtEnd - incentiveAtStart, block.timestamp - start, end - start);
-        uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentiveFactor, WAD);
+        uint256 incentiveAssets = UtilsLib.mulDivDown(assets, incentive, WAD);
 
         emit Roll(msg.sender, user, midnightId, blueId, configId, assets, collateralAssets, incentiveAssets);
 
@@ -133,6 +136,8 @@ contract BlueFallbackRolling is IBlueFallbackRolling {
             address user
         ) = abi.decode(data, (Market, MarketParams, uint256, uint256, uint256, address));
 
+        // Borrowing on Blue introduces a rounding against the borrower because of share accounting. minRollableAssets
+        // limits how many times the rounding can be applied.
         IMorpho(BLUE).borrow(blueMarketParams, assets + incentiveAssets, 0, user, address(this));
         SafeApproveLib.forceApproveMax(midnightMarket.loanToken, MIDNIGHT);
         IMidnight(MIDNIGHT).repay(midnightMarket, assets, user, address(0), hex"");
