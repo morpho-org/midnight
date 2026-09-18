@@ -13,8 +13,7 @@ methods {
     function maxRepaidFor(Midnight.Market, bytes32, uint256, address) external returns (uint256) envfree;
     function maxDebtFor(Midnight.Market, bytes32, address) external returns (uint256) envfree;
 
-    // Assumption: price does not change during the rule (same value in maxRepaidFor, in liquidate and in the
-    // post-state isHealthyNoBitmap). Deterministic per oracle address, as in Healthiness.spec.
+    // Assumption: price does not change during the rule (same value in maxRepaidFor, in liquidate and in the post-state isHealthyNoBitmap). Deterministic per oracle address, as in Healthiness.spec.
     function _.price() external => summaryPrice(calledContract) expect(uint256);
 
     // The three summaries below do not restrict the verified behaviours:
@@ -31,10 +30,7 @@ methods {
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
-    // Summarizing mulDivDown and mulDivUp by unconstrained deterministic ghosts adds no assumption about
-    // mulDiv: the ghosts are arbitrary, and the summaries revert on a nondeterministic overflow flag, so
-    // every real mulDiv behaviour is still allowed. All the arithmetic the rule actually needs is required
-    // explicitly below, one ground instance per rule proved over the concrete mulDiv in MulDiv.spec.
+    // Summarizing mulDivDown and mulDivUp by unconstrained deterministic ghosts adds no assumption about mulDiv: the ghosts are arbitrary, and the summaries revert on a nondeterministic overflow flag, so every real mulDiv behaviour is still allowed. All the arithmetic the rule actually needs is required explicitly below, one ground instance per rule proved over the concrete mulDiv in MulDiv.spec.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
@@ -140,9 +136,7 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     bool isHealthyAfter = isHealthyNoBitmap(globalMarket, globalId, borrower);
 
     /// MAX-DEBT DROP BOUND ///
-    // Establish oldContrib - newContrib <= maxDebtDropBound. When it seizes, liquidate computes
-    // seizedOut = floor(floor(repaidUnits * lif / WAD) * ORACLE_PRICE_SCALE / price), matching the ghost terms
-    // below. Each require is one ground instance of a rule proved in MulDiv.spec.
+    // Establish oldContrib - newContrib <= maxDebtDropBound. When it seizes, liquidate computes seizedOut = floor(floor(repaidUnits * lif / WAD) * ORACLE_PRICE_SCALE / price), matching the ghost terms below. Each require is one ground instance of a rule proved in MulDiv.spec.
 
     uint256 lltv = globalMarketCollateralLLTV[collateralIndex];
     uint256 lif = maxLifGhost(lltv, globalMarketCollateralLiquidationCursor[collateralIndex]);
@@ -172,13 +166,10 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // L4: maxSeizedValue * lltv <= maxDebtDropBound
     require axiomMathMulDivDownUpComposition(repaidUnits, lif, lltv, WAD()), "axiom";
 
-    // L1-L2 bound the collateral-value decrease by maxSeizedValue. L3 transports that bound through the LLTV
-    // contribution, and L4 bounds the composed rounding by maxDebtDropBound.
+    // L1-L2 bound the collateral-value decrease by maxSeizedValue. L3 transports that bound through the LLTV contribution, and L4 bounds the composed rounding by maxDebtDropBound.
 
     /// FINAL HEALTH BOUND ///
-    // repaidUnits is ceil(gap * WAD^2 / (WAD^2 - lif * lltv)). The two rounding facts below imply
-    // maxDebtDropBound <= repaidUnits - gap. Therefore the new max debt falls by no more than the amount
-    // repaid in excess of the old health gap.
+    // repaidUnits is ceil(gap * WAD^2 / (WAD^2 - lif * lltv)). The two rounding facts below imply maxDebtDropBound <= repaidUnits - gap. Therefore the new max debt falls by no more than the amount repaid in excess of the old health gap.
 
     mathint gap = debtBefore - maxDebtBefore;
     mathint rcfDenominator = WAD_SQUARED() - lifTimesLltv;

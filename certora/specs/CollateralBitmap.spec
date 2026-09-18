@@ -46,9 +46,7 @@ strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint25
 strong invariant atMostMaxCollateralsBitsSet(bytes32 id, address user)
     summaryCountBits(currentContract.position[id][user].collateralBitmap) <= Utils.maxCollateralsPerBorrower();
 
-// This shows that the real isHealthy returns true if and only if the isHealthy function
-// that does not use collateral bitmap returns true.  We also check that the latter function
-// does not revert if isHealthy does not revert.
+// This shows that the real isHealthy returns true if and only if the isHealthy function that does not use collateral bitmap returns true.  We also check that the latter function does not revert if isHealthy does not revert.
 rule isHealthyEquivalent(Midnight.Market market, bytes32 id, address borrower) {
     require market.collateralParams.length <= 3, "restrict to three collateralParams";
     requireInvariant nonZeroCollateralsAreActivated(id, borrower, 0);

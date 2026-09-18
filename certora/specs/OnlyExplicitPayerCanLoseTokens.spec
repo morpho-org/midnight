@@ -9,10 +9,7 @@ methods {
 
     function Utils.callbackSuccess() external returns (bytes32) envfree;
 
-    // Callbacks can modify the whole state arbitrarily, and can only modify the ghost variables to allow
-    // themselves as payer. Callbacks are checked to only be called by their corresponding function,
-    // eg onLiquidate is only called by liquidate. onSell cannot authorize a payer, so we model them
-    // with a plain HAVOC_ALL.
+    // Callbacks can modify the whole state arbitrarily, and can only modify the ghost variables to allow themselves as payer. Callbacks are checked to only be called by their corresponding function, eg onLiquidate is only called by liquidate. onSell cannot authorize a payer, so we model them with a plain HAVOC_ALL.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => onCallBackSummary(calledContract, buyCallbackAllowed) expect(bytes32);
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => onCallBackSummary(calledContract, liquidateCallbackAllowed) expect(bytes32);
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => onCallBackSummary(calledContract, repayCallbackAllowed) expect(bytes32);
@@ -115,8 +112,7 @@ rule takeOnlyExplicitPayer(env e, Midnight.Offer offer, bytes ratifierData, uint
     assert !badPullSeen;
 }
 
-/// Proves that for every entry point other than `take`, tokens are only ever pulled from msg.sender
-/// or from a callback that returned CALLBACK_SUCCESS.
+/// Proves that for every entry point other than `take`, tokens are only ever pulled from msg.sender or from a callback that returned CALLBACK_SUCCESS.
 rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
     require e.msg.sender != currentContract, "only external calls";
 

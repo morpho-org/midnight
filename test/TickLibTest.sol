@@ -140,8 +140,7 @@ contract TickLibTest is BaseTest {
                 assertLe(relErrorWad, 0.0007e18, string.concat("Tick ", vm.toString(tick), " error exceeds 7 bps"));
             }
 
-            // Check exact price is bracketed by adjacent sol prices in the bulk of the range,
-            // away from the rounding-dominated tails.
+            // Check exact price is bracketed by adjacent sol prices in the bulk of the range, away from the rounding-dominated tails.
             if (solPrice > 0.01e18 && solPrice < 0.99e18) {
                 assertGe(
                     exactPrice,

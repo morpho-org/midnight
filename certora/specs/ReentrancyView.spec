@@ -4,8 +4,7 @@
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    // ignore changes done by touchMarket and _updatePosition; the state after these calls is still
-    // valid even if they changed the state.
+    // ignore changes done by touchMarket and _updatePosition; the state after these calls is still valid even if they changed the state.
     function touchMarket(Midnight.Market memory) internal returns (bytes32) => NONDET;
     function _updatePosition(Midnight.Market memory, bytes32, address) internal returns (uint128, uint128, uint128) => NONDET;
 

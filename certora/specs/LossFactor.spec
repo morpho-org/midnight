@@ -170,8 +170,7 @@ rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
     assert currentContract.marketState[id].continuousFeeCredit == cfcAfterFirst;
 }
 
-/// When the user's lastLossFactor is in sync with the market's lossFactor (and not saturated),
-/// updatePosition does not slash: credit and pendingFee only decrease by the accrued fee.
+/// When the user's lastLossFactor is in sync with the market's lossFactor (and not saturated), updatePosition does not slash: credit and pendingFee only decrease by the accrued fee.
 rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 

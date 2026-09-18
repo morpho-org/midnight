@@ -26,8 +26,7 @@ rule takeRequiresMakerConsent(env e, Midnight.Offer offer, bytes ratifierData, u
     assert makerAuthorizedRatifier;
 }
 
-/// address(0) can't authorize another account, because it can't call
-/// and setIsAuthorized requires msg.sender == onBehalf || isAuthorized[onBehalf][msg.sender].
+/// address(0) can't authorize another account, because it can't call and setIsAuthorized requires msg.sender == onBehalf || isAuthorized[onBehalf][msg.sender].
 strong invariant addressZeroCantAuthorize(address authorized)
     !isAuthorized(0, authorized)
     {

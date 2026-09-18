@@ -13,8 +13,7 @@ import {
 
 /// @dev Helper contract to authorize on Midnight with a signature.
 /// @dev This contract must be authorized on Midnight.
-/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed authorizations
-/// are no longer valid.
+/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed authorizations are no longer valid.
 contract EcrecoverAuthorizer is IEcrecoverAuthorizer {
     address public immutable MIDNIGHT;
     mapping(address => uint256) public nonce;

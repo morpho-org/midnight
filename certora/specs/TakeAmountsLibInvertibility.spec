@@ -22,8 +22,7 @@ methods {
     // Deterministic price: the same tick yields the same price for both the library and take().
     function TickLib.tickToPrice(uint256 tick) internal returns (uint256) => summaryTickToPrice(tick);
 
-    // Dispatch TakeAmountsLib's external call IMidnight(midnight).settlementFee(...) to currentContract,
-    // so the value the library reads matches the value take() reads internally.
+    // Dispatch TakeAmountsLib's external call IMidnight(midnight).settlementFee(...) to currentContract, so the value the library reads matches the value take() reads internally.
     function _.settlementFee(bytes32, uint256) external => DISPATCHER(true);
 
     // Axiomatic mulDiv summaries.
@@ -39,8 +38,7 @@ function summaryToId(Midnight.Market market) returns bytes32 {
     return Utils.hashMarket(market);
 }
 
-// tickToPrice maps every valid tick into [0, WAD] (proved in TickToPrice.spec: tickToPriceAtMostWad, with
-// equality reached at MAX_TICK via tickToPriceIsOneAtMaxTick).
+// tickToPrice maps every valid tick into [0, WAD] (proved in TickToPrice.spec: tickToPriceAtMostWad, with equality reached at MAX_TICK via tickToPriceIsOneAtMaxTick).
 persistent ghost summaryTickToPrice(uint256) returns uint256 {
     axiom forall uint256 tick. summaryTickToPrice(tick) <= 10 ^ 18;
 }

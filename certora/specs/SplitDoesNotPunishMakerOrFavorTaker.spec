@@ -108,8 +108,7 @@ rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 unitsA, uint256 unitsB, 
     assert !offer.buy => buyerAssetsB + buyerAssetsC >= buyerAssetsA;
     assert !offer.buy => buyerAssetsB + buyerAssetsC <= buyerAssetsA + 1;
 
-    // Maker's offer cap consumption can change by at most 1 wei across splits in maxAssets mode
-    // (bounded by the asset deviation), and is exact in maxUnits mode (consumed += units, with A == B + C).
+    // Maker's offer cap consumption can change by at most 1 wei across splits in maxAssets mode (bounded by the asset deviation), and is exact in maxUnits mode (consumed += units, with A == B + C).
     assert consumedAfterA <= consumedAfterBC + 1;
     assert consumedAfterBC <= consumedAfterA + 1;
     assert offer.maxAssets == 0 => consumedAfterA == consumedAfterBC;

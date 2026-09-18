@@ -34,9 +34,7 @@ methods {
 
 /// UPDATE POSITION ///
 
-/// updatePosition can only decrease user's credit (through slashing and fee accrual),
-/// sets it to the post-update value, only changes credit of user at the market id,
-/// and accrues fee to continuousFeeCredit.
+/// updatePosition can only decrease user's credit (through slashing and fee accrual), sets it to the post-update value, only changes credit of user at the market id, and accrues fee to continuousFeeCredit.
 rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 anyId, address anyUser) {
     bytes32 id = Utils.toId(market);
 
@@ -62,8 +60,7 @@ rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 
 
 /// WITHDRAW ///
 
-/// withdraw decreases onBehalf's post-update credit by exactly units
-/// and only changes credit of onBehalf at the market id.
+/// withdraw decreases onBehalf's post-update credit by exactly units and only changes credit of onBehalf at the market id.
 rule withdrawEffects(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
     bytes32 id = Utils.toId(market);
 
@@ -85,8 +82,7 @@ rule withdrawEffects(env e, Midnight.Market market, uint256 units, address onBeh
 
 /// TAKE ///
 
-/// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values
-/// and only changes credit of maker and taker and debt of maker and taker at the market id.
+/// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values and only changes credit of maker and taker and debt of maker and taker at the market id.
 rule takeEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes32 anyId, address anyUser) {
     bytes32 id = Utils.toId(offer.market);
 
@@ -210,8 +206,7 @@ filtered {
 
 /// SUPPLY COLLATERAL ///
 
-/// supplyCollateral increases onBehalf's collateral by exactly assets,
-/// and only changes position[id][onBehalf].collateral[collateralIndex].
+/// supplyCollateral increases onBehalf's collateral by exactly assets, and only changes position[id][onBehalf].collateral[collateralIndex].
 rule supplyCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, bytes32 anyId, address anyUser, uint256 anyIndex) {
     bytes32 id = Utils.toId(market);
 
@@ -226,8 +221,7 @@ rule supplyCollateralEffects(env e, Midnight.Market market, uint256 collateralIn
 
 /// WITHDRAW COLLATERAL ///
 
-/// withdrawCollateral decreases onBehalf's collateral by exactly assets,
-/// and only changes position[id][onBehalf].collateral[collateralIndex].
+/// withdrawCollateral decreases onBehalf's collateral by exactly assets, and only changes position[id][onBehalf].collateral[collateralIndex].
 rule withdrawCollateralCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver, bytes32 anyId, address anyUser, uint256 anyIndex) {
     bytes32 id = Utils.toId(market);
 
@@ -242,8 +236,7 @@ rule withdrawCollateralCollateralEffects(env e, Midnight.Market market, uint256 
 
 /// LIQUIDATE (COLLATERAL) ///
 
-/// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult,
-/// and only changes position[id][borrower].collateral[collateralIndex].
+/// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult, and only changes position[id][borrower].collateral[collateralIndex].
 rule liquidateCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex, bool postMaturityMode) {
     bytes32 id = Utils.toId(market);
 

@@ -77,16 +77,13 @@ contract MidnightWrapper is Midnight {
         return maxDebt;
     }
 
-    // This realizableBadDebt function recomputes, verbatim, the badDebt local that
-    // liquidate() computes at src/Midnight.sol:643-657, so that the prover can equate this
-    // getter's result with liquidate's inlined bad-debt computation.
+    // This realizableBadDebt function recomputes, verbatim, the badDebt local that liquidate() computes at src/Midnight.sol:643-657, so that the prover can equate this getter's result with liquidate's inlined bad-debt computation.
     //
     // realizableBadDebt(id, borrower)
     //   = zeroFloorSub(debt, SUM over active-collateral i of
     //       ceil(ceil(collateral_i * price_i / ORACLE_PRICE_SCALE) * WAD / maxLif_i)).
     //
-    // id is taken explicitly (mirroring isHealthyNoBitmap) and must be the id derived from
-    // market; the caller passes the matching Market, exactly as liquidate does.
+    // id is taken explicitly (mirroring isHealthyNoBitmap) and must be the id derived from market; the caller passes the matching Market, exactly as liquidate does.
     function realizableBadDebt(Market memory market, bytes32 id, address borrower) public view returns (uint256) {
         Position storage _position = position[id][borrower];
         uint256 badDebt = _position.debt;

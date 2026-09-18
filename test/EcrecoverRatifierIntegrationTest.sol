@@ -11,8 +11,7 @@ import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
-/// @dev Tests covering the merkle/signature flow of `EcrecoverRatifier` end-to-end via `Midnight.take`.
-/// `EcrecoverRatifierTest` covers the ratifier in isolation; this file pins the integration with Midnight.
+/// @dev Tests covering the merkle/signature flow of `EcrecoverRatifier` end-to-end via `Midnight.take`. `EcrecoverRatifierTest` covers the ratifier in isolation; this file pins the integration with Midnight.
 contract EcrecoverRatifierIntegrationTest is BaseTest {
     using UtilsLib for uint256;
 
@@ -135,8 +134,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         return abi.encode(_sig, _root, 0, _proof);
     }
 
-    /// @dev Builds merkle ratifier data with explicit root, leaf index, and proof — useful for negative tests where
-    /// the signed root or the proof is intentionally inconsistent with the offer.
+    /// @dev Builds merkle ratifier data with explicit root, leaf index, and proof — useful for negative tests where the signed root or the proof is intentionally inconsistent with the offer.
     function merkleRatifierData(Offer memory offer, bytes32 _root, uint256 _leafIndex, bytes32[] memory _proof)
         internal
         view
@@ -327,8 +325,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
 
     function testTakeOfferValidSignature(uint256 makerSecretKey, address sender) public {
         vm.assume(sender != address(0));
-        // The fuzzed address must not be the market's SStore2 blob address: creating the market
-        // CREATE2-deploys there, and CREATE2 fails against an account that is not empty.
+        // The fuzzed address must not be the market's SStore2 blob address: creating the market CREATE2-deploys there, and CREATE2 fails against an account that is not empty.
         vm.assume(sender != address(uint160(uint256(toId(market)))));
         makerSecretKey = boundPrivateKey(makerSecretKey);
         privateKey[vm.addr(makerSecretKey)] = makerSecretKey;
@@ -341,8 +338,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
     }
 
     function testOfferAuthorization(uint256 makerSecretKey, address sender, uint256 otherSecretKey) public {
-        // The fuzzed address must not be the market's SStore2 blob address: creating the market
-        // CREATE2-deploys there, and CREATE2 fails against an account that is not empty.
+        // The fuzzed address must not be the market's SStore2 blob address: creating the market CREATE2-deploys there, and CREATE2 fails against an account that is not empty.
         vm.assume(sender != address(uint160(uint256(toId(market)))));
         makerSecretKey = boundPrivateKey(makerSecretKey);
         otherSecretKey = boundPrivateKey(otherSecretKey);
@@ -371,8 +367,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         public
     {
         vm.assume(sender != address(0));
-        // The fuzzed address must not be the market's SStore2 blob address: creating the market
-        // CREATE2-deploys there, and CREATE2 fails against an account that is not empty.
+        // The fuzzed address must not be the market's SStore2 blob address: creating the market CREATE2-deploys there, and CREATE2 fails against an account that is not empty.
         vm.assume(sender != address(uint160(uint256(toId(market)))));
         makerSecretKey = boundPrivateKey(makerSecretKey);
         otherSecretKey = boundPrivateKey(otherSecretKey);
@@ -426,8 +421,7 @@ contract EcrecoverRatifierIntegrationTest is BaseTest {
         vm.expectRevert(IMidnight.InvalidMidnight.selector);
         otherMidnight.take(lenderOffer, ratifierData, 0, borrower, borrower, address(0), hex"");
 
-        // The signer can ratify offers on otherMidnight though, but this is explicit (offers have to have the
-        // otherMidnight address), and this is documented.
+        // The signer can ratify offers on otherMidnight though, but this is explicit (offers have to have the otherMidnight address), and this is documented.
         Offer memory newOffer = lenderOffer;
         newOffer.market.midnight = address(otherMidnight);
         bytes memory newRatifierData = merkleRatifierData([newOffer], signer);

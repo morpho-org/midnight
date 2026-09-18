@@ -15,17 +15,14 @@ import {IBlueBuyCallback} from "./interfaces/IBlueBuyCallback.sol";
 import {IERC20Extended} from "./interfaces/IERC20Extended.sol";
 import {ERC20Lib} from "../libraries/ERC20Lib.sol";
 
-/// @dev This contract is meant to be used as a Midnight buy offer callback in order to park funds on a Blue market
-/// while the offer waits to be taken.
+/// @dev This contract is meant to be used as a Midnight buy offer callback in order to park funds on a Blue market while the offer waits to be taken.
 /// @dev The positions on the Blue markets are acquired through supplies on behalf of this contract (permissionless).
 /// @dev The OWNER can withdraw this position on Blue, for example if the offer expired.
 /// @dev The OWNER can also authorize other accounts (optionally with signature), typically useful for
 /// bundle contracts.
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
-/// @dev Anyone authorized by the owner on Midnight can pull this contract's Blue positions through a take on Midnight
-/// on behalf of OWNER.
-/// @dev An account authorized on Blue to act on behalf of this contract can notably borrow on its behalf, which
-/// is not the expected use-case, but it is not explicitly prevented because it does not affect onBuy.
+/// @dev Anyone authorized by the owner on Midnight can pull this contract's Blue positions through a take on Midnight on behalf of OWNER.
+/// @dev An account authorized on Blue to act on behalf of this contract can notably borrow on its behalf, which is not the expected use-case, but it is not explicitly prevented because it does not affect onBuy.
 contract BlueBuyCallback is IBlueBuyCallback {
     using MarketParamsLib for MarketParams;
     using MorphoBalancesLib for IMorpho;
@@ -75,8 +72,7 @@ contract BlueBuyCallback is IBlueBuyCallback {
         emit Skim(msg.sender, token, balance);
     }
 
-    /// @dev Reverts if the owner position on the requested market is too small or if the liquidity on that market is
-    /// too small.
+    /// @dev Reverts if the owner position on the requested market is too small or if the liquidity on that market is too small.
     function onBuy(
         bytes32,
         Market memory market,
@@ -98,11 +94,8 @@ contract BlueBuyCallback is IBlueBuyCallback {
     }
 
     /// @dev Max buyerAssets amount that the callback can handle.
-    /// @dev Takers receive the amount to take per offer from the routing layer. But the routing layer is
-    /// asynchronous/offchain, and might not be up to date on the chain's latest state. To counter this, takers can
-    /// query atomically this function to cap their take.
-    /// @dev Ignores some static reasons why the bound might be smaller, such as wrong loan token, wrong owner... But it
-    /// is easy for the routing layer to take that into account.
+    /// @dev Takers receive the amount to take per offer from the routing layer. But the routing layer is asynchronous/offchain, and might not be up to date on the chain's latest state. To counter this, takers can query atomically this function to cap their take.
+    /// @dev Ignores some static reasons why the bound might be smaller, such as wrong loan token, wrong owner... But it is easy for the routing layer to take that into account.
     /// @dev Reverts if data is not well formed.
     /// @dev Under-estimates the real bound if the callback is the fee recipient of the blue market.
     function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {

@@ -75,9 +75,7 @@ rule expRIsMonotonicWithinSegment(int256 x) {
     assert expR(assert_uint256(x)) <= expR(assert_uint256(x1));
 }
 
-// q changes by 0 or 1 between consecutive inputs; together with the two cases below this proves
-// wExp monotonicity on the positive range. Splitting on q lets the solver pin the polynomial inputs
-// (r) to constants at a jump, avoiding the tight symbolic nonlinear bound it cannot otherwise discharge.
+// q changes by 0 or 1 between consecutive inputs; together with the two cases below this proves wExp monotonicity on the positive range. Splitting on q lets the solver pin the polynomial inputs (r) to constants at a jump, avoiding the tight symbolic nonlinear bound it cannot otherwise discharge.
 rule qIncreasesByZeroOrOne(int256 x) {
     require 0 <= x && x < maxInput(), "wExp is only called on inputs in this range";
     int256 x1 = assert_int256(x + 1);

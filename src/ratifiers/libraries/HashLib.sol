@@ -20,8 +20,7 @@ library HashLib {
     error TreeTooHigh();
 
     /// @dev Returns the EIP-712 typehash of OfferTree(Offer[2]...[2] offerTree) with height levels.
-    /// @dev Same as keccak256(bytes.concat("OfferTree(Offer[2]...[2] offerTree)", COLLATERAL_PARAMS_TYPE,
-    /// MARKET_TYPE, OFFER_TYPE)).
+    /// @dev Same as keccak256(bytes.concat("OfferTree(Offer[2]...[2] offerTree)", COLLATERAL_PARAMS_TYPE, MARKET_TYPE, OFFER_TYPE)).
     /// @dev Reverts if height is greater than 20.
     function offerTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height <= 10) {
@@ -51,11 +50,8 @@ library HashLib {
         }
     }
 
-    /// @dev Returns the EIP-712 typehash of SetIsRootRatified(address maker,PriceRatifierV1Offer[2]...[2]
-    /// offerTree,bool newIsRootRatified,uint128 nonce,uint256 deadline) with height levels.
-    /// @dev Same as keccak256(bytes.concat("SetIsRootRatified(address maker,PriceRatifierV1Offer[2]...[2]
-    /// offerTree,bool newIsRootRatified,uint128 nonce,uint256 deadline)", COLLATERAL_PARAMS_TYPE, MARKET_TYPE,
-    /// PRICE_RATIFIER_V1_OFFER_TYPE)), where PriceRatifierV1Offer encodes an Offer with an `allowedTaker` (address).
+    /// @dev Returns the EIP-712 typehash of SetIsRootRatified(address maker,PriceRatifierV1Offer[2]...[2] offerTree,bool newIsRootRatified,uint128 nonce,uint256 deadline) with height levels.
+    /// @dev Same as keccak256(bytes.concat("SetIsRootRatified(address maker,PriceRatifierV1Offer[2]...[2] offerTree,bool newIsRootRatified,uint128 nonce,uint256 deadline)", COLLATERAL_PARAMS_TYPE, MARKET_TYPE, PRICE_RATIFIER_V1_OFFER_TYPE)), where PriceRatifierV1Offer encodes an Offer with an `allowedTaker` (address).
     /// @dev Reverts if height is greater than 20.
     function priceRatifierV1OfferTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height <= 10) {
@@ -85,12 +81,8 @@ library HashLib {
         }
     }
 
-    /// @dev Returns the EIP-712 typehash of SetIsRootRatified(address maker,RateRatifierV1Offer[2]...[2]
-    /// offerTree,bool newIsRootRatified,uint128 nonce,uint256 deadline) with height levels.
-    /// @dev Same as keccak256(bytes.concat("SetIsRootRatified(address maker,RateRatifierV1Offer[2]...[2]
-    /// offerTree,bool newIsRootRatified,uint128 nonce,uint256 deadline)", COLLATERAL_PARAMS_TYPE, MARKET_TYPE,
-    /// RATE_RATIFIER_V1_OFFER_TYPE)), where RateRatifierV1Offer encodes an Offer with `tick` replaced by
-    /// `rate` (uint256) and an `allowedTaker` (address).
+    /// @dev Returns the EIP-712 typehash of SetIsRootRatified(address maker,RateRatifierV1Offer[2]...[2] offerTree,bool newIsRootRatified,uint128 nonce,uint256 deadline) with height levels.
+    /// @dev Same as keccak256(bytes.concat("SetIsRootRatified(address maker,RateRatifierV1Offer[2]...[2] offerTree,bool newIsRootRatified,uint128 nonce,uint256 deadline)", COLLATERAL_PARAMS_TYPE, MARKET_TYPE, RATE_RATIFIER_V1_OFFER_TYPE)), where RateRatifierV1Offer encodes an Offer with `tick` replaced by `rate` (uint256) and an `allowedTaker` (address).
     /// @dev Reverts if height is greater than 20.
     function rateRatifierV1OfferTreeTypeHash(uint256 height) internal pure returns (bytes32) {
         if (height <= 10) {

@@ -37,8 +37,7 @@ definition WAD() returns uint256 = 10 ^ 18;
 
 definition zeroFloorSub(uint256 a, uint256 b) returns mathint = a >= b ? a - b : 0;
 
-// Monotonic clock: the greatest block.timestamp observed so far. block.timestamp only increases,
-// so this lower-bounds every future timestamp. Persistent so callbacks cannot havoc it.
+// Monotonic clock: the greatest block.timestamp observed so far. block.timestamp only increases, so this lower-bounds every future timestamp. Persistent so callbacks cannot havoc it.
 persistent ghost uint256 lastTimestamp;
 
 hook TIMESTAMP() uint newTimestamp {
@@ -123,8 +122,7 @@ strong invariant maturityBoundedById(bytes32 id)
 
 /// RULES ///
 
-/// The up-to-date face value of a lender's position (credit - pendingFee) can only change by
-/// withdrawing, taking, or liquidating. Every other function leaves it unchanged.
+/// The up-to-date face value of a lender's position (credit - pendingFee) can only change by withdrawing, taking, or liquidating. Every other function leaves it unchanged.
 rule netCreditUnaffected(env e, method f, calldataarg args, Midnight.Market market, address user)
 filtered {
     f -> !f.isView
@@ -199,8 +197,7 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
     assert user == seller => netCreditAfter <= netCreditBefore;
 }
 
-/// Liquidating does not change any user's net credit as long as no bad debt is realized on the same market,
-/// i.e. the market loss factor is unchanged by the liquidation.
+/// Liquidating does not change any user's net credit as long as no bad debt is realized on the same market, i.e. the market loss factor is unchanged by the liquidation.
 rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidateMarket, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
     uint128 lossFactorBefore = lossFactor(id);

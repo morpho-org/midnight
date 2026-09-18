@@ -7,9 +7,7 @@ import {IMidnight, Offer} from "../interfaces/IMidnight.sol";
 import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {HashLib} from "./libraries/HashLib.sol";
 
-/// @dev This ratifier checks that the offer has been ratified by an authorized address in a Merkle tree of offers.
-/// To that end, it expects the ratifier data to contain the root of the tree, the leaf index of the offer in the tree,
-/// and the proof of the offer in the tree.
+/// @dev This ratifier checks that the offer has been ratified by an authorized address in a Merkle tree of offers. To that end, it expects the ratifier data to contain the root of the tree, the leaf index of the offer in the tree, and the proof of the offer in the tree.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each hash order during merkle proof verification.
 /// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
@@ -22,8 +20,7 @@ contract SetterRatifier is ISetterRatifier {
         MIDNIGHT = _midnight;
     }
 
-    /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a
-    /// tree might not be ratified or unratified by a single call to this function.
+    /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a tree might not be ratified or unratified by a single call to this function.
     function setIsRootRatified(address maker, bytes32 root, bool newIsRootRatified) external {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         isRootRatified[maker][root] = newIsRootRatified;

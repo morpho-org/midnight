@@ -29,8 +29,7 @@ methods {
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function UtilsLib.countBits(uint128) internal returns (uint256) => NONDET;
 
-    // Use ghost function summaries (deterministic: same inputs → same output) so that calling
-    // updatePositionView twice on unchanged storage returns the same credit value.
+    // Use ghost function summaries (deterministic: same inputs → same output) so that calling updatePositionView twice on unchanged storage returns the same credit value.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 z) internal returns (uint256) => ghostMulDivDown(x, y, z);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 z) internal returns (uint256) => ghostMulDivUp(x, y, z);
 

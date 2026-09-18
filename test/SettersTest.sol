@@ -334,8 +334,7 @@ contract SettersTest is BaseTest {
         uint256 lltv = 0.5e18;
         midnight.enableLltv(lltv);
 
-        // maxLif = 1998001998001998001, which is <= 2 WAD (so InvalidMaxLif passes) but
-        // lltv * maxLif = 999000999000999000.5e18 > 0.999e18 * WAD, so MaxLifTooHigh trips.
+        // maxLif = 1998001998001998001, which is <= 2 WAD (so InvalidMaxLif passes) but lltv * maxLif = 999000999000999000.5e18 > 0.999e18 * WAD, so MaxLifTooHigh trips.
         uint256 _maxLif = maxLif(lltv, liquidationCursor);
         assertLe(_maxLif, 2 * WAD, "maxLif below two WAD");
         assertGt(lltv * _maxLif, 0.999 ether * WAD, "lltv * maxLif above bound");
