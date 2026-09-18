@@ -18,8 +18,7 @@ import {ERC20Lib} from "../libraries/ERC20Lib.sol";
 /// @dev This contract is meant to be used as a Midnight buy offer callback in order to park funds on a Blue market while the offer waits to be taken.
 /// @dev The positions on the Blue markets are acquired through supplies on behalf of this contract (permissionless).
 /// @dev The OWNER can withdraw this position on Blue, for example if the offer expired.
-/// @dev The OWNER can also authorize other accounts (optionally with signature), typically useful for
-/// bundle contracts.
+/// @dev The OWNER can also authorize other accounts (optionally with signature), typically useful for bundle contracts.
 /// @dev Inherits the token safety requirements of Midnight (see Midnight.sol).
 /// @dev Anyone authorized by the owner on Midnight can pull this contract's Blue positions through a take on Midnight on behalf of OWNER.
 /// @dev An account authorized on Blue to act on behalf of this contract can notably borrow on its behalf, which is not the expected use-case, but it is not explicitly prevented because it does not affect onBuy.
