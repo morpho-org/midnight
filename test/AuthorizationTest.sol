@@ -13,7 +13,6 @@ import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 contract AuthorizationTest is BaseTest {
     using UtilsLib for uint256;
 
-
     Market internal market;
     bytes32 internal id;
 
