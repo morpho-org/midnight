@@ -16,8 +16,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev Hashing offers as in EIP-712, which allows clear signing of the tree in setIsRootRatifiedWithSig, credits to Seaport for this mechanism.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed ratifications are no longer valid.
 /// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
-/// @dev All offers in a tree are expected to share the same maker and ratifier.
-/// Otherwise all offers in a tree might not be ratified or unratified by a single call to either root setter.
+/// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a tree might not be ratified or unratified by a single call to either root setter.
 contract PriceRatifierV1 is IPriceRatifierV1 {
     address public immutable MIDNIGHT;
 

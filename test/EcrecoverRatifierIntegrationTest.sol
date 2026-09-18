@@ -11,8 +11,7 @@ import {TickLib, MAX_TICK} from "../src/libraries/TickLib.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
-/// @dev Tests covering the merkle/signature flow of `EcrecoverRatifier` end-to-end via `Midnight.take`.
-/// `EcrecoverRatifierTest` covers the ratifier in isolation; this file pins the integration with Midnight.
+/// @dev Tests covering the merkle/signature flow of `EcrecoverRatifier` end-to-end via `Midnight.take`. `EcrecoverRatifierTest` covers the ratifier in isolation; this file pins the integration with Midnight.
 contract EcrecoverRatifierIntegrationTest is BaseTest {
     using UtilsLib for uint256;
 
