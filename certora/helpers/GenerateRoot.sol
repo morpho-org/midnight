@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 
 import {OfferTree} from "./OfferTree.sol";
 import {Offer} from "../../src/interfaces/IMidnight.sol";
-import {HashLib} from "../../src/ratifiers/libraries/HashLib.sol";
 
 contract GenerateRoot is OfferTree {
     // Build a perfect tree from a non-empty power-of-two list. Duplicate hashes share nodes.
@@ -13,24 +12,14 @@ contract GenerateRoot is OfferTree {
 
         bytes32[] memory level = new bytes32[](leaves.length);
         for (uint256 i = 0; i < leaves.length; i++) {
-            bytes32 leafHash = HashLib.hashOffer(leaves[i]);
-            if (isEmpty(tree[leafHash])) {
-                newLeaf(leaves[i]);
-            }
-            level[i] = leafHash;
+            level[i] = newLeaf(leaves[i]);
         }
 
         uint256 levelLength = level.length;
         while (levelLength > 1) {
             levelLength /= 2;
             for (uint256 i = 0; i < levelLength; i++) {
-                bytes32 left = level[2 * i];
-                bytes32 right = level[2 * i + 1];
-                bytes32 nodeHash = HashLib.hashNode(left, right);
-                if (isEmpty(nodeHash)) {
-                    newInternalNode(left, right);
-                }
-                level[i] = nodeHash;
+                level[i] = newInternalNode(level[2 * i], level[2 * i + 1]);
             }
         }
 

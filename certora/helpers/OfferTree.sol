@@ -37,11 +37,12 @@ contract OfferTree {
     // Every populated node is keyed by its hash.
     mapping(bytes32 => Node) internal tree;
 
-    function newLeaf(Offer memory offer) public {
-        bytes32 id = HashLib.hashOffer(offer);
+    // Create a leaf or return its existing hash ID.
+    function newLeaf(Offer memory offer) public returns (bytes32 id) {
+        id = HashLib.hashOffer(offer);
         require(id != 0, "id is the zero bytes");
         Node storage n = tree[id];
-        require(isEmpty(n), "leaf is not empty");
+        if (!isEmpty(n)) return id;
         Leaf storage l = n.leaf;
         l.marketHash = HashLib.hashMarket(offer.market);
         l.buy = offer.buy;
@@ -61,6 +62,7 @@ contract OfferTree {
         n.hash = id;
     }
 
+    // Create an internal node or return its existing hash ID.
     function newInternalNode(bytes32 left, bytes32 right) public returns (bytes32 id) {
         bytes32 leftHash = tree[left].hash;
         bytes32 rightHash = tree[right].hash;
@@ -69,7 +71,7 @@ contract OfferTree {
         id = HashLib.hashNode(leftHash, rightHash);
         require(id != 0, "zero hash");
         Node storage n = tree[id];
-        require(isEmpty(n), "node already populated");
+        if (!isEmpty(n)) return id;
         n.left = left;
         n.right = right;
         n.hash = id;
