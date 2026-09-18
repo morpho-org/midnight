@@ -4,17 +4,20 @@ pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {GenerateRoot} from "../certora/helpers/GenerateRoot.sol";
+import {OfferTree} from "../certora/helpers/OfferTree.sol";
 import {Offer} from "../src/interfaces/IMidnight.sol";
 import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
 contract OfferTreeTest is Test {
-    GenerateRoot internal tree;
+    OfferTree internal tree;
+    GenerateRoot internal rootReference;
 
     function setUp() public {
-        tree = new GenerateRoot();
+        tree = new OfferTree();
+        rootReference = new GenerateRoot();
     }
 
-    function testGenerateRootWithPrebuiltSubtree(uint256 leftTick, uint256 rightTick) public {
+    function testGenerateRootMatchesOfferTree(uint256 leftTick, uint256 rightTick) public {
         Offer memory leftOffer;
         leftOffer.tick = leftTick;
         Offer memory rightOffer;
@@ -24,14 +27,14 @@ contract OfferTreeTest is Test {
         assertEq(tree.newLeaf(leftOffer), left);
         assertEq(tree.newLeaf(rightOffer), right);
         assertEq(tree.newLeaf(leftOffer), left);
-        assertEq(tree.getHash(left), left);
+        assertFalse(tree.isEmpty(left));
         assertTrue(tree.isLeafNode(left));
         assertTrue(tree.isWellFormed(left));
 
         bytes32 parent = tree.newInternalNode(left, right);
         assertEq(parent, keccak256(abi.encode(left, right)));
         assertEq(tree.newInternalNode(left, right), parent);
-        assertEq(tree.getHash(parent), parent);
+        assertFalse(tree.isEmpty(parent));
         assertTrue(tree.isWellFormed(parent));
 
         Offer[] memory offers = new Offer[](4);
@@ -39,9 +42,11 @@ contract OfferTreeTest is Test {
         offers[1] = rightOffer;
         offers[2] = leftOffer;
         offers[3] = rightOffer;
-        bytes32 root = tree.generateRoot(offers);
+        bytes32 root = rootReference.generateRoot(offers);
         assertEq(root, keccak256(abi.encode(parent, parent)));
-        assertEq(tree.getHash(root), root);
+        assertTrue(tree.isEmpty(root));
+        assertEq(tree.newInternalNode(parent, parent), root);
+        assertFalse(tree.isEmpty(root));
         assertTrue(tree.isWellFormed(root));
 
         bytes32[] memory proof = new bytes32[](2);
@@ -50,21 +55,20 @@ contract OfferTreeTest is Test {
             proof[0] = i % 2 == 0 ? right : left;
             assertTrue(HashLib.isLeaf(root, HashLib.hashOffer(offers[i]), i, proof));
         }
-        assertEq(tree.generateRoot(offers), root);
+        assertEq(rootReference.generateRoot(offers), root);
     }
 
-    function testGenerateRootWithDuplicateSiblings() public {
+    function testGenerateRootWithDuplicateSiblings() public view {
         Offer[] memory offers = new Offer[](4);
         bytes32 leaf = HashLib.hashOffer(offers[0]);
         bytes32 parent = keccak256(abi.encode(leaf, leaf));
         bytes32 expectedRoot = keccak256(abi.encode(parent, parent));
 
-        assertEq(tree.generateRoot(offers), expectedRoot);
-        assertEq(tree.getHash(parent), parent);
-        assertEq(tree.getHash(expectedRoot), expectedRoot);
-        assertTrue(tree.isWellFormed(parent));
-        assertTrue(tree.isWellFormed(expectedRoot));
-        assertEq(tree.generateRoot(offers), expectedRoot);
+        assertEq(rootReference.generateRoot(offers), expectedRoot);
+        assertTrue(tree.isEmpty(leaf));
+        assertTrue(tree.isEmpty(parent));
+        assertTrue(tree.isEmpty(expectedRoot));
+        assertEq(rootReference.generateRoot(offers), expectedRoot);
     }
 
     function testNewInternalNodeRequiresPopulatedChildren() public {
@@ -78,6 +82,7 @@ contract OfferTreeTest is Test {
         tree.newInternalNode(leaf, bytes32(0));
 
         bytes32 parent = tree.newInternalNode(leaf, leaf);
-        assertEq(tree.getHash(parent), parent);
+        assertFalse(tree.isEmpty(parent));
+        assertTrue(tree.isWellFormed(parent));
     }
 }

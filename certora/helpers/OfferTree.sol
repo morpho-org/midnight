@@ -85,10 +85,6 @@ contract OfferTree {
         return isEmpty(tree[id]);
     }
 
-    function getHash(bytes32 id) public view returns (bytes32) {
-        return tree[id].hash;
-    }
-
     function isLeafNode(bytes32 id) public view returns (bool) {
         return tree[id].left == 0 && tree[id].right == 0 && tree[id].hash != 0;
     }
