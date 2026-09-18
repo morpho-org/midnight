@@ -21,9 +21,8 @@ methods {
     function _.price() external => CVL_oraclePrice(calledContract) expect(uint256);
 
     // Gates: routed through CVL functions using calledContract to identify which gate is being called.
-    // Return values are deterministic per gate address via ghost functions, so
-    // rules can constrain a specific gate's return value without affecting other gates. Each call can also
-    // nondeterministically revert, modeling that external gates can fail for any reason.
+    // Return values are deterministic per gate address via ghost functions, so rules can constrain a specific gate's return value without affecting other gates.
+    // Each call can also nondeterministically revert, modeling that external gates can fail for any reason.
     function _.canIncreaseCredit(address) external => summaryCanIncreaseCredit(calledContract) expect(bool);
     function _.canIncreaseDebt(address) external => summaryCanIncreaseDebt(calledContract) expect(bool);
     function _.canLiquidate(address) external => summaryCanLiquidate(calledContract) expect(bool);

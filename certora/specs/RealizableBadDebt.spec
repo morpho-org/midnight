@@ -80,7 +80,8 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
 rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight.Market market, address borrower) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     bytes32 id = summaryToId(market);
 
-    // if seller is locked, they can create a position with bad debt.  In that case the position must be healthy when the lock is removed later and no bad debt can be realized.
+    // If seller is locked, they can create a position with bad debt.
+    // In that case the position must be healthy when the lock is removed later and no bad debt can be realized.
     require !liquidationLocked(id, borrower), "scope out the re-entrant case";
 
     require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA)";

@@ -59,7 +59,9 @@ hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (ui
     sumDebt[id] = sumDebt[id] - to_mathint(oldDebt) + to_mathint(newDebt);
 }
 
-// Monotonic clock: the greatest block.timestamp observed so far. block.timestamp only increases, so this lower-bounds every future timestamp. Persistent so callbacks cannot havoc it.
+// Monotonic clock: the greatest block.timestamp observed so far.
+// block.timestamp only increases, so this lower-bounds every future timestamp.
+// Persistent so callbacks cannot havoc it.
 persistent ghost uint256 lastTimestamp;
 
 hook TIMESTAMP() uint newTimestamp {

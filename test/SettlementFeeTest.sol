@@ -15,7 +15,10 @@ uint256 constant MAX_DEBT = MAX_TEST_AMOUNT * 3 / 4;
 
 uint256 constant MIN_SELLER_PRICE = 0.5e18;
 
-// In sell tests, sellerPrice = buyerPrice - settlementFee, so the minimum effective price is MIN_SELLER_PRICE - maxSettlementFee. Price conversion amplifies assets by up to WAD / minPrice. Combined with the collateral constraint: assets * WAD / minPrice * 4/3 <= type(uint128).max. Uses 0.005e18 which is maxSettlementFee(6), the biggest max settlement fee.
+// In sell tests, sellerPrice = buyerPrice - settlementFee, so the minimum effective price is MIN_SELLER_PRICE - maxSettlementFee.
+// Price conversion amplifies assets by up to WAD / minPrice.
+// Combined with the collateral constraint: assets * WAD / minPrice * 4/3 <= type(uint128).max.
+// Uses 0.005e18 which is maxSettlementFee(6), the biggest max settlement fee.
 uint256 constant MAX_ASSETS = MAX_TEST_AMOUNT * (MIN_SELLER_PRICE - 0.005e18) / WAD * 3 / 4;
 
 contract SettlementFeeTest is BaseTest {

@@ -136,7 +136,8 @@ definition cvlPendingFee(bytes32 id, address owner) returns uint128 = currentCon
 
 definition cvlLastAccrual(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].lastAccrual;
 
-// Body of the strong invariant. The aggregate product is routed through the uninterpreted `multiply` (== sumPreciseCreditDivIndex[id] * mapFactor(...)).
+// Body of the strong invariant.
+// The aggregate product is routed through the uninterpreted `multiply` (== sumPreciseCreditDivIndex[id] * mapFactor(...)).
 definition sumOfCreditsBody(bytes32 id) returns bool = multiply(sumPreciseCreditDivIndex[id], mapFactor(lossFactor(id))) <= multiply(totalUnits(id), PRECISION) - multiply(continuousFeeCredit(id), PRECISION);
 
 /// HOOKS ///
@@ -168,7 +169,9 @@ function checkCreditDivInvariant(bytes32 id, address owner) returns bool {
     uint128 userIndex = cvlLastLossFactor(id, owner);
     mathint mappedIndex = mapFactor(userIndex);
 
-    // Per-user invariant stays in REAL-product form: it is per-user (cheap) and the hook's division-exactness genuinely needs real arithmetic. Abstracting it to multiply weakened this ASSUMED invariant enough to make a fully-slashed store (mapFactor==0, credit!=0) reachable, breaking the hook assert. Only the AGGREGATE (sumOfCreditsBody) is abstracted.
+    // Per-user invariant stays in REAL-product form: it is per-user (cheap) and the hook's division-exactness genuinely needs real arithmetic.
+    // Abstracting it to multiply weakened this ASSUMED invariant enough to make a fully-slashed store (mapFactor==0, credit!=0) reachable, breaking the hook assert.
+    // Only the AGGREGATE (sumOfCreditsBody) is abstracted.
     return mappedIndex == 0 || credit == 0 ? preciseCreditDivIndex[id][owner] == 0 : multiply(preciseCreditDivIndex[id][owner], mappedIndex) == multiply(credit, PRECISION);
 }
 

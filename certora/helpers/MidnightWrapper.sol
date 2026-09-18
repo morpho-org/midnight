@@ -12,7 +12,7 @@ contract MidnightWrapper is Midnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
 
-    /* This isHealthy function iterates over all collateralParams, it doesn't use the collateral bitmap. */
+    // This isHealthy function iterates over all collateralParams, it doesn't use the collateral bitmap.
 
     function isHealthyNoBitmap(Market memory market, bytes32 id, address borrower) public view returns (bool) {
         Position storage _position = position[id][borrower];
@@ -32,10 +32,9 @@ contract MidnightWrapper is Midnight {
         return maxDebt >= debt;
     }
 
-    /* maxRepaidFor recomputes the repay-cap-factor cap of Midnight.liquidate through a bitmap-free,
-     * array-based code path. maxDebt is summed exactly as in isHealthyNoBitmap and the liquidate bad-debt
-     * loop, then the cap's mulDivUp is applied with lif = maxLif (normal mode).
-     * Expects the position to be unhealthy (debt > maxDebt) so that debt - maxDebt does not underflow. */
+    // maxRepaidFor recomputes the repay-cap-factor cap of Midnight.liquidate through a bitmap-free, array-based code path.
+    // maxDebt is summed exactly as in isHealthyNoBitmap and the liquidate bad-debt loop, then the cap's mulDivUp is applied with lif = maxLif (normal mode).
+    // Expects the position to be unhealthy (debt > maxDebt) so that debt - maxDebt does not underflow.
     function maxRepaidFor(Market memory market, bytes32 id, uint256 collateralIndex, address borrower)
         public
         view
@@ -59,9 +58,8 @@ contract MidnightWrapper is Midnight {
         return (debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv);
     }
 
-    /* Compute the maxDebt a user can have to be still considered healthy.  This uses the same math as
-     * isHealthyNoBitmap.
-     */
+    // Compute the maxDebt a user can have to be still considered healthy.
+    // This uses the same math as isHealthyNoBitmap.
     function maxDebtFor(Market memory market, bytes32 id, address borrower) public view returns (uint256) {
         Position storage _position = position[id][borrower];
         uint256 maxDebt;

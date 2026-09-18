@@ -26,7 +26,8 @@ methods {
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
-    // maxLif is recomputed on the fly from (lltv, liquidationCursor) during liquidate. Summarize it by a deterministic ghost; its lltv * maxLif <= WAD * WAD bound is assumed below (see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec).
+    // maxLif is recomputed on the fly from (lltv, liquidationCursor) during liquidate.
+    // Summarize it by a deterministic ghost; its lltv * maxLif <= WAD * WAD bound is assumed below (see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec).
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
     function _.havocAll() external => HAVOC_ALL;
 
