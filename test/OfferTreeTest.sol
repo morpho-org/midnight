@@ -58,16 +58,38 @@ contract OfferTreeTest is Test {
         assertEq(rootReference.generateRoot(offers), root);
     }
 
+    function testGenerateRootWithDuplicatePair() public view {
+        Offer[] memory offers = new Offer[](2);
+        bytes32 leaf = HashLib.hashOffer(offers[0]);
+        bytes32 expectedRoot = keccak256(abi.encode(leaf, leaf));
+        bytes32 root = rootReference.generateRoot(offers);
+        assertEq(root, expectedRoot);
+
+        bytes32[] memory proof = new bytes32[](1);
+        proof[0] = leaf;
+        for (uint256 i = 0; i < offers.length; i++) {
+            assertTrue(HashLib.isLeaf(root, HashLib.hashOffer(offers[i]), i, proof));
+        }
+    }
+
     function testGenerateRootWithDuplicateSiblings() public view {
         Offer[] memory offers = new Offer[](4);
         bytes32 leaf = HashLib.hashOffer(offers[0]);
         bytes32 parent = keccak256(abi.encode(leaf, leaf));
         bytes32 expectedRoot = keccak256(abi.encode(parent, parent));
 
-        assertEq(rootReference.generateRoot(offers), expectedRoot);
+        bytes32 root = rootReference.generateRoot(offers);
+        assertEq(root, expectedRoot);
         assertTrue(tree.isEmpty(leaf));
         assertTrue(tree.isEmpty(parent));
         assertTrue(tree.isEmpty(expectedRoot));
+
+        bytes32[] memory proof = new bytes32[](2);
+        proof[0] = leaf;
+        proof[1] = parent;
+        for (uint256 i = 0; i < offers.length; i++) {
+            assertTrue(HashLib.isLeaf(root, HashLib.hashOffer(offers[i]), i, proof));
+        }
         assertEq(rootReference.generateRoot(offers), expectedRoot);
     }
 
