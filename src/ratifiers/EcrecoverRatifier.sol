@@ -8,7 +8,8 @@ import {CALLBACK_SUCCESS} from "../libraries/ConstantsLib.sol";
 import {HashLib} from "./libraries/HashLib.sol";
 
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed offers are no longer valid.
-/// @dev This ratifier checks that the offer has been signed by an authorized address in a Merkle tree of offers. To that end, it expects the ratifier data to contain the signature, the root of the tree, the leaf index of the offer, and the proof of the offer in the tree.
+/// @dev This ratifier checks that the offer has been signed by an authorized address in a Merkle tree of offers.
+/// To that end, it expects the ratifier data to contain the signature, the root of the tree, the leaf index of the offer, and the proof of the offer in the tree.
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each sibling's left/right position.
 /// @dev Hashing offers as in EIP-712, which allows clear signing of the tree, credits to Seaport for this mechanism.
@@ -22,7 +23,8 @@ contract EcrecoverRatifier is IEcrecoverRatifier {
         MIDNIGHT = _midnight;
     }
 
-    /// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a tree might not be cancelled by a single call to this function.
+    /// @dev All offers in a tree are expected to share the same maker and ratifier.
+    /// Otherwise all offers in a tree might not be cancelled by a single call to this function.
     function cancelRoot(address maker, bytes32 root) external {
         require(maker == msg.sender || IMidnight(MIDNIGHT).isAuthorized(maker, msg.sender), Unauthorized());
         isRootCanceled[maker][root] = true;

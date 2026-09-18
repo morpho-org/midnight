@@ -46,7 +46,8 @@ contract ContinuousFeeTest is BaseTest {
         midnight.setIsAuthorized(address(this), true, otherBorrower);
     }
 
-    /// @dev Sets up a lend + borrow position. After: lender.pendingFee = credit * feeRate * ttm / WAD, borrower.pendingFee = 0.
+    /// @dev Sets up a lend + borrow position.
+    /// After: lender.pendingFee = credit * feeRate * ttm / WAD, borrower.pendingFee = 0.
     function setupLender(uint256 credit, uint256 feeRate, uint256 ttm) internal {
         market.maturity = vm.getBlockTimestamp() + ttm;
         id = toId(market);
