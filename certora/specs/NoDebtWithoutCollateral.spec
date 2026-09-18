@@ -5,8 +5,8 @@
 //   position[id][user].collateralBitmap == 0  =>  position[id][user].debt == 0
 // Combined with `nonZeroCollateralsAreActivated` (proved in CollateralBitmap.spec), this implies the full semantic property: no position can have collateral[i] == 0 for every i while having debt > 0.
 // The spec is verified under two confs because the two halves need opposite call modelings:
-// - NoDebtWithoutCollateralNative.conf (-havocAllByDefault true): proves the strong invariant `lockedOrNoDebtWithoutCollateral`. HAVOC_ALL at every external call is the sound modeling of reentrancy on the *regular* storage (debt/bitmap).
-// - NoDebtWithoutCollateralNativeLock.conf (no -havocAllByDefault): proves the lock facts `liquidationLockClearedAtBoundary` and `liquidationLockNeutral`. The default AUTO summary (HAVOC_ECF for state-changers, NONDET for views) leaves currentContract storage untouched, which is faithful for the transient lock: an external callee cannot tstore Midnight's transient namespace, and reentrant Midnight code restores the lock (proved by `liquidationLockNeutral`).
+// - NoDebtWithoutCollateral.conf (-havocAllByDefault true): proves the strong invariant `lockedOrNoDebtWithoutCollateral`. HAVOC_ALL at every external call is the sound modeling of reentrancy on the *regular* storage (debt/bitmap).
+// - NoDebtWithoutCollateralNativeECF.conf (no -havocAllByDefault): proves the lock facts `liquidationLockClearedAtBoundary` and `liquidationLockNeutral`. The default AUTO summary (HAVOC_ECF for state-changers, NONDET for views) leaves currentContract storage untouched, which is faithful for the transient lock: an external callee cannot tstore Midnight's transient namespace, and reentrant Midnight code restores the lock (proved by `liquidationLockNeutral`).
 // The structure of the proof is: assume external calls leave the lock unchanged, prove every method does, conclude by induction.
 
 import "BitmapSummaries.spec";
