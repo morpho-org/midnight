@@ -13,8 +13,7 @@ import {
 /// @dev Each side has its own role setter and whitelisters.
 /// @dev A side can be made open at deployment, letting any account enter on that side (forever).
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
-/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are
-/// no longer valid.
+/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are no longer valid.
 contract WhitelistEnterGate is IWhitelistEnterGate {
     /// STORAGE ///
     bool public immutable CREDIT_OPEN;
@@ -104,8 +103,7 @@ contract WhitelistEnterGate is IWhitelistEnterGate {
     /// MULTICALL ///
 
     /// @dev Useful for EOAs to batch privileged calls.
-    /// @dev Does not return anything, because accounts who would use the return data would be contracts, which can do
-    /// the multicall themselves.
+    /// @dev Does not return anything, because accounts who would use the return data would be contracts, which can do the multicall themselves.
     function multicall(bytes[] calldata data) external {
         for (uint256 i = 0; i < data.length; i++) {
             (bool success, bytes memory returnData) = address(this).delegatecall(data[i]);

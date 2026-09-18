@@ -12,7 +12,7 @@ contract MidnightWrapper is Midnight {
     using UtilsLib for uint256;
     using UtilsLib for uint128;
 
-    /* This isHealthy function iterates over all collateralParams, it doesn't use the collateral bitmap. */
+    // This isHealthy function iterates over all collateralParams, it doesn't use the collateral bitmap.
 
     function isHealthyNoBitmap(Market memory market, bytes32 id, address borrower) public view returns (bool) {
         Position storage _position = position[id][borrower];
@@ -32,10 +32,9 @@ contract MidnightWrapper is Midnight {
         return maxDebt >= debt;
     }
 
-    /* maxRepaidFor recomputes the repay-cap-factor cap of Midnight.liquidate through a bitmap-free,
-     * array-based code path. maxDebt is summed exactly as in isHealthyNoBitmap and the liquidate bad-debt
-     * loop, then the cap's mulDivUp is applied with lif = maxLif (normal mode).
-     * Expects the position to be unhealthy (debt > maxDebt) so that debt - maxDebt does not underflow. */
+    // maxRepaidFor recomputes the repay-cap-factor cap of Midnight.liquidate through a bitmap-free, array-based code path.
+    // maxDebt is summed exactly as in isHealthyNoBitmap and the liquidate bad-debt loop, then the cap's mulDivUp is applied with lif = maxLif (normal mode).
+    // Expects the position to be unhealthy (debt > maxDebt) so that debt - maxDebt does not underflow.
     function maxRepaidFor(Market memory market, bytes32 id, uint256 collateralIndex, address borrower)
         public
         view
@@ -59,9 +58,8 @@ contract MidnightWrapper is Midnight {
         return (debt - maxDebt).mulDivUp(WAD * WAD, WAD * WAD - lif * lltv);
     }
 
-    /* Compute the maxDebt a user can have to be still considered healthy.  This uses the same math as
-     * isHealthyNoBitmap.
-     */
+    // Compute the maxDebt a user can have to be still considered healthy.
+    // This uses the same math as isHealthyNoBitmap.
     function maxDebtFor(Market memory market, bytes32 id, address borrower) public view returns (uint256) {
         Position storage _position = position[id][borrower];
         uint256 maxDebt;
@@ -77,16 +75,13 @@ contract MidnightWrapper is Midnight {
         return maxDebt;
     }
 
-    // This realizableBadDebt function recomputes, verbatim, the badDebt local that
-    // liquidate() computes at src/Midnight.sol:643-657, so that the prover can equate this
-    // getter's result with liquidate's inlined bad-debt computation.
+    // This realizableBadDebt function recomputes, verbatim, the badDebt local that liquidate() computes at src/Midnight.sol:643-657, so that the prover can equate this getter's result with liquidate's inlined bad-debt computation.
     //
     // realizableBadDebt(id, borrower)
     //   = zeroFloorSub(debt, SUM over active-collateral i of
     //       ceil(ceil(collateral_i * price_i / ORACLE_PRICE_SCALE) * WAD / maxLif_i)).
     //
-    // id is taken explicitly (mirroring isHealthyNoBitmap) and must be the id derived from
-    // market; the caller passes the matching Market, exactly as liquidate does.
+    // id is taken explicitly (mirroring isHealthyNoBitmap) and must be the id derived from market; the caller passes the matching Market, exactly as liquidate does.
     function realizableBadDebt(Market memory market, bytes32 id, address borrower) public view returns (uint256) {
         Position storage _position = position[id][borrower];
         uint256 badDebt = _position.debt;

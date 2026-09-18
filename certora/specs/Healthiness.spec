@@ -26,8 +26,8 @@ methods {
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
-    // maxLif is recomputed on the fly from (lltv, liquidationCursor) during liquidate. Summarize it by a deterministic ghost; its
-    // lltv * maxLif <= WAD * WAD bound is assumed below (see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec).
+    // maxLif is recomputed on the fly from (lltv, liquidationCursor) during liquidate.
+    // Summarize it by a deterministic ghost; its lltv * maxLif <= WAD * WAD bound is assumed below (see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec).
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
     function _.havocAll() external => HAVOC_ALL;
 
@@ -225,16 +225,13 @@ rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 se
     mathint collateralAfter = collateralBefore - seizedAssetsOut;
     mathint price = summaryPrice(globalMarket.collateralParams[collateralIndex].oracle);
 
-    // The liquidation incentive factor that liquidate() actually uses.  Post maturity it ramps from WAD up to
-    // maxLif over TIME_TO_MAX_LIF; expressing it as a CVL term lets us instantiate every mulDiv axiom at a
-    // ground term instead of quantifying over all arguments.
+    // The liquidation incentive factor that liquidate() actually uses.  Post maturity it ramps from WAD up to maxLif over TIME_TO_MAX_LIF; expressing it as a CVL term lets us instantiate every mulDiv axiom at a ground term instead of quantifying over all arguments.
     mathint maxLifValue = maxLifGhost(globalMarketCollateralLLTV[collateralIndex], globalMarketCollateralLiquidationCursor[collateralIndex]);
     mathint timeSinceMaturity = e.block.timestamp > globalMarket.maturity ? e.block.timestamp - globalMarket.maturity : 0;
     mathint lifCandidate = WAD() + (maxLifValue - WAD()) * timeSinceMaturity / TIME_TO_MAX_LIF();
     mathint lifValue = postMaturityMode ? (maxLifValue < lifCandidate ? maxLifValue : lifCandidate) : maxLifValue;
 
-    // seizedValue is the (rounded up) value of the seized collateral; repaidValue is the value the liquidator
-    // is entitled to seize for repaidUnits.  Both appear as the first argument of the axioms below.
+    // seizedValue is the (rounded up) value of the seized collateral; repaidValue is the value the liquidator is entitled to seize for repaidUnits.  Both appear as the first argument of the axioms below.
     mathint seizedValue = ghostMulDivUp(seizedAssetsOut, price, ORACLE_PRICE_SCALE());
     mathint repaidValue = ghostMulDivDown(repaidUnitsOut, lifValue, WAD());
 
@@ -322,9 +319,7 @@ rule liquidationLockedPreserved(env e, method f, calldataarg args) {
 weak invariant notLiquidationLocked()
     !liquidationLocked(globalId, globalBorrower);
 
-// Check that locked positions cannot be liquidated: for any liquidate() parameters
-// (other than the global market and borrower), the call must revert when the borrower
-// is liquidationLocked.
+// Check that locked positions cannot be liquidated: for any liquidate() parameters (other than the global market and borrower), the call must revert when the borrower is liquidationLocked.
 rule notLiquidatableWhenLocked(env e, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address receiver, address callbackAddr, bytes data, bool postMaturityMode) {
     Midnight.Market globalMarket = getGlobalMarket();
 

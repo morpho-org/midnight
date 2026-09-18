@@ -15,8 +15,7 @@
 //
 //   sumPreciseCreditDivIndex[id].mulDivDown(marketState[id].lossFactor, PRECISION)
 //
-// The global invariant we show is that this value is <= totalUnits - continuousFeeCredit, i.e. the lender positions are backed by
-// the sum of all debt and the withdrawable amount in the contract (see totalUnitsEqualsSumNegativeDebtPlusWithdrawable in Midnight.spec).
+// The global invariant we show is that this value is <= totalUnits - continuousFeeCredit, i.e. the lender positions are backed by the sum of all debt and the withdrawable amount in the contract (see totalUnitsEqualsSumNegativeDebtPlusWithdrawable in Midnight.spec).
 //
 // To avoid division we state the invariant as:
 //   multiply(sumPreciseCreditDivIndex[id], mapFactor(lossFactor(id))) <= multiply(totalUnits(id), PRECISION) - multiply(continuousFeeCredit(id), PRECISION);
@@ -37,9 +36,7 @@ methods {
     /// PRICE / ORACLE ///
     function _.price() external => NONDET;
 
-    /// MUL/DIV — exact mathint summaries (still needed for the parts of
-    /// withdraw / take outside `updatePositionView`, e.g. the proportional
-    /// pendingFee adjustment and the take buyer-fee accrual).
+    /// MUL/DIV — exact mathint summaries (still needed for the parts of withdraw / take outside `updatePositionView`, e.g. the proportional pendingFee adjustment and the take buyer-fee accrual).
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
@@ -139,8 +136,8 @@ definition cvlPendingFee(bytes32 id, address owner) returns uint128 = currentCon
 
 definition cvlLastAccrual(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].lastAccrual;
 
-// Body of the strong invariant. The aggregate product is routed through the
-// uninterpreted `multiply` (== sumPreciseCreditDivIndex[id] * mapFactor(...)).
+// Body of the strong invariant.
+// The aggregate product is routed through the uninterpreted `multiply` (== sumPreciseCreditDivIndex[id] * mapFactor(...)).
 definition sumOfCreditsBody(bytes32 id) returns bool = multiply(sumPreciseCreditDivIndex[id], mapFactor(lossFactor(id))) <= multiply(totalUnits(id), PRECISION) - multiply(continuousFeeCredit(id), PRECISION);
 
 /// HOOKS ///
@@ -172,11 +169,9 @@ function checkCreditDivInvariant(bytes32 id, address owner) returns bool {
     uint128 userIndex = cvlLastLossFactor(id, owner);
     mathint mappedIndex = mapFactor(userIndex);
 
-    // Per-user invariant stays in REAL-product form: it is per-user (cheap) and
-    // the hook's division-exactness genuinely needs real arithmetic. Abstracting
-    // it to multiply weakened this ASSUMED invariant enough to make a
-    // fully-slashed store (mapFactor==0, credit!=0) reachable, breaking the hook
-    // assert. Only the AGGREGATE (sumOfCreditsBody) is abstracted.
+    // Per-user invariant stays in REAL-product form: it is per-user (cheap) and the hook's division-exactness genuinely needs real arithmetic.
+    // Abstracting it to multiply weakened this ASSUMED invariant enough to make a fully-slashed store (mapFactor==0, credit!=0) reachable, breaking the hook assert.
+    // Only the AGGREGATE (sumOfCreditsBody) is abstracted.
     return mappedIndex == 0 || credit == 0 ? preciseCreditDivIndex[id][owner] == 0 : multiply(preciseCreditDivIndex[id][owner], mappedIndex) == multiply(credit, PRECISION);
 }
 
@@ -203,8 +198,7 @@ hook Sstore marketState[KEY bytes32 id].totalUnits uint128 newTotal (uint128 old
 
 /// SUMMARY OF updatePositionView ///
 //
-// Returns nondet (newCredit, newPendingFee, fee) constrained by the inequalities
-// proved by rule updatePositionViewReflectedByFactor in UpdatePositionView.spec
+// Returns nondet (newCredit, newPendingFee, fee) constrained by the inequalities proved by rule updatePositionViewReflectedByFactor in UpdatePositionView.spec
 function summaryUpdatePositionView(env e, bytes32 id, address user) returns (uint128, uint128, uint128) {
     uint128 oldCredit = cvlCredit(id, user);
     uint128 oldPendingFee = cvlPendingFee(id, user);
@@ -236,9 +230,7 @@ function summaryUpdatePositionView(env e, bytes32 id, address user) returns (uin
 strong invariant preciseCreditCorrect(bytes32 id, address owner)
     checkCreditDivInvariant(id, owner);
 
-// Parametric coverage of the sum invariant for all methods EXCEPT liquidate and
-// take, which are handled by their dedicated rules (sumOfCreditsLeTotalUnitsPreservedByLiquidate
-// and sumOfCreditsLeTotalUnitsPreservedByTake).
+// Parametric coverage of the sum invariant for all methods EXCEPT liquidate and take, which are handled by their dedicated rules (sumOfCreditsLeTotalUnitsPreservedByLiquidate and sumOfCreditsLeTotalUnitsPreservedByTake).
 strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
     sumOfCreditsBody(id)
     filtered { f -> f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
@@ -341,12 +333,10 @@ rule sumOfCreditsLeTotalUnitsPreservedByTake(bytes32 id, env e, uint256 units, a
     take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
     mathint tuPost = totalUnits(id);
 
-    // Compute the buyer credit increase. Note that updatePosition does
-    // not touch debt, so we can use this formula from Midnight.
+    // Compute the buyer credit increase. Note that updatePosition does not touch debt, so we can use this formula from Midnight.
     mathint buyerCreditIncrease = units > debtPre_b ? units - debtPre_b : 0;
 
-    // We do not have the credit of seller after updatePosition before take,
-    // but we can compute sellerCreditDecrease from totalUnits change.
+    // We do not have the credit of seller after updatePosition before take, but we can compute sellerCreditDecrease from totalUnits change.
     mathint sellerCreditDecrease = tuPre + buyerCreditIncrease - tuPost;
 
     // These distributivity axiom is needed because Midnight adds buyer and

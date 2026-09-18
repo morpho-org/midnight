@@ -46,8 +46,7 @@ contract ContinuousFeeTest is BaseTest {
         midnight.setIsAuthorized(address(this), true, otherBorrower);
     }
 
-    /// @dev Sets up a lend + borrow position. After: lender.pendingFee = credit * feeRate * ttm / WAD,
-    /// borrower.pendingFee = 0.
+    /// @dev Sets up a lend + borrow position. After: lender.pendingFee = credit * feeRate * ttm / WAD, borrower.pendingFee = 0.
     function setupLender(uint256 credit, uint256 feeRate, uint256 ttm) internal {
         market.maturity = vm.getBlockTimestamp() + ttm;
         id = toId(market);
@@ -480,8 +479,7 @@ contract ContinuousFeeTest is BaseTest {
 
     function testClaimContinuousFeeOnlyFeeClaimer(address caller) public {
         vm.assume(caller != feeClaimer);
-        // The fuzzed address must not be the market's SStore2 blob address: creating the market
-        // CREATE2-deploys there, and CREATE2 fails against an account that is not empty.
+        // The fuzzed address must not be the market's SStore2 blob address: creating the market CREATE2-deploys there, and CREATE2 fails against an account that is not empty.
         vm.assume(caller != address(uint160(uint256(toId(market)))));
         vm.prank(caller);
         vm.expectRevert(IMidnight.OnlyFeeClaimer.selector);

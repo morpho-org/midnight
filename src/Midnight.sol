@@ -20,25 +20,19 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Collaterals list must be sorted by collateral address (ascending, no duplicates), and not empty.
 /// @dev Within a market, a borrower can use at most MAX_COLLATERALS_PER_BORROWER (16) collaterals simultaneously.
 /// @dev The case LLTV = 1 is special, and should be used with care, notably:
-/// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In
-/// particular, the RCF (see LIQUIDATIONS section) is "inactive", meaning liquidations can always liquidate everything.
+/// - It has no overcollateralization, so unhealthy positions will almost always realize bad debt when liquidated. In particular, the RCF (see LIQUIDATIONS section) is "inactive", meaning liquidations can always liquidate everything.
 /// - It has no liquidation incentive, so liquidators repay at exactly the oracle price (plus roundings).
 /// @dev To check if a market has been touched, check if tickSpacing(marketId) > 0.
-/// @dev When some assets become withdrawable before maturity (after a repayment or a liquidation), there
-/// is an incentive to take resting sell offers with price < 1 (more precisely price < 1 - settlementFee) and withdraw
-/// instantly. Lenders (and the fee claimer) might also race to withdraw first.
+/// @dev When some assets become withdrawable before maturity (after a repayment or a liquidation), there is an incentive to take resting sell offers with price < 1 (more precisely price < 1 - settlementFee) and withdraw instantly. Lenders (and the fee claimer) might also race to withdraw first.
 ///
 /// MULTI-COLLATERAL MARKETS
-/// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to a health check on withdrawal. In
-/// particular, the borrowers of multi-collateral markets can completely change their collateral composition.
+/// @dev Borrowers can supply/withdraw their collaterals at any time, subject only to a health check on withdrawal. In particular, the borrowers of multi-collateral markets can completely change their collateral composition.
 /// @dev Liquidation reverts if any of the activated collaterals' oracle reverts (see LIVENESS).
-/// @dev The oracle-quoted liquidator incentive (i.e., maxRepayable * (LIF-1)) might not be constant across activated
-/// collaterals. Hence, liquidators may have a preference order over collaterals when liquidating.
+/// @dev The oracle-quoted liquidator incentive (i.e., maxRepayable * (LIF-1)) might not be constant across activated collaterals. Hence, liquidators may have a preference order over collaterals when liquidating.
 ///
 /// SETTLEMENT FEES
 /// @dev A default settlement fee (per loan token) is set on new markets. Then, the fee setter can override it.
-/// @dev The settlement fee is a piecewise linear function on the TTM (time to maturity). It is computed with linear
-/// approximation between breakpoints.
+/// @dev The settlement fee is a piecewise linear function on the TTM (time to maturity). It is computed with linear approximation between breakpoints.
 /// @dev Settlement fee breakpoint indices: 0=0d, 1=1d, 2=7d, 3=30d, 4=90d, 5=180d, 6=360d.
 /// @dev For TTM > 360d, the settlement fee is the fee at the 360d breakpoint.
 /// @dev Post-maturity, the settlement fee is the fee at the 0d breakpoint.
@@ -48,40 +42,27 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// CONTINUOUS FEES
 /// @dev A default continuous fee (per loan token) is set on new markets. Then, the fee setter can override it.
-/// @dev The fee is tracked per lender via pendingFee in each position. If the market's continuous fee changes, the
-/// pending fee of existing lenders is not updated (=> their fee is fixed). If the market's continuous fee is decreased
-/// lenders might self-take to exit and re-enter to reduce their pending fee (at the cost of the settlement fee).
+/// @dev The fee is tracked per lender via pendingFee in each position. If the market's continuous fee changes, the pending fee of existing lenders is not updated (=> their fee is fixed). If the market's continuous fee is decreased lenders might self-take to exit and re-enter to reduce their pending fee (at the cost of the settlement fee).
 /// @dev In the absence of bad debt realizations, the face value of a lender's position is credit - pendingFee.
-/// @dev An offer cannot be taken if its continuousFeeCap value is lower than the current market continuous fee.
-/// This ensures maker buyers can protect against future continuous fee increases.
+/// @dev An offer cannot be taken if its continuousFeeCap value is lower than the current market continuous fee. This ensures maker buyers can protect against future continuous fee increases.
 ///
 /// LIQUIDATIONS
-/// @dev Accounts are liquidatable only if they are either unhealthy or the maturity has passed. The liquidation
-/// shouldn't be locked either.
+/// @dev Accounts are liquidatable only if they are either unhealthy or the maturity has passed. The liquidation shouldn't be locked either.
 /// @dev Liquidations are locked for the seller during the callbacks of take.
 /// @dev Liquidations can revert for other reasons, see LIVENESS.
-/// @dev There are two liquidation modes: The "post-maturity mode", available after the market's maturity, and the
-/// "normal mode", available if the borrower is unhealthy. After maturity, an unhealthy borrower's liquidator can choose
-/// between both modes.
-/// @dev In the "normal mode", the liquidation incentive factor (LIF) is the computed maxLif and the liquidation amount
-/// is capped by what is needed to put back the position into health ("recovery close factor", or "RCF").
+/// @dev There are two liquidation modes: The "post-maturity mode", available after the market's maturity, and the "normal mode", available if the borrower is unhealthy. After maturity, an unhealthy borrower's liquidator can choose between both modes.
+/// @dev In the "normal mode", the liquidation incentive factor (LIF) is the computed maxLif and the liquidation amount is capped by what is needed to put back the position into health ("recovery close factor", or "RCF").
 /// @dev The RCF condition is (omitting scaling and roundings):
 ///   newDebt >= newMaxDebt <=> debt - repaidUnits >= maxDebt - repaidUnits*LIF*LLTV
 ///                         <=> repaidUnits <= (debt-maxDebt) / (1 - LIF*LLTV).
 /// @dev maxRepaid is rounded up such that it doesn't prevent to liquidate enough to put back the account into health.
-/// @dev When LIF*LLTV = 1, repaying never restores health, so the RCF is inactive and the whole position can be
-/// liquidated.
-/// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are
-/// too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral
-/// with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
+/// @dev When LIF*LLTV = 1, repaying never restores health, so the RCF is inactive and the whole position can be liquidated.
+/// @dev The RCF is deactivated for small collateral amount, essentially to mitigate issues with liquidations that are too small compared to the gas cost. More precisely, it is deactivated if the liquidation could leave a collateral with a value that would not be enough to repay rcfThreshold units. Which means (omitting scaling and roundings):
 ///   minNewCollateral * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> (collateral - maxRepaid * LIF / liquidatedCollatPrice) * liquidatedCollatPrice / LIF < rcfThreshold
 ///     <=> collateral * liquidatedCollatPrice / LIF - maxRepaid < rcfThreshold
-/// @dev Nothing prevents borrowers from opening small positions / takers and liquidators from leaving small positions
-/// that might not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents
-/// the systemic aspect (liquidations with RCF progressively reducing the position's sizes).
-/// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to the
-/// computed maxLif at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
+/// @dev Nothing prevents borrowers from opening small positions / takers and liquidators from leaving small positions that might not be profitable to liquidate because of gas cost. The RCF deactivation at rcfThreshold just prevents the systemic aspect (liquidations with RCF progressively reducing the position's sizes).
+/// @dev In the "post-maturity mode", the LIF (liquidation incentive factor) grows linearly from 1 at maturity to the computed maxLif at maturity + TIME_TO_MAX_LIF, and the RCF is deactivated.
 /// @dev In both modes, maxLif is used to determine if the account has some bad debt, to always assume the worst case.
 ///
 /// SLASHING
@@ -90,16 +71,14 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// GROUPS
 /// @dev Groups are useful to have a global offered amount shared across multiple offers ("One cancels the other").
-/// @dev To work as expected, all offers in the same group should have the same maker, direction (offer.buy), max values
-/// and loan token.
+/// @dev To work as expected, all offers in the same group should have the same maker, direction (offer.buy), max values and loan token.
 ///
 /// OFFER SIZE
 /// @dev Exactly one of maxAssets or maxUnits must be nonzero per offer (take reverts otherwise).
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
 /// @dev Midnight can call the callback of offers through a no-op take, even if those offers have consumed==max.
-/// @dev Fully consumed assets-based offers can still be taken for nonzero units when the asset amount added to
-/// consumed is zero.
+/// @dev Fully consumed assets-based offers can still be taken for nonzero units when the asset amount added to consumed is zero.
 /// @dev consumed can be increased manually by the maker or authorized accounts.
 ///
 /// TICK SPACING
@@ -108,28 +87,19 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The tickSpacingSetter can decrease the spacing to a divisor of the current spacing, unlocking new ticks only.
 ///
 /// AUTHORIZATIONS
-/// @dev All functions that change the position, consumed and authorization are accessible to the user and to
-/// any account that has been authorized. Thus, to scope authorizations one should authorize a smart-contract with
-/// scoped behavior.
+/// @dev All functions that change the position, consumed and authorization are accessible to the user and to any account that has been authorized. Thus, to scope authorizations one should authorize a smart-contract with scoped behavior.
 /// @dev When authorizing a smart-contract, one should consider:
-/// - The targets/functions that the account can call. At least Midnight's functions should be considered, but other
-/// contracts might re-use Midnight's authorization mapping too (e.g ratifiers and authorizers). In particular,
-/// authorized accounts can authorize other accounts on behalf of the user.
+/// - The targets/functions that the account can call. At least Midnight's functions should be considered, but other contracts might re-use Midnight's authorization mapping too (e.g ratifiers and authorizers). In particular, authorized accounts can authorize other accounts on behalf of the user.
 /// - Under which conditions the account can return CALLBACK_SUCCESS when its isRatified function is called.
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
-/// @dev assets are rounded against the taker and in favor of the maker in take (in particular a take with non-zero
-/// units could end up with buyerAssets or sellerAssets equal to zero). Therefore, the settlement fee has no defined
-/// rounding direction, which could lead to fees manipulations on chains with very cheap gas.
+/// @dev assets are rounded against the taker and in favor of the maker in take (in particular a take with non-zero units could end up with buyerAssets or sellerAssets equal to zero). Therefore, the settlement fee has no defined rounding direction, which could lead to fees manipulations on chains with very cheap gas.
 /// @dev pendingFee updates are rounded in favor of the user. It could lead to fees manipulations too.
 /// @dev maxDebt is rounded down in isHealthy and liquidate.
 /// @dev lossFactor is rounded up so lenders collectively lose a bit more than badDebt on each bad debt realization.
-/// @dev If a market loses almost all of its value to bad debt over its lifetime, then the accounting of the loss
-/// may become extremely imprecise (against the user), potentially leading to a total loss. Note that the take function
-/// reverts when the loss factor is maxed out.
-/// @dev updatePosition rounds credit down, so each lender loses a bit at their next interaction after a bad debt
-/// realization.
+/// @dev If a market loses almost all of its value to bad debt over its lifetime, then the accounting of the loss may become extremely imprecise (against the user), potentially leading to a total loss. Note that the take function reverts when the loss factor is maxed out.
+/// @dev updatePosition rounds credit down, so each lender loses a bit at their next interaction after a bad debt realization.
 /// @dev repaidUnits/seizedAssets computations round against the liquidator.
 ///
 /// GATES
@@ -140,8 +110,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// TOKEN SAFETY REQUIREMENTS
 /// @dev List of assumptions on tokens that guarantee that Midnight behaves as expected:
-/// - It should be ERC-20 compliant, except that it can omit return values on transfer and transferFrom. In particular,
-/// it should not revert because a transfer is no-op.
+/// - It should be ERC-20 compliant, except that it can omit return values on transfer and transferFrom. In particular, it should not revert because a transfer is no-op.
 /// - Midnight's balance of the token should only decrease on transfer and transferFrom.
 /// - It should not re-enter Midnight on transfer nor transferFrom.
 /// - Midnight must send/receive exactly the requested amount on transfers.
@@ -149,27 +118,19 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 ///
 /// LIVENESS
 /// @dev If an activated collateral oracle reverts on price, liquidate reverts.
-/// @dev If the supplied collateral oracle reverts on price, the activation of that collateral through supplyCollateral
-/// reverts.
-/// @dev If an activated collateral oracle reverts on price, isHealthy, withdrawCollateral and take revert when the user
-/// (seller for take) has non-zero debt.
+/// @dev If the supplied collateral oracle reverts on price, the activation of that collateral through supplyCollateral reverts.
+/// @dev If an activated collateral oracle reverts on price, isHealthy, withdrawCollateral and take revert when the user (seller for take) has non-zero debt.
 /// @dev If the liquidated collateral oracle returns 0 on price, liquidate with repaid input reverts.
-/// @dev If an activated collateral oracle returns a price such that the user's collateral quoted in loan token is
-/// greater than type(uint128).max, then liquidate, isHealthy, withdrawCollateral when the borrower has debt, and take
-/// whenever the seller still has debt could revert.
+/// @dev If an activated collateral oracle returns a price such that the user's collateral quoted in loan token is greater than type(uint128).max, then liquidate, isHealthy, withdrawCollateral when the borrower has debt, and take whenever the seller still has debt could revert.
 /// @dev If enterGate.canIncreaseCredit reverts or returns false, take reverts if the buyer's credit increases.
 /// @dev If enterGate.canIncreaseDebt reverts or returns false, take reverts if the seller's debt increases.
 /// @dev If liquidatorGate.canLiquidate reverts or returns false, liquidate reverts.
-/// @dev If a token pulled by Midnight reverts or returns false on transferFrom, take, repay, supplyCollateral,
-/// liquidate, and flashLoan repayment revert when they need to pull that token.
-/// @dev If a token sent by Midnight reverts or returns false on transfer, withdraw, withdrawCollateral, fee claims,
-/// liquidate, and flashLoan revert when they need to send that token.
-/// @dev If a callback reverts or returns something other than CALLBACK_SUCCESS, take, repay, liquidate, and flashLoan
-/// revert.
+/// @dev If a token pulled by Midnight reverts or returns false on transferFrom, take, repay, supplyCollateral, liquidate, and flashLoan repayment revert when they need to pull that token.
+/// @dev If a token sent by Midnight reverts or returns false on transfer, withdraw, withdrawCollateral, fee claims, liquidate, and flashLoan revert when they need to send that token.
+/// @dev If a callback reverts or returns something other than CALLBACK_SUCCESS, take, repay, liquidate, and flashLoan revert.
 ///
 /// ROLES
-/// @dev The configurator can set the configurator, fee setter, fee claimer, and tick spacing setter, as well as enable
-/// LLTV tiers and liquidation cursors.
+/// @dev The configurator can set the configurator, fee setter, fee claimer, and tick spacing setter, as well as enable LLTV tiers and liquidation cursors.
 /// @dev The fee setter can set the default and per-market settlement fee and continuous fee.
 /// @dev The fee claimer can claim the settlement fee and continuous fee.
 /// @dev When the claimer is set, the old claimer loses the unclaimed fees.
@@ -184,8 +145,7 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev The max amount of totalUnits, collateral, credit, continuousFeeCredit and debt is type(uint128).max (~1e38).
 /// @dev Markets use their creation chainId, so after a chain fork two markets on different chains can have the same id.
 /// @dev When selecting offers ("routing"), one should take into consideration the gas associated with their callbacks.
-/// @dev Relies on the clz opcode (Osaka), on the mcopy, tload, and tstore opcodes (Cancun), and on the push0 opcode
-/// (Shanghai).
+/// @dev Relies on the clz opcode (Osaka), on the mcopy, tload, and tstore opcodes (Cancun), and on the push0 opcode (Shanghai).
 ///
 contract Midnight is IMidnight {
     using UtilsLib for uint256;
@@ -261,10 +221,8 @@ contract Midnight is IMidnight {
         emit EventsLib.EnableLltv(lltv);
     }
 
-    /// @dev Enables a liquidationCursor for use at market creation. Liquidation cursors can only be enabled, never
-    /// disabled. touchMarket checks the resulting maxLif for each market.
-    /// @dev liquidationCursor is required to be strictly below WAD so that maxLif's denominator
-    /// (WAD - liquidationCursor * (WAD - lltv) / WAD) stays positive for every enabled lltv.
+    /// @dev Enables a liquidationCursor for use at market creation. Liquidation cursors can only be enabled, never disabled. touchMarket checks the resulting maxLif for each market.
+    /// @dev liquidationCursor is required to be strictly below WAD so that maxLif's denominator (WAD - liquidationCursor * (WAD - lltv) / WAD) stays positive for every enabled lltv.
     function enableLiquidationCursor(uint256 liquidationCursor) external {
         require(msg.sender == configurator, OnlyConfigurator());
         require(liquidationCursor < WAD, InvalidLiquidationCursor());
@@ -352,12 +310,10 @@ contract Midnight is IMidnight {
 
     /// ENTRY-POINTS ///
 
-    /// @dev The taker might not get the price they expected if the settlement fee was just changed. A smart-contract
-    /// can be used to perform atomic price checks.
+    /// @dev The taker might not get the price they expected if the settlement fee was just changed. A smart-contract can be used to perform atomic price checks.
     /// @dev Taking buy offers with price < settlement fee will revert.
     /// @dev In particular, if the settlement fee gets increased, it might implicitly cancel offers with very low price.
-    /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice
-    /// <= WAD.
+    /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
     /// @dev Returns buyerAssets and sellerAssets.
     function take(
@@ -613,8 +569,7 @@ contract Midnight is IMidnight {
     /// @dev See LIQUIDATIONS section for more details.
     /// @dev At least one of seizedAssets or repaidUnits should be equal to zero.
     /// @dev Passing both 0 for seizedAssets and repaidUnits allows to realize bad debt with 0 token transferred.
-    /// @dev Liquidations with both 0 for seizedAssets and repaidUnits can be done with a collateral that is not
-    /// activated.
+    /// @dev Liquidations with both 0 for seizedAssets and repaidUnits can be done with a collateral that is not activated.
     /// @dev Returns the seized assets and the repaid units.
     function liquidate(
         Market calldata market,

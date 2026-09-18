@@ -21,9 +21,8 @@ methods {
     function _.price() external => CVL_oraclePrice(calledContract) expect(uint256);
 
     // Gates: routed through CVL functions using calledContract to identify which gate is being called.
-    // Return values are deterministic per gate address via ghost functions, so
-    // rules can constrain a specific gate's return value without affecting other gates. Each call can also
-    // nondeterministically revert, modeling that external gates can fail for any reason.
+    // Return values are deterministic per gate address via ghost functions, so rules can constrain a specific gate's return value without affecting other gates.
+    // Each call can also nondeterministically revert, modeling that external gates can fail for any reason.
     function _.canIncreaseCredit(address) external => summaryCanIncreaseCredit(calledContract) expect(bool);
     function _.canIncreaseDebt(address) external => summaryCanIncreaseDebt(calledContract) expect(bool);
     function _.canLiquidate(address) external => summaryCanLiquidate(calledContract) expect(bool);
@@ -40,8 +39,7 @@ methods {
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => CVL_callbackBytes32() expect(bytes32);
     function _.onFlashLoan(address, address[], uint256[], bytes) external => CVL_callbackBytes32() expect(bytes32);
 
-    // Token transfers: routed through CVL functions to force revert per rule. Modeled as no-op on success
-    // (no balance tracking), which is sound for revert-propagation rules.
+    // Token transfers: routed through CVL functions to force revert per rule. Modeled as no-op on success (no balance tracking), which is sound for revert-propagation rules.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => CVL_safeTransferFrom();
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => CVL_safeTransfer();
 
@@ -241,8 +239,7 @@ rule oracleRevertPreventsTakeWhenSellerHasDebt(env e, Midnight.Offer offer, byte
     bytes32 id = summaryToId(offer.market);
     address seller = offer.buy ? taker : offer.maker;
 
-    // Without this, take's liquidatability check short-circuits to false (without calling isHealthy) because
-    // take's tExchange keeps the lock set when wasLocked is true, so the oracle is never queried.
+    // Without this, take's liquidatability check short-circuits to false (without calling isHealthy) because take's tExchange keeps the lock set when wasLocked is true, so the oracle is never queried.
     require !liquidationLocked(id, seller), "seller is not liquidation locked";
 
     uint128 bitmap = collateralBitmap(id, seller);

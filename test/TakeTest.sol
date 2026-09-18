@@ -1154,8 +1154,8 @@ contract TakeTest is BaseTest {
 
         vm.prank(lender);
         midnight.setIsAuthorized(address(ratifier), true, lender);
-        // otherBorrower takes on behalf of borrower, so msg.sender != taker. This checks Midnight forwards the taker
-        // argument and not msg.sender.
+        // otherBorrower takes on behalf of borrower, so msg.sender != taker.
+        // This checks Midnight forwards the taker argument and not msg.sender.
         vm.prank(borrower);
         midnight.setIsAuthorized(otherBorrower, true, borrower);
 

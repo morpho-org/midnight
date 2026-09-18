@@ -141,8 +141,7 @@ hook Sstore marketState[KEY bytes32 id].withdrawable uint128 newWithdrawable (ui
     withdrawableMirror[id][loantoken[id]] = newWithdrawable;
 }
 
-// Settlement fee receipts pending settlement: claimableSettlementFee is incremented in take before
-// the inbound fee transfer happens, so we track the gap and clear it in CVL_transferFrom.
+// Settlement fee receipts pending settlement: claimableSettlementFee is incremented in take before the inbound fee transfer happens, so we track the gap and clear it in CVL_transferFrom.
 persistent ghost mapping(address => mathint) pendingFeeReceipt {
     init_state axiom (forall address token. pendingFeeReceipt[token] == 0);
 }
@@ -156,8 +155,7 @@ hook Sstore claimableSettlementFee[KEY address token] uint256 newVal (uint256 ol
 
 /// INVARIANTS AND RULES ///
 
-// For any token, the pending settlement fee receipt after a transaction is 0: every claimableSettlementFee
-// increment in take is paid back in by the same-function inbound transfer.
+// For any token, the pending settlement fee receipt after a transaction is 0: every claimableSettlementFee increment in take is paid back in by the same-function inbound transfer.
 weak invariant pendingFeeReceiptZero(address token)
     pendingFeeReceipt[token] == 0;
 

@@ -10,15 +10,13 @@ import {EventsLib} from "../src/libraries/EventsLib.sol";
 
 import {BaseTest, LLTV, MAX_TEST_AMOUNT, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
-// The maximum debt from a take must fit in uint128, and the required collateral (debt / lltv)
-// must also fit in uint128. With lltv = 0.75: collateral = debt * 4/3.
-// So debt <= type(uint128).max * 3/4.
+// The maximum debt from a take must fit in uint128, and the required collateral (debt / lltv) must also fit in uint128. With lltv = 0.75: collateral = debt * 4/3. So debt <= type(uint128).max * 3/4.
 uint256 constant MAX_DEBT = MAX_TEST_AMOUNT * 3 / 4;
 
 uint256 constant MIN_SELLER_PRICE = 0.5e18;
 
-// In sell tests, sellerPrice = buyerPrice - settlementFee, so the minimum effective price is
-// MIN_SELLER_PRICE - maxSettlementFee. Price conversion amplifies assets by up to WAD / minPrice.
+// In sell tests, sellerPrice = buyerPrice - settlementFee, so the minimum effective price is MIN_SELLER_PRICE - maxSettlementFee.
+// Price conversion amplifies assets by up to WAD / minPrice.
 // Combined with the collateral constraint: assets * WAD / minPrice * 4/3 <= type(uint128).max.
 // Uses 0.005e18 which is maxSettlementFee(6), the biggest max settlement fee.
 uint256 constant MAX_ASSETS = MAX_TEST_AMOUNT * (MIN_SELLER_PRICE - 0.005e18) / WAD * 3 / 4;
