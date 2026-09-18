@@ -16,8 +16,6 @@ contract GenerateRoot is OfferTree {
             bytes32 leafHash = HashLib.hashOffer(leaves[i]);
             if (isEmpty(tree[leafHash])) {
                 newLeaf(leaves[i]);
-            } else {
-                require(isLeafNode(leafHash), "leaf id collision");
             }
             level[i] = leafHash;
         }
@@ -29,11 +27,8 @@ contract GenerateRoot is OfferTree {
                 bytes32 left = level[2 * i];
                 bytes32 right = level[2 * i + 1];
                 bytes32 nodeHash = HashLib.hashNode(left, right);
-                Node storage n = tree[nodeHash];
-                if (isEmpty(n)) {
-                    newInternalNode(nodeHash, left, right);
-                } else {
-                    require(n.left == left && n.right == right && n.hash == nodeHash, "internal node id collision");
+                if (isEmpty(nodeHash)) {
+                    newInternalNode(left, right);
                 }
                 level[i] = nodeHash;
             }

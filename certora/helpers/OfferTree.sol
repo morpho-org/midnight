@@ -34,7 +34,7 @@ contract OfferTree {
         bytes32 hash;
     }
 
-    // Leaf ids are offer hashes. Internal node ids may be arbitrary.
+    // Every populated node is keyed by its hash.
     mapping(bytes32 => Node) internal tree;
 
     function newLeaf(Offer memory offer) public {
@@ -61,19 +61,18 @@ contract OfferTree {
         n.hash = id;
     }
 
-    function newInternalNode(bytes32 id, bytes32 left, bytes32 right) public {
-        require(id != 0, "zero id");
-        Node storage n = tree[id];
-        require(isEmpty(n), "node already populated");
+    function newInternalNode(bytes32 left, bytes32 right) public returns (bytes32 id) {
         bytes32 leftHash = tree[left].hash;
         bytes32 rightHash = tree[right].hash;
         require(leftHash != 0, "left empty");
         require(rightHash != 0, "right empty");
-        bytes32 hash = HashLib.hashNode(leftHash, rightHash);
-        require(hash != 0, "zero hash");
+        id = HashLib.hashNode(leftHash, rightHash);
+        require(id != 0, "zero hash");
+        Node storage n = tree[id];
+        require(isEmpty(n), "node already populated");
         n.left = left;
         n.right = right;
-        n.hash = hash;
+        n.hash = id;
     }
 
     function isEmpty(Node storage n) internal view returns (bool) {
@@ -128,7 +127,7 @@ contract OfferTree {
         );
     }
 
-    // A node is empty, a correctly hashed leaf, or a correctly hashed internal node with two children.
+    // Populated nodes have their hash as identifier and hash their leaf data or their two non-empty children.
     function isWellFormed(bytes32 id) public view returns (bool) {
         Node storage n = tree[id];
         if (isEmpty(n)) return n.left == 0 && n.right == 0;
@@ -139,7 +138,7 @@ contract OfferTree {
         if (n.left != 0 && n.right != 0) {
             bytes32 leftHash = tree[n.left].hash;
             bytes32 rightHash = tree[n.right].hash;
-            return leftHash != 0 && rightHash != 0 && n.hash == HashLib.hashNode(leftHash, rightHash);
+            return leftHash != 0 && rightHash != 0 && n.hash == id && n.hash == HashLib.hashNode(leftHash, rightHash);
         }
         return false;
     }
