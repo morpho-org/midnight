@@ -989,7 +989,8 @@ contract LiquidationTest is BaseTest {
             .mulDivDown(market.collateralParams[0].lltv, WAD);
     }
 
-    /// @dev Tests that non-zero liquidation works pre-maturity when LLTV = WAD (1e18). Before the fix, this reverted with a division-by-zero in the recovery close factor check.
+    /// @dev Tests that non-zero liquidation works pre-maturity when LLTV = WAD (1e18).
+    /// Before the fix, this reverted with a division-by-zero in the recovery close factor check.
     function testLiquidatePreMaturityLltvWad(uint256 units) public {
         units = bound(units, 2, MAX_UNITS);
 
