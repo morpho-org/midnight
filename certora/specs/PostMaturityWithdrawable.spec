@@ -49,14 +49,20 @@ rule withdrawableOnlyDecreasesOnWithdrawOrClaimContinuousFee(env e, method f, ca
 /// A withdrawal can only take out what the withdrawing position is actually owed: the resulting decrease in the market's withdrawable pool is bounded by the position's credit before the call.
 rule withdrawDecreaseBoundedByCredit(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver) {
     bytes32 id = summaryToId(market);
+    bytes32 otherid;
     uint256 creditBefore = updatedCredit(e, market, id, onBehalf);
     uint256 withdrawableBefore = withdrawable(id);
+    uint256 withdrawableOtherBefore = withdrawable(otherid);
 
     withdraw(e, market, units, onBehalf, receiver);
 
     uint256 withdrawableAfter = withdrawable(id);
     assert withdrawableBefore - withdrawableAfter <= creditBefore;
     assert withdrawableAfter <= withdrawableBefore;
+
+    // check that other markets are not affected at all.
+    uint256 withdrawableOtherAfter = withdrawable(otherid);
+    assert id != otherid => withdrawableOtherAfter == withdrawableOtherBefore;
 }
 
 /// Post maturity, a market's totalUnits can never increase.
