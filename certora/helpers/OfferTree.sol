@@ -125,10 +125,17 @@ contract OfferTree {
         );
     }
 
-    // Populated nodes have their hash as identifier and hash their leaf data or their two non-empty children.
+    // Empty nodes are fully zeroed. Populated nodes have their hash as identifier and hash their leaf data or their
+    // two non-empty children.
     function isWellFormed(bytes32 id) public view returns (bool) {
         Node storage n = tree[id];
-        if (isEmpty(n)) return n.left == 0 && n.right == 0;
+        if (isEmpty(n)) {
+            Leaf storage l = n.leaf;
+            return n.left == 0 && n.right == 0 && l.marketHash == 0 && !l.buy && l.maker == address(0) && l.start == 0
+                && l.expiry == 0 && l.tick == 0 && l.group == 0 && l.callback == address(0) && l.callbackDataHash == 0
+                && l.receiverIfMakerIsSeller == address(0) && l.ratifier == address(0) && !l.reduceOnly
+                && l.maxUnits == 0 && l.maxAssets == 0 && l.continuousFeeCap == 0;
+        }
         if (n.left == 0 && n.right == 0) {
             bytes32 expected = hashLeaf(n.leaf);
             return n.hash == expected && id == expected;
