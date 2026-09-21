@@ -14,7 +14,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev The ratifier data must contain the root, the leaf index, the Merkle proof and the offer's rate and allowed taker (or address(0)).
 /// @dev The leaf index determines each sibling's left/right position during Merkle proof verification.
 /// @dev The maker sets a rate instead of a fixed price. It is a WAD-scaled per-second rate. When isRatified is called, the rate is converted to a price limit using the remaining time to maturity.
-/// @dev The rate is quoted as simple interest using the money market quoting method. It does not account for compounding or any continuous fee charged if the buyer's credit increases.
+/// @dev The rate is quoted as simple interest using the money market quoting method. It does not account for compounding or continuous fees.
 /// @dev A root can also be ratified with a signature.
 /// @dev The nonce is per (maker, root) and shared by all the maker's authorized signers, instead of being per signer, so that a ratification stays within a single storage slot.
 /// @dev Hashing offers as in EIP-712, which allows clear signing of the tree in setIsRootRatifiedWithSig, credits to Seaport for this mechanism.
