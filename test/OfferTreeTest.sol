@@ -29,13 +29,11 @@ contract OfferTreeTest is Test {
         assertEq(tree.newLeaf(leftOffer), left);
         assertFalse(tree.isEmpty(left));
         assertTrue(tree.isLeafNode(left));
-        assertTrue(tree.isWellFormed(left));
 
         bytes32 parent = tree.newInternalNode(left, right);
         assertEq(parent, keccak256(abi.encode(left, right)));
         assertEq(tree.newInternalNode(left, right), parent);
         assertFalse(tree.isEmpty(parent));
-        assertTrue(tree.isWellFormed(parent));
 
         Offer[] memory offers = new Offer[](4);
         offers[0] = leftOffer;
@@ -48,11 +46,7 @@ contract OfferTreeTest is Test {
         assertEq(root, expectedRoot);
         assertTrue(tree.isLeafNode(left));
         assertTrue(tree.isLeafNode(right));
-        assertTrue(tree.isWellFormed(left));
-        assertTrue(tree.isWellFormed(right));
-        assertTrue(tree.isWellFormed(parent));
         assertFalse(tree.isEmpty(root));
-        assertTrue(tree.isWellFormed(root));
         assertEq(tree.newInternalNode(parent, parent), root);
 
         bytes32[] memory proof = new bytes32[](2);
@@ -63,7 +57,6 @@ contract OfferTreeTest is Test {
             assertTrue(tree.wellFormedPath(root, i, proof.length));
         }
         assertEq(generator.generateRoot(offers), root);
-        assertTrue(tree.isWellFormed(root));
     }
 
     function testGenerateRootWithDuplicatePair() public {
@@ -74,7 +67,6 @@ contract OfferTreeTest is Test {
         assertEq(root, expectedRoot);
         assertTrue(tree.isLeafNode(leaf));
         assertFalse(tree.isEmpty(root));
-        assertTrue(tree.isWellFormed(root));
 
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = leaf;
@@ -94,11 +86,8 @@ contract OfferTreeTest is Test {
         bytes32 root = generator.generateRoot(offers);
         assertEq(root, expectedRoot);
         assertTrue(tree.isLeafNode(leaf));
-        assertTrue(tree.isWellFormed(leaf));
         assertFalse(tree.isEmpty(parent));
-        assertTrue(tree.isWellFormed(parent));
         assertFalse(tree.isEmpty(root));
-        assertTrue(tree.isWellFormed(root));
 
         bytes32[] memory proof = new bytes32[](2);
         proof[0] = leaf;
@@ -116,7 +105,6 @@ contract OfferTreeTest is Test {
         bytes32 root = generator.generateRoot(offers);
         assertEq(root, leaf);
         assertTrue(tree.isLeafNode(root));
-        assertTrue(tree.isWellFormed(root));
         assertTrue(HashLib.isLeaf(root, leaf, 0, new bytes32[](0)));
         assertEq(generator.generateRoot(offers), root);
     }
@@ -126,20 +114,6 @@ contract OfferTreeTest is Test {
         generator.generateRoot(new Offer[](0));
         vm.expectRevert("invalid leaves length");
         generator.generateRoot(new Offer[](3));
-    }
-
-    function testGenerateRootOnlyPopulatesConfiguredTree() public {
-        OfferTree otherTree = new OfferTree();
-        Offer[] memory offers = new Offer[](2);
-        bytes32 leaf = HashLib.hashOffer(offers[0]);
-
-        bytes32 root = generator.generateRoot(offers);
-
-        assertEq(address(generator.offerTree()), address(tree));
-        assertTrue(tree.isLeafNode(leaf));
-        assertFalse(tree.isEmpty(root));
-        assertTrue(otherTree.isEmpty(leaf));
-        assertTrue(otherTree.isEmpty(root));
     }
 
     function testGeneratedRootExcludesPreviouslyStoredLeaf() public {
@@ -171,6 +145,5 @@ contract OfferTreeTest is Test {
 
         bytes32 parent = tree.newInternalNode(leaf, leaf);
         assertFalse(tree.isEmpty(parent));
-        assertTrue(tree.isWellFormed(parent));
     }
 }

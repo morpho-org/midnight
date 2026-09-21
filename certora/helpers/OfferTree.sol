@@ -5,8 +5,7 @@ pragma solidity ^0.8.0;
 import {Offer} from "../../src/interfaces/IMidnight.sol";
 import {HashLib, OFFER_TYPEHASH} from "../../src/ratifiers/libraries/HashLib.sol";
 
-// Fixed-size pre-image of HashLib.hashOffer. Dynamic fields are stored as hashes so CVL can re-hash a leaf
-// without iterating over dynamic data.
+// Fixed-size pre-image of HashLib.hashOffer. Dynamic fields are stored as hashes so CVL can re-hash a leaf without iterating over dynamic data.
 struct Leaf {
     bytes32 marketHash; // = HashLib.hashMarket(offer.market)
     bool buy;
@@ -125,8 +124,7 @@ contract OfferTree {
         );
     }
 
-    // Empty nodes are fully zeroed. Populated nodes have their hash as identifier and hash their leaf data or their
-    // two non-empty children.
+    // Empty nodes are fully zeroed. Populated nodes have their hash as identifier and hash their leaf data or their two non-empty children.
     function isWellFormed(bytes32 id) public view returns (bool) {
         Node storage n = tree[id];
         if (isEmpty(n)) {
