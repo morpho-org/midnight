@@ -8,7 +8,7 @@ methods {
 
     function withdrawable(bytes32 id) external returns (uint128) envfree;
     function totalUnits(bytes32 id) external returns (uint128) envfree;
-    function credit(bytes32 id, address user) external returns (uint128) envfree;
+    function continuousFeeCredit(bytes32 id) external returns (uint128) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Deterministic toId summary.
@@ -58,6 +58,25 @@ rule withdrawDecreaseBoundedByCredit(env e, Midnight.Market market, uint256 unit
 
     uint256 withdrawableAfter = withdrawable(id);
     assert withdrawableBefore - withdrawableAfter <= creditBefore;
+    assert withdrawableAfter <= withdrawableBefore;
+
+    // check that other markets are not affected at all.
+    uint256 withdrawableOtherAfter = withdrawable(otherid);
+    assert id != otherid => withdrawableOtherAfter == withdrawableOtherBefore;
+}
+
+/// claimContinuousFee decreases withdrawable by at most the credited fee.
+rule claimContinuousFeeDecreaseBoundedByCredit(env e, Midnight.Market market, uint256 amount, address receiver) {
+    bytes32 id = summaryToId(market);
+    bytes32 otherid;
+    uint256 continuousFeeCreditBefore = continuousFeeCredit(id);
+    uint256 withdrawableBefore = withdrawable(id);
+    uint256 withdrawableOtherBefore = withdrawable(otherid);
+
+    claimContinuousFee(e, market, amount, receiver);
+
+    uint256 withdrawableAfter = withdrawable(id);
+    assert withdrawableBefore - withdrawableAfter <= continuousFeeCreditBefore;
     assert withdrawableAfter <= withdrawableBefore;
 
     // check that other markets are not affected at all.
