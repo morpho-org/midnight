@@ -11,7 +11,8 @@ methods {
 strong invariant zeroIsEmpty()
     isEmpty(to_bytes32(0));
 
-// Every node remains well-formed.
+// Every node remains well-formed, including after calls from the linked GenerateRoot contract.
+// Generator executions and other Solidity loops are bounded by the config's loop_iter.
 strong invariant wellFormed(bytes32 id)
     isWellFormed(id)
     {

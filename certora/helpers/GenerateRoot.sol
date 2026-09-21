@@ -3,23 +3,29 @@
 pragma solidity ^0.8.0;
 
 import {Offer} from "../../src/interfaces/IMidnight.sol";
-import {HashLib} from "../../src/ratifiers/libraries/HashLib.sol";
+import {OfferTree} from "./OfferTree.sol";
 
 contract GenerateRoot {
-    // Reference root for a non-empty, power-of-two list of offers.
-    function generateRoot(Offer[] memory leaves) public pure returns (bytes32) {
+    OfferTree public immutable offerTree;
+
+    constructor(OfferTree _offerTree) {
+        offerTree = _offerTree;
+    }
+
+    // Populate the supplied model and return the root for a non-empty, power-of-two list of offers.
+    function generateRoot(Offer[] memory leaves) public returns (bytes32) {
         require(leaves.length > 0 && (leaves.length & (leaves.length - 1)) == 0, "invalid leaves length");
 
         bytes32[] memory level = new bytes32[](leaves.length);
         for (uint256 i = 0; i < leaves.length; i++) {
-            level[i] = HashLib.hashOffer(leaves[i]);
+            level[i] = offerTree.newLeaf(leaves[i]);
         }
 
         uint256 levelLength = level.length;
         while (levelLength > 1) {
             levelLength /= 2;
             for (uint256 i = 0; i < levelLength; i++) {
-                level[i] = HashLib.hashNode(level[2 * i], level[2 * i + 1]);
+                level[i] = offerTree.newInternalNode(level[2 * i], level[2 * i + 1]);
             }
         }
 

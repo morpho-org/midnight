@@ -10,11 +10,11 @@ import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 
 contract OfferTreeTest is Test {
     OfferTree internal tree;
-    GenerateRoot internal rootReference;
+    GenerateRoot internal generator;
 
     function setUp() public {
         tree = new OfferTree();
-        rootReference = new GenerateRoot();
+        generator = new GenerateRoot(tree);
     }
 
     function testGenerateRootMatchesOfferTree(uint256 leftTick, uint256 rightTick) public {
@@ -42,55 +42,121 @@ contract OfferTreeTest is Test {
         offers[1] = rightOffer;
         offers[2] = leftOffer;
         offers[3] = rightOffer;
-        bytes32 root = rootReference.generateRoot(offers);
-        assertEq(root, keccak256(abi.encode(parent, parent)));
-        assertTrue(tree.isEmpty(root));
-        assertEq(tree.newInternalNode(parent, parent), root);
+        bytes32 expectedRoot = keccak256(abi.encode(parent, parent));
+        assertTrue(tree.isEmpty(expectedRoot));
+        bytes32 root = generator.generateRoot(offers);
+        assertEq(root, expectedRoot);
+        assertTrue(tree.isLeafNode(left));
+        assertTrue(tree.isLeafNode(right));
+        assertTrue(tree.isWellFormed(left));
+        assertTrue(tree.isWellFormed(right));
+        assertTrue(tree.isWellFormed(parent));
         assertFalse(tree.isEmpty(root));
         assertTrue(tree.isWellFormed(root));
+        assertEq(tree.newInternalNode(parent, parent), root);
 
         bytes32[] memory proof = new bytes32[](2);
         proof[1] = parent;
         for (uint256 i = 0; i < offers.length; i++) {
             proof[0] = i % 2 == 0 ? right : left;
             assertTrue(HashLib.isLeaf(root, HashLib.hashOffer(offers[i]), i, proof));
+            assertTrue(tree.wellFormedPath(root, i, proof.length));
         }
-        assertEq(rootReference.generateRoot(offers), root);
+        assertEq(generator.generateRoot(offers), root);
+        assertTrue(tree.isWellFormed(root));
     }
 
-    function testGenerateRootWithDuplicatePair() public view {
+    function testGenerateRootWithDuplicatePair() public {
         Offer[] memory offers = new Offer[](2);
         bytes32 leaf = HashLib.hashOffer(offers[0]);
         bytes32 expectedRoot = keccak256(abi.encode(leaf, leaf));
-        bytes32 root = rootReference.generateRoot(offers);
+        bytes32 root = generator.generateRoot(offers);
         assertEq(root, expectedRoot);
+        assertTrue(tree.isLeafNode(leaf));
+        assertFalse(tree.isEmpty(root));
+        assertTrue(tree.isWellFormed(root));
 
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = leaf;
         for (uint256 i = 0; i < offers.length; i++) {
             assertTrue(HashLib.isLeaf(root, HashLib.hashOffer(offers[i]), i, proof));
+            assertTrue(tree.wellFormedPath(root, i, proof.length));
         }
+        assertEq(generator.generateRoot(offers), root);
     }
 
-    function testGenerateRootWithDuplicateSiblings() public view {
+    function testGenerateRootWithDuplicateSiblings() public {
         Offer[] memory offers = new Offer[](4);
         bytes32 leaf = HashLib.hashOffer(offers[0]);
         bytes32 parent = keccak256(abi.encode(leaf, leaf));
         bytes32 expectedRoot = keccak256(abi.encode(parent, parent));
 
-        bytes32 root = rootReference.generateRoot(offers);
+        bytes32 root = generator.generateRoot(offers);
         assertEq(root, expectedRoot);
-        assertTrue(tree.isEmpty(leaf));
-        assertTrue(tree.isEmpty(parent));
-        assertTrue(tree.isEmpty(expectedRoot));
+        assertTrue(tree.isLeafNode(leaf));
+        assertTrue(tree.isWellFormed(leaf));
+        assertFalse(tree.isEmpty(parent));
+        assertTrue(tree.isWellFormed(parent));
+        assertFalse(tree.isEmpty(root));
+        assertTrue(tree.isWellFormed(root));
 
         bytes32[] memory proof = new bytes32[](2);
         proof[0] = leaf;
         proof[1] = parent;
         for (uint256 i = 0; i < offers.length; i++) {
             assertTrue(HashLib.isLeaf(root, HashLib.hashOffer(offers[i]), i, proof));
+            assertTrue(tree.wellFormedPath(root, i, proof.length));
         }
-        assertEq(rootReference.generateRoot(offers), expectedRoot);
+        assertEq(generator.generateRoot(offers), expectedRoot);
+    }
+
+    function testGenerateRootWithSingleLeaf() public {
+        Offer[] memory offers = new Offer[](1);
+        bytes32 leaf = HashLib.hashOffer(offers[0]);
+        bytes32 root = generator.generateRoot(offers);
+        assertEq(root, leaf);
+        assertTrue(tree.isLeafNode(root));
+        assertTrue(tree.isWellFormed(root));
+        assertTrue(HashLib.isLeaf(root, leaf, 0, new bytes32[](0)));
+        assertEq(generator.generateRoot(offers), root);
+    }
+
+    function testGenerateRootRejectsInvalidLengths() public {
+        vm.expectRevert("invalid leaves length");
+        generator.generateRoot(new Offer[](0));
+        vm.expectRevert("invalid leaves length");
+        generator.generateRoot(new Offer[](3));
+    }
+
+    function testGenerateRootOnlyPopulatesConfiguredTree() public {
+        OfferTree otherTree = new OfferTree();
+        Offer[] memory offers = new Offer[](2);
+        bytes32 leaf = HashLib.hashOffer(offers[0]);
+
+        bytes32 root = generator.generateRoot(offers);
+
+        assertEq(address(generator.offerTree()), address(tree));
+        assertTrue(tree.isLeafNode(leaf));
+        assertFalse(tree.isEmpty(root));
+        assertTrue(otherTree.isEmpty(leaf));
+        assertTrue(otherTree.isEmpty(root));
+    }
+
+    function testGeneratedRootExcludesPreviouslyStoredLeaf() public {
+        Offer memory unrelatedOffer;
+        unrelatedOffer.tick = 1;
+        bytes32 unrelatedLeaf = tree.newLeaf(unrelatedOffer);
+        Offer[] memory offers = new Offer[](2);
+        bytes32 leaf = HashLib.hashOffer(offers[0]);
+        bytes32 root = generator.generateRoot(offers);
+        bytes32[] memory proof = new bytes32[](1);
+        proof[0] = leaf;
+
+        assertTrue(tree.isLeafNode(unrelatedLeaf));
+        for (uint256 i = 0; i < offers.length; i++) {
+            assertTrue(HashLib.isLeaf(root, leaf, i, proof));
+            assertFalse(HashLib.isLeaf(root, unrelatedLeaf, i, proof));
+        }
     }
 
     function testNewInternalNodeRequiresPopulatedChildren() public {
