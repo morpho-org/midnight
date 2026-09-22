@@ -10,6 +10,8 @@ methods {
     function credit(bytes32 id, address user) external returns (uint128) envfree;
     function debt(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
+    function lossFactor(bytes32 id) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
@@ -21,6 +23,10 @@ methods {
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
+
+    // Summaries over-approximating the behavior of transient storage.
+    function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
+    function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
 
     // Assume no reentrancy: callbacks and token transfers do not re-enter Midnight.
     // This is justified because the properties we verify are about the effect of each function's own body on credit and debt, not the effect of the full transaction including callbacks.
@@ -56,6 +62,51 @@ rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 
     assert pendingFee(id, user) == newPendingFee;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
     assert credit(id, user) <= creditBefore;
+}
+
+
+// If stored credit already equals the up-to-date credit, they can diverge only when this
+// market's loss factor increases (bad debt is socialized; see lossFactorChangesIffBadDebt).
+// take is checked by onlyBadDebtDesyncsCreditFromViewOnTake.
+rule onlyBadDebtDesyncsCreditFromView(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> !f.isView && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
+    bytes32 id = Utils.toId(market);
+
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+    require lastAccrual(id, user) <= e.block.timestamp, "time is increasing";
+    require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactorLeqMarketLossFactor in Midnight";
+
+    uint128 viewCreditBefore;
+    viewCreditBefore, _, _ = updatePositionView(e, market, id, user);
+    require viewCreditBefore == credit(id, user);
+
+    uint128 lossFactorBefore = lossFactor(id);
+
+    f(e, args);
+
+    uint128 viewCreditAfter;
+    viewCreditAfter, _, _ = updatePositionView(e, market, id, user);
+    assert viewCreditAfter != credit(id, user) => lossFactor(id) != lossFactorBefore;
+}
+
+// Same as onlyBadDebtDesyncsCreditFromView, instantiated on take.
+rule onlyBadDebtDesyncsCreditFromViewOnTake(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, Midnight.Market market, address user) {
+    bytes32 id = Utils.toId(market);
+
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+    require lastAccrual(id, user) <= e.block.timestamp, "time is increasing";
+    require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactorLeqMarketLossFactor in Midnight";
+
+    uint128 viewCreditBefore;
+    viewCreditBefore, _, _ = updatePositionView(e, market, id, user);
+    require viewCreditBefore == credit(id, user);
+
+    uint128 lossFactorBefore = lossFactor(id);
+
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
+
+    uint128 viewCreditAfter;
+    viewCreditAfter, _, _ = updatePositionView(e, market, id, user);
+    assert viewCreditAfter != credit(id, user) => lossFactor(id) != lossFactorBefore;
 }
 
 /// Withdraw.
