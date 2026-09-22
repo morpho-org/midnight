@@ -51,11 +51,10 @@ rule withdrawDecreaseBoundedByCredit(env e, Midnight.Market market, uint256 unit
 
     uint256 withdrawableAfter = withdrawable(id);
     assert withdrawableBefore - withdrawableAfter <= creditBefore;
-    assert withdrawableAfter <= withdrawableBefore;
+    assert withdrawableAfter == withdrawableBefore - units;
 
     // check that other markets are not affected at all.
-    uint256 withdrawableOtherAfter = withdrawable(otherid);
-    assert id != otherid => withdrawableOtherAfter == withdrawableOtherBefore;
+    assert id != otherid => withdrawable(otherid) == withdrawableOtherBefore;
 }
 
 /// claimContinuousFee decreases withdrawable by at most the credited fee.
