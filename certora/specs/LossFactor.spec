@@ -236,7 +236,8 @@ rule withdrawDoesNotRevert(env e, Midnight.Market market, uint256 units, address
 
     // Read user credit; doesn't revert as shown in updatePositionViewDoesNotRevert.
     uint128 updatedUserCredit;
-    updatedUserCredit, _, _ = updatePositionView(e, market, id, onBehalf);
+    uint128 accruedFee;
+    updatedUserCredit, _, accruedFee = updatePositionView(e, market, id, onBehalf);
 
     // These are the assumptions under which withdraw does not revert.
     require units <= updatedUserCredit, "withdrawing at most the up-to-date credit";
@@ -249,10 +250,10 @@ rule withdrawDoesNotRevert(env e, Midnight.Market market, uint256 units, address
     require currentContract.position[id][onBehalf].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
 
-    // These assumptions are proved in other files or are global assumptions
+    // These assumptions are proved in other spec files.
     require lastLossFactor(id, onBehalf) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight.spec";
     require pendingFee(id, onBehalf) <= credit(id, onBehalf), "pendingContinuousFeeBoundedByCredit in Midnight.spec";
-    require currentContract.marketState[id].continuousFeeCredit + credit(id, onBehalf) <= totalUnits(id), "sumOfCreditsLeTotalUnits in SumOfCreditsAxiomatic.spec";
+    require currentContract.marketState[id].continuousFeeCredit + updatedUserCredit + accruedFee <= totalUnits(id), "sumOfCreditsLeTotalUnits in SumOfCreditsAxiomatic.spec";
     require withdrawable(id) <= totalUnits(id), "totalUnitsEqualsSumNegativeDebtPlusWithdrawable in Midnight.spec (sumDebt >= 0 because it sums up unsigned values)";
 
     withdraw@withrevert(e, market, units, onBehalf, receiver);
