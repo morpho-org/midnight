@@ -1360,7 +1360,6 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
-    /// @dev The activated collateral check happens before the debt is read, so a user without a position fails there.
     function testRollRevertsForNoActivatedCollateral() public {
         vm.prank(keeper);
         fallbackContract.setConfig(
@@ -1429,7 +1428,6 @@ contract BlueFallbackRollingTest is BaseTest {
         );
     }
 
-    /// @dev A Blue LLTV below the Midnight LLTV leaves the collateral moved insufficient for the rolled debt.
     function testRollRevertsWhenBluePositionWouldBeUnhealthy() public {
         uint256 lowLltv = LLTV / 2;
         blue.enableLltv(lowLltv);
