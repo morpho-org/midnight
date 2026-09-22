@@ -12,6 +12,8 @@ methods {
     function credit(bytes32 id, address user) external returns (uint128) envfree;
     function debt(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
+    function lossFactor(bytes32 id) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
@@ -69,6 +71,18 @@ rule updatePositionSyncsCreditWithView(env e, Midnight.Market market, address us
     updatePosition(e, market, user);
 
     assert updatedCredit(e, market, id, user) == credit(id, user);
+}
+
+/// After updatePosition, the user's lastLossFactor matches the market and lastAccrual matches the block timestamp.
+rule updatePositionSyncsLossFactorAndLastAccrual(env e, Midnight.Market market, address user) {
+    bytes32 id = Utils.toId(market);
+
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+
+    updatePosition(e, market, user);
+
+    assert lastLossFactor(id, user) == lossFactor(id);
+    assert lastAccrual(id, user) == e.block.timestamp;
 }
 
 /// WITHDRAW ///
