@@ -8,17 +8,19 @@ methods {
 
     function credit(bytes32 id, address user) external returns (uint128) envfree;
     function totalUnits(bytes32 id) external returns (uint128) envfree;
+    function withdrawable(bytes32 id) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
+    function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
 
     // Deterministic toId needed to link market arguments to stored state.
     function IdLib.toId(Midnight.Market memory market) internal returns (bytes32) => summaryToId(market);
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
 
-    // SafeTransferLib summaries: bypass transfer logic (needed for liquidate @withrevert rules).
+    // SafeTransferLib summaries: we do not care about token values and we explicitly assume token transfer does not revert.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
@@ -226,4 +228,34 @@ rule liquidateLossFactorDoesNotRevert(env e, Midnight.Market market, address bor
     liquidate@withrevert(e, market, 0, 0, 0, borrower, false, borrower, zero, data);
 
     assert !lastReverted, "liquidate should not revert under valid state (bad debt realization path)";
+}
+
+/// Withdraw doesn't revert when withdrawing at most onBehalf's up-to-date credit and at most withdrawable(id).
+rule withdrawDoesNotRevert(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver) {
+    bytes32 id = summaryToId(market);
+
+    // Read user credit; doesn't revert as shown in updatePositionViewDoesNotRevert.
+    uint128 updatedUserCredit;
+    updatedUserCredit, _, _ = updatePositionView(e, market, id, onBehalf);
+
+    // These are the assumptions under which withdraw does not revert.
+    require units <= updatedUserCredit, "withdrawing at most the up-to-date credit";
+    require units <= withdrawable(id), "withdrawing at most the market's available liquidity";
+    require onBehalf == e.msg.sender || isAuthorized(onBehalf, e.msg.sender), "caller must be authorized";
+    require e.msg.value == 0, "Midnight is not payable";
+    require marketIsCreated(market), "market must be created";
+
+    // Timestamp assumptions.
+    require currentContract.position[id][onBehalf].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+
+    // These assumptions are proved in other files or are global assumptions
+    require lastLossFactor(id, onBehalf) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight.spec";
+    require pendingFee(id, onBehalf) <= credit(id, onBehalf), "pendingContinuousFeeBoundedByCredit in Midnight.spec";
+    require currentContract.marketState[id].continuousFeeCredit + credit(id, onBehalf) <= totalUnits(id), "sumOfCreditsLeTotalUnits in SumOfCreditsAxiomatic.spec";
+    require withdrawable(id) <= totalUnits(id), "totalUnitsEqualsSumNegativeDebtPlusWithdrawable in Midnight.spec (sumDebt >= 0 because it sums up unsigned values)";
+
+    withdraw@withrevert(e, market, units, onBehalf, receiver);
+
+    assert !lastReverted, "withdraw should not revert under valid state";
 }
