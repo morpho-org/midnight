@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
+import "UpdatedCredit.spec";
+
 using Utils as Utils;
 
 methods {
@@ -56,6 +58,17 @@ rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 
     assert pendingFee(id, user) == newPendingFee;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
     assert credit(id, user) <= creditBefore;
+}
+
+/// After updatePosition, the up-to-date credit equals the stored credit.
+rule updatePositionSyncsCreditWithView(env e, Midnight.Market market, address user) {
+    bytes32 id = Utils.toId(market);
+
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+
+    updatePosition(e, market, user);
+
+    assert updatedCredit(e, market, id, user) == credit(id, user);
 }
 
 /// WITHDRAW ///
