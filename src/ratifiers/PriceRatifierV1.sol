@@ -27,11 +27,11 @@ contract PriceRatifierV1 is IPriceRatifierV1 {
         MIDNIGHT = _midnight;
     }
 
-    function isRootRatified(address maker, bytes32 root) public view returns (bool) {
+    function isRootRatified(address maker, bytes32 root) external view returns (bool) {
         return ratification[maker][root].isRootRatified;
     }
 
-    function rootNonce(address maker, bytes32 root) public view returns (uint128) {
+    function rootNonce(address maker, bytes32 root) external view returns (uint128) {
         return ratification[maker][root].rootNonce;
     }
 
