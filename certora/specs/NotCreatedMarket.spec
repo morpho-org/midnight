@@ -20,7 +20,7 @@ methods {
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 }
 
-/// HELPERS ///
+/// HELPERS
 
 function marketIsCreated(bytes32 id) returns (bool) {
     return tickSpacing(id) > 0;
@@ -39,9 +39,10 @@ definition userHasNoLastAccrual(bytes32 id, address user) returns bool = lastAcc
 
 definition userHasNoCollateral(bytes32 id, address user, uint256 collateralIndex) returns bool = collateralIndex < 128 => currentContract.position[id][user].collateral[collateralIndex] == 0;
 
-/// RULES ///
+/// PROPERTIES
 
-// Show that each market state field is empty if the market is not created.
+/// Show that each market state field is empty if the market is not created.
+
 strong invariant marketTotalUnitsIsEmptyIfNotCreated(bytes32 id)
     !marketIsCreated(id) => totalUnits(id) == 0;
 
@@ -81,7 +82,7 @@ strong invariant marketCollateralIsEmptyIfNotCreated(bytes32 id, address user, u
 strong invariant positionLastLossFactorIsEmptyIfNotCreated(bytes32 id, address user)
     !marketIsCreated(id) => currentContract.position[id][user].lastLossFactor == 0;
 
-/// NOT CREATED MARKET BEHAVIOR RULES ///
+/// Not created market behavior rules.
 
 rule updatePositionViewIsZeroIfMarketNotCreated(env e, Midnight.Market market, bytes32 id, address user) {
     require currentContract.marketState[id].tickSpacing == 0, "assume that the market is not created";

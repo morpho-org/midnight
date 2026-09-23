@@ -8,8 +8,6 @@ methods {
     function UtilsLib.countBits(uint128 bitmap) internal returns (uint256) => summaryCountBits(bitmap);
 }
 
-/// SUMMARIES ///
-
 persistent ghost summaryGetBit(uint128, uint256) returns bool {
     // see rule zeroBitmapEmpty in Bitmap.spec
     axiom forall uint256 bit. !summaryGetBit(0, bit);

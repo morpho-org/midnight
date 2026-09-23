@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// Leaves store a fixed-size pre-image so isWellFormed can re-hash them without dynamic loops.
+/// Leaves store a fixed-size pre-image so isWellFormed can re-hash them without dynamic loops.
 
 methods {
     function isEmpty(bytes32) external returns (bool) envfree;

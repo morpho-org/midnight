@@ -17,7 +17,7 @@ methods {
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
 }
 
-/// Every successful take requires the maker to have authorized the ratifier.
+// Every successful take requires the maker to have authorized the ratifier.
 rule takeRequiresMakerConsent(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
     bool makerAuthorizedRatifier = isAuthorized(offer.maker, offer.ratifier);
 
@@ -26,7 +26,7 @@ rule takeRequiresMakerConsent(env e, Midnight.Offer offer, bytes ratifierData, u
     assert makerAuthorizedRatifier;
 }
 
-/// address(0) can't authorize another account, because it can't call and setIsAuthorized requires msg.sender == onBehalf || isAuthorized[onBehalf][msg.sender].
+// address(0) can't authorize another account, because it can't call and setIsAuthorized requires msg.sender == onBehalf || isAuthorized[onBehalf][msg.sender].
 strong invariant addressZeroCantAuthorize(address authorized)
     !isAuthorized(0, authorized)
     {
@@ -36,7 +36,7 @@ strong invariant addressZeroCantAuthorize(address authorized)
         }
     }
 
-/// No successful take can use address(0) as maker.
+// No successful take can use address(0) as maker.
 rule takeRequiresNonZeroMaker(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
     requireInvariant addressZeroCantAuthorize(offer.ratifier);
 

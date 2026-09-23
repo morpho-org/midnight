@@ -37,7 +37,7 @@ methods {
     function _.onFlashLoan(address, address[], uint256[], bytes) external => NONDET;
 }
 
-/// SUMMARIES / GHOSTS ///
+/// HELPERS
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -75,7 +75,7 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
 
-/// RULES ///
+/// PROPERTIES
 
 // liquidate realizes the bad debt and doesn't create new bad debt: the recomputed realizable bad debt is exactly 0 after a liquidate.
 rule liquidateRealizesBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {

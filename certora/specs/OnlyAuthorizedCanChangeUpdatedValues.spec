@@ -75,7 +75,7 @@ ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 x. forall uint256 y. forall uint256 d. (x <= d && y <= d) => x - ghostMulDivUp(x, y, d) <= d - y;
 }
 
-/// HELPERS ///
+/// HELPERS
 
 ghost mapping(address => bool) makerRatified {
     init_state axiom forall address a. makerRatified[a] == false;
@@ -91,11 +91,13 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
 }
 
-/// UPDATED VALUES CHANGE RULES ///
+/// PROPERTIES
 
-/// An unauthorized caller cannot change a user's updated credit or updated pending fee except via liquidate.
-/// accruedFee is intentionally excluded: updatePosition is permissionless and can set the fees to 0.
-/// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant collateral changes are not covered.
+/// Updated values change rules.
+
+// An unauthorized caller cannot change a user's updated credit or updated pending fee except via liquidate.
+// accruedFee is intentionally excluded: updatePosition is permissionless and can set the fees to 0.
+// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant collateral changes are not covered.
 rule onlyAuthorizedCanChangeUpdatedValuesExceptLiquidate(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     require e.block.timestamp <= max_uint128, "realistic timestamp, needed for the uint128 cast";
 

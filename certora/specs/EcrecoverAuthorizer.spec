@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-// Signature verification is verified in tests.
+/// Signature verification is verified in tests.
 
 methods {
     function nonce(address) external returns (uint256) envfree;
@@ -9,7 +9,7 @@ methods {
     function Midnight.isAuthorized(address, address) external returns (bool) envfree;
 }
 
-/// EcrecoverAuthorizer increments nonce on success and does not change other nonces.
+// EcrecoverAuthorizer increments nonce on success and does not change other nonces.
 rule effects(env e, EcrecoverAuthorizer.Authorization authorization, EcrecoverAuthorizer.Signature signature, address other) {
     require other != authorization.authorizer;
     uint256 nonceBefore = nonce(authorization.authorizer);
@@ -21,7 +21,7 @@ rule effects(env e, EcrecoverAuthorizer.Authorization authorization, EcrecoverAu
     assert nonce(other) == otherNonceBefore;
 }
 
-/// Expired deadline, wrong nonce, and nonce reused cause revert.
+// Expired deadline, wrong nonce, and nonce reused cause revert.
 rule requiredConditions(env e1, env e2, EcrecoverAuthorizer.Authorization authorization, EcrecoverAuthorizer.Signature signature, EcrecoverAuthorizer.Authorization otherAuthorization, EcrecoverAuthorizer.Signature otherSignature) {
     require authorization.authorizer == otherAuthorization.authorizer;
     uint256 nonceBefore = nonce(authorization.authorizer);

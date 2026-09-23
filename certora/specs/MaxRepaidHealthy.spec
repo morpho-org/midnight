@@ -42,7 +42,7 @@ methods {
     // Unresolved callbacks and token calls use AUTO/HAVOC_ECF, which models non-reentrant callees.
 }
 
-/// SUMMARY ///
+/// HELPERS
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -66,7 +66,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     return require_uint256(ghostMulDivUp(a, b, d));
 }
 
-// Pin every field that contributes to the market id, making the toId summary deterministic and injective.
+/// Pin every field that contributes to the market id, making the toId summary deterministic and injective.
 
 persistent ghost address globalMarketLoanToken;
 
@@ -116,7 +116,7 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
     return id;
 }
 
-/// RULE ///
+/// PROPERTIES
 
 // In a market, liquidating at the amount computed by maxRepaidFor leaves the position healthy.
 // The call uses normal mode and covers the strictly unhealthy and health-boundary cases.
@@ -137,10 +137,10 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     uint256 collatAfter = assert_uint256(collatBefore - seizedOut);
     bool isHealthyAfter = isHealthyNoBitmap(globalMarket, globalId, borrower);
 
-    /// MAX-DEBT DROP BOUND ///
-    // Establish oldContrib - newContrib <= maxDebtDropBound.
-    // When it seizes, liquidate computes seizedOut = floor(floor(repaidUnits * lif / WAD) * ORACLE_PRICE_SCALE / price), matching the ghost terms below.
-    // Each require is one ground instance of a rule proved in MulDiv.spec.
+    /// MAX-DEBT DROP BOUND
+    /// Establish oldContrib - newContrib <= maxDebtDropBound.
+    /// When it seizes, liquidate computes seizedOut = floor(floor(repaidUnits * lif / WAD) * ORACLE_PRICE_SCALE / price), matching the ghost terms below.
+    /// Each require is one ground instance of a rule proved in MulDiv.spec.
 
     uint256 lltv = globalMarketCollateralLLTV[collateralIndex];
     uint256 lif = maxLifGhost(lltv, globalMarketCollateralLiquidationCursor[collateralIndex]);
@@ -173,10 +173,10 @@ rule liquidateAtCapRestoresHealth(env e, uint256 collateralIndex, address borrow
     // L1-L2 bound the collateral-value decrease by maxSeizedValue.
     // L3 transports that bound through the LLTV contribution, and L4 bounds the composed rounding by maxDebtDropBound.
 
-    /// FINAL HEALTH BOUND ///
-    // repaidUnits is ceil(gap * WAD^2 / (WAD^2 - lif * lltv)).
-    // The two rounding facts below imply maxDebtDropBound <= repaidUnits - gap.
-    // Therefore the new max debt falls by no more than the amount repaid in excess of the old health gap.
+    /// FINAL HEALTH BOUND
+    /// repaidUnits is ceil(gap * WAD^2 / (WAD^2 - lif * lltv)).
+    /// The two rounding facts below imply maxDebtDropBound <= repaidUnits - gap.
+    /// Therefore the new max debt falls by no more than the amount repaid in excess of the old health gap.
 
     mathint gap = debtBefore - maxDebtBefore;
     mathint rcfDenominator = WAD_SQUARED() - lifTimesLltv;

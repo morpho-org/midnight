@@ -34,7 +34,7 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
 
-/// HELPERS ///
+/// HELPERS
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -48,7 +48,7 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
 
-/// RULES ///
+/// PROPERTIES
 
 // Show that a created market has at least one collateral.
 strong invariant createdMarketsHaveNonEmptyCollaterals(Midnight.Market market)

@@ -34,7 +34,7 @@ methods {
     function SafeTransferLib.safeTransferFrom(address token, address from, address to, uint256 amount) internal => cvlSafeTransferFrom(token, from, to, amount);
 }
 
-/// HELPERS ///
+/// HELPERS
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -83,7 +83,9 @@ function marketIsCreated(bytes32 id) returns (bool) {
     return tickSpacing(id) > 0;
 }
 
-/// CONFIGURATOR: LIVENESS ///
+/// PROPERTIES
+
+/// Configurator: liveness rules.
 
 rule configuratorCanChangeConfigurator(env e, address newConfigurator) {
     address configuratorBefore = configurator();
@@ -125,7 +127,7 @@ rule configuratorCanEnableLltv(env e, uint256 lltv) {
     assert !lastReverted => isLltvEnabled(lltv);
 }
 
-/// CONFIGURATOR: ACCESS CONTROL ///
+/// Configurator: Access control rules.
 
 rule onlyConfiguratorCanChangeConfigurator(env e, method f, calldataarg args) filtered { f -> !f.isView } {
     address configuratorBefore = configurator();
@@ -162,9 +164,9 @@ rule onlyConfiguratorCanChangeTickSpacingSetter(env e, method f, calldataarg arg
     assert tickSpacingSetter() != tickSpacingSetterBefore => e.msg.sender == configuratorBefore && f.selector == sig:setTickSpacingSetter(address).selector;
 }
 
-/// LLTV TIERS: ACCESS CONTROL ///
+/// LLTV tiers: Access control rules.
 
-/// Enabled LLTV tiers can only be enabled by the configurator, and never removed.
+// Enabled LLTV tiers can only be enabled by the configurator, and never removed.
 rule onlyConfiguratorCanEnableLltv(env e, method f, calldataarg args, uint256 lltv) filtered { f -> !f.isView } {
     bool enabledBefore = isLltvEnabled(lltv);
     address configuratorBefore = configurator();
@@ -174,7 +176,7 @@ rule onlyConfiguratorCanEnableLltv(env e, method f, calldataarg args, uint256 ll
     assert isLltvEnabled(lltv) != enabledBefore => enabledBefore == false && e.msg.sender == configuratorBefore && f.selector == sig:enableLltv(uint256).selector;
 }
 
-/// LIQUIDATION CURSORS: LIVENESS ///
+/// Liquidation cursors: liveness rules.
 
 rule configuratorCanEnableLiquidationCursor(env e, uint256 liquidationCursor) {
     address configuratorBefore = configurator();
@@ -185,9 +187,9 @@ rule configuratorCanEnableLiquidationCursor(env e, uint256 liquidationCursor) {
     assert !reverted => currentContract.isLiquidationCursorEnabled[liquidationCursor];
 }
 
-/// LIQUIDATION CURSORS: ACCESS CONTROL ///
+/// Liquidation cursors: Access control rules.
 
-/// Only the configurator can enable a liquidationCursor, and only through enableLiquidationCursor.
+// Only the configurator can enable a liquidationCursor, and only through enableLiquidationCursor.
 rule onlyConfiguratorCanEnableLiquidationCursor(env e, method f, calldataarg args, uint256 liquidationCursor) filtered { f -> !f.isView } {
     bool enabledBefore = currentContract.isLiquidationCursorEnabled[liquidationCursor];
     address configuratorBefore = configurator();
@@ -197,7 +199,7 @@ rule onlyConfiguratorCanEnableLiquidationCursor(env e, method f, calldataarg arg
     assert currentContract.isLiquidationCursorEnabled[liquidationCursor] != enabledBefore => e.msg.sender == configuratorBefore && f.selector == sig:enableLiquidationCursor(uint256).selector;
 }
 
-/// LiquidationCursors can only be enabled, never disabled.
+// LiquidationCursors can only be enabled, never disabled.
 rule liquidationCursorsOnlyGrow(env e, method f, calldataarg args, uint256 liquidationCursor) filtered { f -> !f.isView } {
     bool enabledBefore = currentContract.isLiquidationCursorEnabled[liquidationCursor];
 
@@ -206,11 +208,11 @@ rule liquidationCursorsOnlyGrow(env e, method f, calldataarg args, uint256 liqui
     assert enabledBefore => currentContract.isLiquidationCursorEnabled[liquidationCursor];
 }
 
-/// Every enabled liquidationCursor is strictly below WAD.
+// Every enabled liquidationCursor is strictly below WAD.
 strong invariant liquidationCursorsBelowOne(uint256 liquidationCursor)
     currentContract.isLiquidationCursorEnabled[liquidationCursor] => liquidationCursor < WAD();
 
-/// FEE SETTER: LIVENESS ///
+/// Fee setter: liveness rules.
 
 rule feeSetterCanSetMarketSettlementFee(env e, bytes32 id, uint256 index, uint256 newSettlementFee) {
     address feeSetterBefore = feeSetter();
@@ -254,10 +256,10 @@ rule feeSetterCanSetDefaultContinuousFee(env e, address loanToken, uint256 newCo
     assert !reverted => currentContract.defaultContinuousFee[loanToken] == newContinuousFee;
 }
 
-/// FEE SETTER: ACCESS CONTROL ///
+/// Fee setter: Access control rules.
 /// Settlement fee access control is covered in SettlementFeeBoundaries.spec.
 
-/// Once a market is created, only the fee setter can modify its continuous fees.
+// Once a market is created, only the fee setter can modify its continuous fees.
 rule onlyFeeSetterCanChangeMarketContinuousFeePostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require marketIsCreated(id), "market must exist";
     uint32 continuousFeeBefore = continuousFee(id);
@@ -277,7 +279,7 @@ rule onlyFeeSetterCanChangeDefaultContinuousFee(env e, method f, calldataarg arg
     assert currentContract.defaultContinuousFee[loanToken] != defaultContinuousFeeBefore => e.msg.sender == feeSetterBefore && f.selector == sig:setDefaultContinuousFee(address, uint256).selector;
 }
 
-/// TICK SPACING SETTER: LIVENESS ///
+/// Tick spacing setter: liveness rules.
 
 rule tickSpacingSetterCanSetMarketTickSpacing(env e, bytes32 id, uint256 newTickSpacing) {
     address tickSpacingSetterBefore = tickSpacingSetter();
@@ -288,12 +290,12 @@ rule tickSpacingSetterCanSetMarketTickSpacing(env e, bytes32 id, uint256 newTick
     setMarketTickSpacing@withrevert(e, id, newTickSpacing);
     bool reverted = lastReverted;
     assert !reverted <=> e.msg.sender == tickSpacingSetterBefore && e.msg.value == 0 && marketIsCreated && validNewTickSpacing;
-    assert !reverted => to_mathint(tickSpacing(id)) == to_mathint(newTickSpacing);
+    assert !reverted => tickSpacing(id) == newTickSpacing;
 }
 
-/// TICK SPACING SETTER: ACCESS CONTROL ///
+/// Tick spacing setter: access control rules.
 
-/// Once a market is created, only the tick spacing setter can modify its tick spacing.
+// Once a market is created, only the tick spacing setter can modify its tick spacing.
 rule onlyTickSpacingSetterCanChangeMarketTickSpacingPostCreation(env e, method f, calldataarg args, bytes32 id) filtered { f -> !f.isView } {
     require marketIsCreated(id), "market must exist";
     uint8 tickSpacingBefore = tickSpacing(id);
@@ -304,21 +306,21 @@ rule onlyTickSpacingSetterCanChangeMarketTickSpacingPostCreation(env e, method f
     assert tickSpacing(id) != tickSpacingBefore => e.msg.sender == tickSpacingSetterBefore && f.selector == sig:setMarketTickSpacing(bytes32, uint256).selector;
 }
 
-/// FEE CLAIMER: ACCESS CONTROL ///
+/// Fee claimer: access control rules.
 
-/// Only the fee claimer can successfully call claimSettlementFee.
+// Only the fee claimer can successfully call claimSettlementFee.
 rule onlyFeeClaimerCanClaimSettlementFee(env e, address token, uint256 amount, address receiver) {
     claimSettlementFee(e, token, amount, receiver);
     assert e.msg.sender == feeClaimer();
 }
 
-/// Only the fee claimer can successfully call claimContinuousFee.
+// Only the fee claimer can successfully call claimContinuousFee.
 rule onlyFeeClaimerCanClaimContinuousFee(env e, Midnight.Market market, uint256 amount, address receiver) {
     claimContinuousFee(e, market, amount, receiver);
     assert e.msg.sender == feeClaimer();
 }
 
-/// FEE CLAIMER: LIVENESS ///
+/// Fee claimer: liveness rules.
 
 rule feeClaimerCanClaimSettlementFee(env e, address token, uint256 amount, address receiver, address user) {
     address feeClaimerBefore = feeClaimer();

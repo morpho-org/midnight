@@ -29,7 +29,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 }
 
-/// SUMMARIES ///
+/// HELPERS
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -67,16 +67,16 @@ function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
     return ghostMulDivUp(x, y, d);
 }
 
-/// INVARIANTS ///
+/// PROPERTIES
 
-/// Proven in CollateralBitmap.spec; assumed here via requireInvariant (not re-proven in this spec).
+// Proven in CollateralBitmap.spec; assumed here via requireInvariant (not re-proven in this spec).
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)
     collateralIndex < 128 => (collateral(id, user, collateralIndex) != 0 <=> summaryGetBit(currentContract.position[id][user].collateralBitmap, collateralIndex));
 
-/// LIF BOUNDARIES ///
+/// LIF boundaries.
 
-/// Liquidation profit is bounded by maxLif (repaidUnits input).
-/// Unlike the seizedAssets rule, no requireInvariant is needed here: if collateralIndex is not in the bitmap because mulDivDown(..., 0) reverts.
+// Liquidation profit is bounded by maxLif (repaidUnits input).
+// Unlike the seizedAssets rule, no requireInvariant is needed here: if collateralIndex is not in the bitmap because mulDivDown(..., 0) reverts.
 rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Market market, uint256 collateralIndex, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     mathint maxLif = Utils.maxLif(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require data.length == 0, "no callback for prover performance";
@@ -91,7 +91,7 @@ rule liquidationProfitBoundedInputRepaidUnits(env e, Midnight.Market market, uin
     assert seizedResult * price * WAD() <= repaidResult * ORACLE_PRICE_SCALE() * maxLif;
 }
 
-/// Liquidation profit is bounded by maxLif (seizedAssets input)
+// Liquidation profit is bounded by maxLif (seizedAssets input)
 rule liquidationProfitBoundedSeizedAssets(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     mathint maxLif = Utils.maxLif(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
     require data.length == 0, "no callback for prover performance";

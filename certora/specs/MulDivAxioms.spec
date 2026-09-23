@@ -9,7 +9,7 @@ definition mathMulDivDown(mathint a, mathint b, mathint d) returns mathint = gho
 
 definition mathMulDivUp(mathint a, mathint b, mathint d) returns mathint = ghostMulDivUp(a, b, d);
 
-/* these are the axioms proved in MulDiv.spec */
+/// These definitions declare the axioms proved in MulDiv.spec.
 
 definition axiomMathMulDivDownZeroA(mathint b, mathint d) returns bool = d > 0 => mathMulDivDown(0, b, d) == 0;
 

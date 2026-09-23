@@ -22,9 +22,7 @@ function mathMulDivUp(mathint a, mathint b, mathint d) returns mathint {
     }
 }
 
-/// RULES ///
-
-/* these proves the axiom used in the other specs */
+/// These rules prove the axioms used in the other specs.
 
 rule mulDivZero(uint256 a, uint256 b, uint256 d) {
     assert mulDivDown(0, b, d) == 0;
