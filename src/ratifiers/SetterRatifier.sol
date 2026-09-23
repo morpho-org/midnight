@@ -11,6 +11,7 @@ import {HashLib} from "./libraries/HashLib.sol";
 /// @dev The root should correspond to the root of the offer tree, which is a Merkle tree of offers.
 /// @dev The leaf index determines each hash order during merkle proof verification.
 /// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
+/// @dev Unratifying a root does not unratify other roots containing the same offers.
 contract SetterRatifier is ISetterRatifier {
     address public immutable MIDNIGHT;
 
