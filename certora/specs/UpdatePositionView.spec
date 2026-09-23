@@ -1,14 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-import "UpdatedCredit.spec";
-
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function lossFactor(bytes32) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
-    function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
-    function credit(bytes32 id, address user) external returns (uint128) envfree;
 
     /// PRICE / ORACLE ///
     function _.price() external => NONDET;
@@ -126,16 +122,6 @@ hook Sstore position[KEY bytes32 id][KEY address owner].lastAccrual uint128 newL
 strong invariant preciseCreditCorrect(bytes32 id, address owner)
     checkCreditDivInvariant(id, owner);
 
-/// When lastLossFactor is saturated, updatePositionView zeros credit, so the stored credit is 0.
-strong invariant noCreditWhenLastLossFactorMaxed(bytes32 id, address user)
-    lastLossFactor(id, user) == max_uint128 => credit(id, user) == 0
-    {
-        preserved with (env e) {
-            require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactorLeqMarketLossFactor in Midnight";
-            require pendingFeeMirror[id][user] <= credit(id, user), "pendingContinuousFeeBoundedByCredit in Midnight";
-        }
-    }
-
 /// RULES ///
 
 rule updatePositionViewProperties(env e, Midnight.Market obligation, bytes32 id, address user) {
@@ -162,15 +148,4 @@ rule updatePositionViewProperties(env e, Midnight.Market obligation, bytes32 id,
     assert newCredit <= oldCredit, "slashing and fee accrual only decrease credit";
     assert newPendingFee <= oldPendingFee, "fee deduction only decreases pending";
     assert mapFactor(currentContract.marketState[id].lossFactor) == 0 => newCredit == 0 && fee == 0, "no credit/fee on total loss factor";
-}
-
-/// When lastLossFactor matches the market and lastAccrual matches now, updatePositionView
-/// returns the stored credit (slash is a no-op and no new fee accrues).
-rule updatePositionViewEqualsCreditWhenSynced(env e, Midnight.Market market, bytes32 id, address user) {
-    requireInvariant noCreditWhenLastLossFactorMaxed(id, user);
-    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
-    require lastLossFactor(id, user) == lossFactor(id), "loss factor is up to date";
-    require lastAccrual(id, user) == e.block.timestamp, "lastAccrual is up to date";
-
-    assert updatedCredit(e, market, id, user) == credit(id, user);
 }

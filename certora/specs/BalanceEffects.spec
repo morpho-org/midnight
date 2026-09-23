@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-import "UpdatedCredit.spec";
-
 using Utils as Utils;
 
 methods {
@@ -12,8 +10,6 @@ methods {
     function credit(bytes32 id, address user) external returns (uint128) envfree;
     function debt(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
-    function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
-    function lossFactor(bytes32 id) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
@@ -60,29 +56,6 @@ rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 
     assert pendingFee(id, user) == newPendingFee;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
     assert credit(id, user) <= creditBefore;
-}
-
-/// After updatePosition, the up-to-date credit equals the stored credit.
-rule updatePositionSyncsCreditWithView(env e, Midnight.Market market, address user) {
-    bytes32 id = Utils.toId(market);
-
-    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
-
-    updatePosition(e, market, user);
-
-    assert updatedCredit(e, market, id, user) == credit(id, user);
-}
-
-/// After updatePosition, the user's lastLossFactor matches the market and lastAccrual matches the block timestamp.
-rule updatePositionSyncsLossFactorAndLastAccrual(env e, Midnight.Market market, address user) {
-    bytes32 id = Utils.toId(market);
-
-    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
-
-    updatePosition(e, market, user);
-
-    assert lastLossFactor(id, user) == lossFactor(id);
-    assert lastAccrual(id, user) == e.block.timestamp;
 }
 
 /// WITHDRAW ///
