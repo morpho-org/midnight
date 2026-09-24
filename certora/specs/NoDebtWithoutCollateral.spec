@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-// Proves: a position can never carry debt while having no active collateral bit, i.e.:
-//   position[id][user].collateralBitmap == 0  =>  position[id][user].debt == 0
-// Combined with `nonZeroCollateralsAreActivated` (proved in CollateralBitmap.spec), this implies the full semantic property: no position can have collateral[i] == 0 for every i while having debt > 0.
-// The spec is verified under two confs because the two halves need opposite call modelings:
-// - NoDebtWithoutCollateral.conf (-havocAllByDefault true): proves the strong invariant `lockedOrNoDebtWithoutCollateral`. HAVOC_ALL at every external call is the sound modeling of reentrancy on the *regular* storage (debt/bitmap).
-// - NoDebtWithoutCollateralNativeECF.conf (no -havocAllByDefault): proves the lock facts `liquidationLockClearedAtBoundary` and `liquidationLockNeutral`. The default AUTO summary (HAVOC_ECF for state-changers, NONDET for views) leaves currentContract storage untouched, which is faithful for the transient lock: an external callee cannot tstore Midnight's transient namespace, and reentrant Midnight code restores the lock (proved by `liquidationLockNeutral`).
-// The structure of the proof is: assume external calls leave the lock unchanged, prove every method does, conclude by induction.
-
 import "BitmapSummaries.spec";
 import "MulDivAxioms.spec";
 
 using Utils as Utils;
 
+/// Proves: a position can never carry debt while having no active collateral bit, i.e.:
+///   position[id][user].collateralBitmap == 0  =>  position[id][user].debt == 0
+/// Combined with `nonZeroCollateralsAreActivated` (proved in CollateralBitmap.spec), this implies the full semantic property: no position can have collateral[i] == 0 for every i while having debt > 0.
+/// The spec is verified under two confs because the two halves need opposite call modelings:
+/// - NoDebtWithoutCollateral.conf (-havocAllByDefault true): proves the strong invariant `lockedOrNoDebtWithoutCollateral`. HAVOC_ALL at every external call is the sound modeling of reentrancy on the *regular* storage (debt/bitmap).
+/// - NoDebtWithoutCollateralNativeECF.conf (no -havocAllByDefault): proves the lock facts `liquidationLockClearedAtBoundary` and `liquidationLockNeutral`. The default AUTO summary (HAVOC_ECF for state-changers, NONDET for views) leaves currentContract storage untouched, which is faithful for the transient lock: an external callee cannot tstore Midnight's transient namespace, and reentrant Midnight code restores the lock (proved by `liquidationLockNeutral`).
+/// The structure of the proof is: assume external calls leave the lock unchanged, prove every method does, conclude by induction.
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -25,7 +24,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 }
 
-/// MULDIV SUMMARIES ///
+/// HELPERS
 
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     if (d == 0 || a * b >= 2 ^ 256) {
@@ -42,7 +41,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     return require_uint256(ghostMulDivUp(a, b, d));
 }
 
-/// INVARIANT ///
+/// PROPERTIES
 
 strong invariant lockedOrNoDebtWithoutCollateral(bytes32 id, address user)
     liquidationLocked(id, user) || (currentContract.position[id][user].collateralBitmap == 0 => currentContract.position[id][user].debt == 0)

@@ -26,7 +26,7 @@ methods {
     // This is justified because the properties we verify are about the effect of each function's own body on the continuous fee, not the effect of the full transaction including callbacks.
 }
 
-/// HELPERS ///
+/// HELPERS
 
 persistent ghost bytes32 lastId;
 
@@ -37,6 +37,8 @@ function summaryToId(Midnight.Market market) returns bytes32 {
 }
 
 definition WAD() returns uint256 = 10 ^ 18;
+
+/// PROPERTIES
 
 // The buyer's pendingFee increases by floor(creditIncrease * continuousFee * timeToMaturity / WAD).
 rule continuousFeeNotOverchargedForBuyer(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {

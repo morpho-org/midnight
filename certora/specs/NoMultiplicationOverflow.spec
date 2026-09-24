@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-// Proves that the only overflows in mulDivDown and mulDivUp that can cause a revert are
-// the ones that compute the value of a collateral against the oracle price.
-// These can only overflow if the collateral is priced at more than max_uint128 debt units,
-// which is documented in Midnight.sol.
-
-// Strictly speaking, other mulDivDown/mulDivUp may revert due to overflow, e.g.,
-// for withdraw a mulDiv can revert for very large values of units > 2^128.
-// However, this would result in a different revert, if the mulDiv is never called.
-// This spec checks for overflows at the end, showing that if there is no other reason the
-// call would have reverted the mulDiv didn't overflow.
-// Thus, the mulDiv did not singlehandedly cause the revert.
-
 using Utils as Utils;
+
+/// Proves that the only overflows in mulDivDown and mulDivUp that can cause a revert are
+/// the ones that compute the value of a collateral against the oracle price.
+/// These can only overflow if the collateral is priced at more than max_uint128 debt units,
+/// which is documented in Midnight.sol.
+
+/// Strictly speaking, other mulDivDown/mulDivUp may revert due to overflow, e.g.,
+/// for withdraw a mulDiv can revert for very large values of units > 2^128.
+/// However, this would result in a different revert, if the mulDiv is never called.
+/// This spec checks for overflows at the end, showing that if there is no other reason the
+/// call would have reverted the mulDiv didn't overflow.
+/// Thus, the mulDiv did not singlehandedly cause the revert.
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -37,7 +37,7 @@ methods {
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 }
 
-/// HELPERS ///
+/// HELPERS
 
 persistent ghost bool mulOverflow;
 
@@ -84,7 +84,7 @@ function boundedTickPrice() returns uint256 {
 
 function mulDivDownSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     uint256 result;
-    mathint product = to_mathint(x) * y;
+    mathint product = x * y;
     if (d != 0 && x * y >= 2 ^ 256) {
         // overflow in mulDivDown
         if (x == lastCollateralAmount && y == lastOraclePrice && d == ORACLE_PRICE_SCALE()) {
@@ -134,7 +134,7 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     return result;
 }
 
-/// RULES ///
+/// PROPERTIES
 
 // Normal calls intentionally scope this proof to non-reverting executions.
 // The updatePositionView and isHealthy have dedicated rules to ensure market and id match.

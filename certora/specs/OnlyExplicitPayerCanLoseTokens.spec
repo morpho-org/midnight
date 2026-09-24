@@ -41,7 +41,7 @@ persistent ghost bool repayCallbackAllowed;
 
 persistent ghost bool flashLoanCallbackAllowed;
 
-/// Tracks the maker address from a validated offer.
+// Tracks the maker address from a validated offer.
 persistent ghost address maker;
 
 persistent ghost bool makerAllowed;
@@ -88,10 +88,10 @@ function CVL_transferFrom(address token, address src, address dest, uint256 valu
     return true;
 }
 
-/// Proves that in `take`, the only addresses whose tokens can be pulled are:
-/// 1. msg.sender (when !offer.buy and buyerCallback == 0),
-/// 2. the buyerCallback that returned CALLBACK_SUCCESS,
-/// 3. the offer maker (when offer.buy and buyerCallback == 0, i.e. maker is the buyer with no callback).
+// Proves that in `take`, the only addresses whose tokens can be pulled are:
+// 1. msg.sender (when !offer.buy and buyerCallback == 0),
+// 2. the buyerCallback that returned CALLBACK_SUCCESS,
+// 3. the offer maker (when offer.buy and buyerCallback == 0, i.e. maker is the buyer with no callback).
 rule takeOnlyExplicitPayer(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
     require e.msg.sender != currentContract, "only external calls";
 
@@ -114,7 +114,7 @@ rule takeOnlyExplicitPayer(env e, Midnight.Offer offer, bytes ratifierData, uint
     assert !badPullSeen;
 }
 
-/// Proves that for every entry point other than `take`, tokens are only ever pulled from msg.sender or from a callback that returned CALLBACK_SUCCESS.
+// Proves that for every entry point other than `take`, tokens are only ever pulled from msg.sender or from a callback that returned CALLBACK_SUCCESS.
 rule otherEntryPointsOnlyPullFromCaller(method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
     require e.msg.sender != currentContract, "only external calls";
 

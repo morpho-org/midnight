@@ -16,13 +16,15 @@ methods {
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
-/// Breakpoint time in seconds for index 0..6, mirroring the settlementFee intervals in Midnight.sol.
+/// HELPERS
+
+// Breakpoint time in seconds for index 0..6, mirroring the settlementFee intervals in Midnight.sol.
 definition breakpointTime(uint256 index) returns uint256 = index == 0 ? 0 : index == 1 ? 86400 : index == 2 ? 7 * 86400 : index == 3 ? 30 * 86400 : index == 4 ? 90 * 86400 : index == 5 ? 180 * 86400 : index == 6 ? 360 * 86400 : 0;
 
-/// Lower enclosing breakpoint index for a given time-to-maturity.
+// Lower enclosing breakpoint index for a given time-to-maturity.
 definition lowerIndex(uint256 ttm) returns uint256 = ttm >= breakpointTime(6) ? 6 : ttm >= breakpointTime(5) ? 5 : ttm >= breakpointTime(4) ? 4 : ttm >= breakpointTime(3) ? 3 : ttm >= breakpointTime(2) ? 2 : ttm >= breakpointTime(1) ? 1 : 0;
 
-/// Upper enclosing breakpoint index for a given time-to-maturity.
+// Upper enclosing breakpoint index for a given time-to-maturity.
 definition upperIndex(uint256 ttm) returns uint256 = ttm >= breakpointTime(6) ? 6 : ttm >= breakpointTime(5) ? 6 : ttm >= breakpointTime(4) ? 5 : ttm >= breakpointTime(3) ? 4 : ttm >= breakpointTime(2) ? 3 : ttm >= breakpointTime(1) ? 2 : 1;
 
 definition CBP() returns uint256 = 10 ^ 12;
@@ -33,11 +35,13 @@ definition marketSettlementFeeCbp(bytes32 id, uint256 index) returns uint16 = in
 
 definition marketSettlementFee(bytes32 id, uint256 index) returns uint256 = assert_uint256(marketSettlementFeeCbp(id, index) * CBP());
 
-/// Default settlement fees for any loan token at each index are bounded by its specific maxSettlementFee cap.
+/// PROPERTIES
+
+// Default settlement fees for any loan token at each index are bounded by its specific maxSettlementFee cap.
 strong invariant defaultSettlementFeePerIndexBound(address loanToken, uint256 index)
     index <= 6 => defaultSettlementFee(loanToken, index) <= Utils.maxSettlementFee(index);
 
-/// Every market's settlement fee breakpoints are bounded by the per-index maximum.
+// Every market's settlement fee breakpoints are bounded by the per-index maximum.
 strong invariant marketSettlementFeePerIndexBound(bytes32 id, uint256 index)
     index <= 6 => marketSettlementFee(id, index) <= Utils.maxSettlementFee(index)
     {
@@ -70,7 +74,7 @@ strong invariant marketSettlementFeePerIndexBound(bytes32 id, uint256 index)
         }
     }
 
-/// When a market is created, its settlement fees are set to the default settlement fees of its loan token.
+// When a market is created, its settlement fees are set to the default settlement fees of its loan token.
 rule newMarketSettlementFeesMatchDefault(env e, Midnight.Market market, uint256 index) {
     require index <= 6, "index out of bounds";
     bytes32 id = Utils.toId(market);
@@ -83,7 +87,7 @@ rule newMarketSettlementFeesMatchDefault(env e, Midnight.Market market, uint256 
     assert marketSettlementFee(id, index) == expectedSettlementFee;
 }
 
-/// Only the fee setter can modify default settlement fees (multicall is DELETEd and not checked here).
+// Only the fee setter can modify default settlement fees (multicall is DELETEd and not checked here).
 rule onlyFeeSetterCanChangeDefaultSettlementFees(method f, env e, address token, uint256 index) filtered { f -> !f.isView } {
     require index <= 6, "index out of bounds";
     uint256 defaultSettlementFeeBefore = defaultSettlementFee(token, index);
@@ -92,7 +96,7 @@ rule onlyFeeSetterCanChangeDefaultSettlementFees(method f, env e, address token,
     assert defaultSettlementFee(token, index) != defaultSettlementFeeBefore => e.msg.sender == currentContract.feeSetter() && f.selector == sig:setDefaultSettlementFee(address, uint256, uint256).selector;
 }
 
-/// Once a market is created, only the fee setter can modify its settlement fees.
+// Once a market is created, only the fee setter can modify its settlement fees.
 rule onlyFeeSetterCanChangeMarketSettlementFeesPostCreation(method f, env e, bytes32 id, uint256 index) filtered { f -> !f.isView } {
     require index <= 6, "index out of bounds";
     require tickSpacing(id) > 0, "assume that the market is created";
@@ -103,12 +107,12 @@ rule onlyFeeSetterCanChangeMarketSettlementFeesPostCreation(method f, env e, byt
     assert marketSettlementFee(id, index) != marketSettlementFeeBefore => e.msg.sender == currentContract.feeSetter() && f.selector == sig:setMarketSettlementFee(bytes32, uint256, uint256).selector;
 }
 
-/// The settlement fee at a breakpoint is equal to the settlement fee state variable at that index.
+// The settlement fee at a breakpoint is equal to the settlement fee state variable at that index.
 rule settlementFeeAtBreakpoint(bytes32 id, uint256 index) {
     assert index <= 6 => settlementFee(id, breakpointTime(index)) == marketSettlementFee(id, index);
 }
 
-/// For any time-to-maturity the settlement fee is enclosed between the two adjacent breakpoint values (never overshoots or undershoots).
+// For any time-to-maturity the settlement fee is enclosed between the two adjacent breakpoint values (never overshoots or undershoots).
 rule settlementFeeIsBoundedByBreakpointFees(bytes32 id, uint256 timeToMaturity) {
     uint256 settlementFeeLo = marketSettlementFee(id, lowerIndex(timeToMaturity));
     uint256 settlementFeeHi = marketSettlementFee(id, upperIndex(timeToMaturity));

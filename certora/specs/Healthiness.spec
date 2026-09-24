@@ -44,7 +44,7 @@ methods {
     function _.onFlashLoan(address caller, address[] tokens, uint256[] amounts, bytes data) external => genericCallbackBytes32() expect(bytes32);
 }
 
-/// SUMMARY ///
+/// HELPERS
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -188,19 +188,19 @@ function genericCallbackBytes32() returns (bytes32) {
     return result;
 }
 
-//// RULES //////
+/// PROPERTIES
 
-// The remaining rules show that a healthy borrower cannot get unhealthy by calling any function of the contract.
-// Since we have a ghost summary for price(), we assume the price will not change during the call.
+/// The remaining rules show that a healthy borrower cannot get unhealthy by calling any function of the contract.
+/// Since we have a ghost summary for price(), we assume the price will not change during the call.
 
-// The precise invariant we show is
-//    `isHealthy(globalMarket, globalId, globalBorrower) || liquidationLocked(globalId, globalBorrower)`
-// which is also true during the callbacks in take().
+/// The precise invariant we show is
+///    `isHealthy(globalMarket, globalId, globalBorrower) || liquidationLocked(globalId, globalBorrower)`
+/// which is also true during the callbacks in take().
 
-// To avoid timeouts, we split out two cases for liquidate:
-//  1) the borrower under consideration is the one that is liquidated on the market under consideration.
-//  2) the borrower is different from the liquidated user, or the market is different.
-// and then we have a final rule for all other functions of the contract.
+/// To avoid timeouts, we split out two cases for liquidate:
+///  1) the borrower under consideration is the one that is liquidated on the market under consideration.
+///  2) the borrower is different from the liquidated user, or the market is different.
+/// and then we have a final rule for all other functions of the contract.
 
 // Show that the user stays healthy on liquidate, if the user gets liquidated (can occur if blocktime exceeds maturity)
 rule stayHealthyLiquidateSameBorrower(env e, uint256 collateralIndex, uint256 seizedAssetsIn, uint256 repaidUnitsIn, address receiver, address callbackAddr, bytes data, bool postMaturityMode) {

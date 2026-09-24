@@ -35,7 +35,7 @@ methods {
     function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
 }
 
-/// SUMMARY FUNCTIONS ///
+/// HELPERS
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
@@ -53,8 +53,10 @@ persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
 // ghostMulDivUp(a, b, d) abstracts ceil(a*b/d).
 persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
 
-/// Taking A units at once preserves position accounting versus taking B then C, where A = B + C.
-/// This is intentionally not an economic no-advantage rule; asset rounding is covered in SplitDoesNotPunishMakerOrFavorTaker.spec.
+/// PROPERTIES
+
+// Taking A units at once preserves position accounting versus taking B then C, where A = B + C.
+// This is intentionally not an economic no-advantage rule; asset rounding is covered in SplitDoesNotPunishMakerOrFavorTaker.spec.
 rule splitPreservesAccounting(env e, uint256 unitsA, uint256 unitsB, uint256 unitsC, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, Midnight.Offer offer, bytes ratifierData) {
     require unitsA == require_uint256(unitsB + unitsC), "unitsA must be equal to unitsB + unitsC";
 

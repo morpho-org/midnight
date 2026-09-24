@@ -9,7 +9,7 @@ methods {
     function tickToPrice(uint256 tick) external returns (uint256) envfree;
 }
 
-/// wExp properties ///
+/// wExp properties
 
 // Check the casting assertions in the wExp function.
 rule wExpCasting(uint256 x) {
@@ -101,7 +101,7 @@ rule wExpIsMonotonicOnPositiveRangeWhenQJumps(int256 x) {
     assert wExp(x) <= wExp(x1);
 }
 
-/// tickToPrice properties ///
+/// tickToPrice properties
 
 // Useful for PriceToTick.spec
 definition cvlMaxTick() returns uint256 = 6744;

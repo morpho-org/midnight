@@ -1,26 +1,26 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-//
-// Proves that loss-adjusted user credit plus continuousFeeCredit never exceeds totalUnits for each market.
-//
-// The loss-adjusted user credit is computed by updatePositionView as
-//     position.credit.mulDivDown(mapFactor(marketState[id].lossFactor), mapFactor(position.lastLossFactor))
-// where mapFactor(lossFactor) = type(uint128).max - lossFactor
-//
-// We pre-compute
-//
-//   sumPreciseCreditDivIndex[id] = sum position. position.credit.mulDivDown(PRECISION, mapFactor(position.lastLossFactor))
-//
-// with PRECISION large enough to avoid any rounding errors (possible in mathint which is unbounded).
-// The sum of all lender positions can then be computed by multiplying with the market's current lossFactor as
-//
-//   sumPreciseCreditDivIndex[id].mulDivDown(marketState[id].lossFactor, PRECISION)
-//
-// The global invariant we show is that this value is <= totalUnits - continuousFeeCredit, i.e. the lender positions are backed by the sum of all debt and the withdrawable amount in the contract (see totalUnitsEqualsSumNegativeDebtPlusWithdrawable in Midnight.spec).
-//
-// To avoid division we state the invariant as:
-//   multiply(sumPreciseCreditDivIndex[id], mapFactor(lossFactor(id))) <= multiply(totalUnits(id), PRECISION) - multiply(continuousFeeCredit(id), PRECISION);
 
 import "MulDivAxioms.spec";
+
+/// Proves that loss-adjusted user credit plus continuousFeeCredit never exceeds totalUnits for each market.
+///
+/// The loss-adjusted user credit is computed by updatePositionView as
+///     position.credit.mulDivDown(mapFactor(marketState[id].lossFactor), mapFactor(position.lastLossFactor))
+/// where mapFactor(lossFactor) = type(uint128).max - lossFactor
+///
+/// We pre-compute
+///
+///   sumPreciseCreditDivIndex[id] = sum position. position.credit.mulDivDown(PRECISION, mapFactor(position.lastLossFactor))
+///
+/// with PRECISION large enough to avoid any rounding errors (possible in mathint which is unbounded).
+/// The sum of all lender positions can then be computed by multiplying with the market's current lossFactor as
+///
+///   sumPreciseCreditDivIndex[id].mulDivDown(marketState[id].lossFactor, PRECISION)
+///
+/// The global invariant we show is that this value is <= totalUnits - continuousFeeCredit, i.e. the lender positions are backed by the sum of all debt and the withdrawable amount in the contract (see totalUnitsEqualsSumNegativeDebtPlusWithdrawable in Midnight.spec).
+///
+/// To avoid division we state the invariant as:
+///   multiply(sumPreciseCreditDivIndex[id], mapFactor(lossFactor(id))) <= multiply(totalUnits(id), PRECISION) - multiply(continuousFeeCredit(id), PRECISION);
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -30,17 +30,16 @@ methods {
     function lossFactor(bytes32) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
 
-    /// SUMMARY OF updatePositionView -- see file header for soundness argument. ///
+    // Summary of updatePositionView -- see file header for soundness argument.
     function Midnight.updatePositionView(Midnight.Market memory obligation, bytes32 id, address user) internal returns (uint128, uint128, uint128) with(env e) => summaryUpdatePositionView(e, id, user);
 
-    /// PRICE / ORACLE ///
     function _.price() external => NONDET;
 
-    /// MUL/DIV — exact mathint summaries (still needed for the parts of withdraw / take outside `updatePositionView`, e.g. the proportional pendingFee adjustment and the take buyer-fee accrual).
+    // mulDivDown and mulDivUp — exact mathint summaries (still needed for the parts of withdraw / take outside `updatePositionView`, e.g. the proportional pendingFee adjustment and the take buyer-fee accrual).
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
-    /// MISC INTERNALS irrelevant to credit / loss-index tracking. ///
+    // Misc internals irrelevant to credit / loss-index tracking.
     function IdLib.toId(Midnight.Market memory) internal returns (bytes32) => NONDET;
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
     function touchMarket(Midnight.Market) external returns (bytes32) => NONDET;
@@ -54,11 +53,10 @@ methods {
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
-    /// SAFE TRANSFERS ///
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
-    /// EXTERNAL CALLBACKS — assume callbacks do not reenter midnight. Prevents havoc of ghosts and variables
+    // External callbacks — assume callbacks do not reenter midnight. Prevents havoc of ghosts and variables
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => NONDET;
@@ -66,7 +64,7 @@ methods {
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
 }
 
-/// GHOSTS ///
+/// HELPERS
 
 persistent ghost mathint PRECISION {
     axiom PRECISION > 0;
@@ -124,7 +122,32 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     return require_uint256(ghostMulDivUp(a, b, d));
 }
 
-/// HELPER DEFINITIONS ///
+// Returns nondet (newCredit, newPendingFee, fee) constrained by the inequalities proved by rule updatePositionViewReflectedByFactor in UpdatePositionView.spec
+function summaryUpdatePositionView(env e, bytes32 id, address user) returns (uint128, uint128, uint128) {
+    uint128 oldCredit = cvlCredit(id, user);
+    uint128 oldPendingFee = cvlPendingFee(id, user);
+    uint128 oldLastAccrual = cvlLastAccrual(id, user);
+
+    require e.block.timestamp >= oldLastAccrual, "time is non-decreasing";
+
+    uint128 newCredit;
+    uint128 newPendingFee;
+    uint128 fee;
+    mathint preciseCreditBefore = multiply(preciseCreditDivIndex[id][user], mapFactor(lossFactor(id)));
+
+    require newCredit <= oldCredit, "proved in UpdatePositionView";
+    require newPendingFee <= oldPendingFee, "proved in UpdatePositionView";
+    require fee <= oldPendingFee, "proved in UpdatePositionView";
+    require multiply(newCredit + fee, PRECISION) <= preciseCreditBefore, "proved in UpdatePositionView";
+
+    require axiomDistributivity(newCredit, fee, PRECISION), "axiom";
+    require mapFactor(lossFactor(id)) == 0 => (newCredit == 0 && fee == 0), "proved in UpdatePositionView";
+
+    // help solver to reason about fee and distributivity.
+    require axiomDistributivity(fee, continuousFeeCredit(id), PRECISION), "axiom";
+
+    return (newCredit, newPendingFee, fee);
+}
 
 definition mapFactor(mathint index) returns mathint = 2 ^ 128 - 1 - index;
 
@@ -139,8 +162,7 @@ definition cvlLastAccrual(bytes32 id, address owner) returns uint128 = currentCo
 // Body of the strong invariant.
 // The aggregate product is routed through the uninterpreted `multiply` (== sumPreciseCreditDivIndex[id] * mapFactor(...)).
 definition sumOfCreditsBody(bytes32 id) returns bool = multiply(sumPreciseCreditDivIndex[id], mapFactor(lossFactor(id))) <= multiply(totalUnits(id), PRECISION) - multiply(continuousFeeCredit(id), PRECISION);
-
-/// HOOKS ///
+/// HOOKS
 
 function updateCreditDivIndex(bytes32 id, address owner, uint128 newCredit, uint128 newIndex) {
     mathint ownerLossIndex = mapFactor(newIndex);
@@ -196,36 +218,7 @@ hook Sstore marketState[KEY bytes32 id].totalUnits uint128 newTotal (uint128 old
     }
 }
 
-/// SUMMARY OF updatePositionView ///
-//
-// Returns nondet (newCredit, newPendingFee, fee) constrained by the inequalities proved by rule updatePositionViewReflectedByFactor in UpdatePositionView.spec
-function summaryUpdatePositionView(env e, bytes32 id, address user) returns (uint128, uint128, uint128) {
-    uint128 oldCredit = cvlCredit(id, user);
-    uint128 oldPendingFee = cvlPendingFee(id, user);
-    uint128 oldLastAccrual = cvlLastAccrual(id, user);
-
-    require to_mathint(e.block.timestamp) >= to_mathint(oldLastAccrual), "time is non-decreasing";
-
-    uint128 newCredit;
-    uint128 newPendingFee;
-    uint128 fee;
-    mathint preciseCreditBefore = multiply(preciseCreditDivIndex[id][user], mapFactor(lossFactor(id)));
-
-    require newCredit <= oldCredit, "proved in UpdatePositionView";
-    require newPendingFee <= oldPendingFee, "proved in UpdatePositionView";
-    require fee <= oldPendingFee, "proved in UpdatePositionView";
-    require multiply(newCredit + fee, PRECISION) <= preciseCreditBefore, "proved in UpdatePositionView";
-
-    require axiomDistributivity(newCredit, fee, PRECISION), "axiom";
-    require mapFactor(lossFactor(id)) == 0 => (newCredit == 0 && fee == 0), "proved in UpdatePositionView";
-
-    // help solver to reason about fee and distributivity.
-    require axiomDistributivity(fee, continuousFeeCredit(id), PRECISION), "axiom";
-
-    return (newCredit, newPendingFee, fee);
-}
-
-/// INVARIANTS ///
+/// PROPERTIES
 
 strong invariant preciseCreditCorrect(bytes32 id, address owner)
     checkCreditDivInvariant(id, owner);
