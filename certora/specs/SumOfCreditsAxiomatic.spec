@@ -115,7 +115,6 @@ function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
 }
 
 function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
-    bool overflow;
     if (d == 0 || a * b + d - 1 >= 2 ^ 256) {
         revert();
     }
