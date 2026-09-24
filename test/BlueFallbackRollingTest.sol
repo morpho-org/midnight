@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {stdError} from "../lib/forge-std/src/Test.sol";
-import {IMorpho, Id, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
+import {IMorpho, Id, MarketParams, Market as BlueMarket} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
 import {Market, CollateralParams, Offer} from "../src/interfaces/IMidnight.sol";
 import {IMidnight} from "../src/interfaces/IMidnight.sol";
@@ -1251,6 +1251,311 @@ contract BlueFallbackRollingTest is BaseTest {
             MIN_ROLLABLE_ASSETS,
             DEBT + 1
         );
+    }
+
+    function testRollBorrowsAssetsPlusIncentiveOnBlue(uint256 elapsed, uint256 assets) public {
+        elapsed = bound(elapsed, 0, end - start);
+        assets = bound(assets, MIN_ROLLABLE_ASSETS, DEBT);
+        vm.warp(start + elapsed);
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            assets
+        );
+
+        uint256 incentiveAssets = assets * expectedIncentive(elapsed) / WAD;
+        BlueMarket memory blueMarket = blue.market(blueMarketParams.id());
+        assertEq(blueMarket.totalBorrowAssets, assets + incentiveAssets);
+        assertEq(blue.position(blueMarketParams.id(), borrower).borrowShares, blueMarket.totalBorrowShares);
+        assertEq(loanToken.balanceOf(keeper), incentiveAssets);
+        assertEq(loanToken.balanceOf(address(fallbackContract)), 0);
+        assertEq(collateralToken1.balanceOf(address(fallbackContract)), 0);
+    }
+
+    function testRollRevertsForUnconfiguredUser() public {
+        vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            keeper,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+    }
+
+    function testRollRevertsForUnconfiguredMidnightMarket() public {
+        midnightMarket.maturity += 1;
+
+        vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+    }
+
+    function testRollRevertsForUnconfiguredStart() public {
+        vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start - 1,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+    }
+
+    function testRollRevertsForUnconfiguredIncentives() public {
+        vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START - 1,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+
+        vm.expectRevert(IBlueFallbackRolling.NotConfigured.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END + 1,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+    }
+
+    function testRollRevertsForNoActivatedCollateral() public {
+        vm.prank(keeper);
+        fallbackContract.setConfig(
+            keeper,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+        assertEq(midnight.collateralBitmap(toId(midnightMarket), keeper), 0);
+
+        vm.expectRevert(IBlueFallbackRolling.IncorrectActivatedCollateral.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            keeper,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+    }
+
+    function testRollRevertsWhenNotAuthorizedOnMidnight() public {
+        vm.prank(borrower);
+        midnight.setIsAuthorized(address(fallbackContract), false, borrower);
+
+        vm.expectRevert(IMidnight.Unauthorized.selector);
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+    }
+
+    function testRollRevertsWhenNotAuthorizedOnBlue() public {
+        vm.prank(borrower);
+        blue.setAuthorization(address(fallbackContract), false);
+
+        vm.expectRevert(bytes("unauthorized"));
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+    }
+
+    function testRollRevertsWhenBluePositionWouldBeUnhealthy() public {
+        uint256 lowLltv = LLTV / 2;
+        blue.enableLltv(lowLltv);
+        blueMarketParams.lltv = lowLltv;
+        blue.createMarket(blueMarketParams);
+        deal(address(loanToken), address(this), 2 * DEBT);
+        blue.supply(blueMarketParams, 2 * DEBT, 0, lender, hex"");
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+
+        vm.expectRevert(bytes("insufficient collateral"));
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+    }
+
+    function testRollRevertsWhenBlueLacksLiquidity() public {
+        vm.prank(lender);
+        blue.withdraw(blueMarketParams, 2 * DEBT - DEBT / 2, 0, lender, lender);
+
+        vm.expectRevert(bytes("insufficient liquidity"));
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+    }
+
+    function testRollCanBeRepeatedAfterDisableAndReenable() public {
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            false
+        );
+        vm.prank(borrower);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+
+        vm.prank(keeper);
+        fallbackContract.roll(
+            midnightMarket,
+            blueMarketParams,
+            borrower,
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            DEBT
+        );
+
+        assertEq(midnight.debt(toId(midnightMarket), borrower), 0);
+    }
+
+    function testSetConfigRevertsForMidnightAuthorizedCallerAfterRevocation() public {
+        vm.prank(borrower);
+        midnight.setIsAuthorized(lender, true, borrower);
+        vm.prank(borrower);
+        midnight.setIsAuthorized(lender, false, borrower);
+
+        vm.expectRevert(IBlueFallbackRolling.Unauthorized.selector);
+        vm.prank(lender);
+        fallbackContract.setConfig(
+            borrower,
+            toId(midnightMarket),
+            Id.unwrap(blueMarketParams.id()),
+            start,
+            end,
+            INCENTIVE_AT_START,
+            INCENTIVE_AT_END,
+            MIN_ROLLABLE_ASSETS,
+            true
+        );
+    }
+
+    function testSetConfigIsPerUser() public view {
+        assertFalse(
+            fallbackContract.isConfig(
+                keeper, configId(start, end, INCENTIVE_AT_START, INCENTIVE_AT_END, MIN_ROLLABLE_ASSETS)
+            )
+        );
+    }
+
+    function testConstructor() public view {
+        assertEq(fallbackContract.MIDNIGHT(), address(midnight));
+        assertEq(fallbackContract.BLUE(), address(blue));
     }
 
     function expectedIncentive(uint256 elapsed) internal view returns (uint256) {
