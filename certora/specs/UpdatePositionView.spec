@@ -129,8 +129,6 @@ strong invariant noCreditWhenLastLossFactorMaxed(bytes32 id, address user)
         }
     }
 
-/// Rules
-
 rule updatePositionViewProperties(env e, Midnight.Market obligation, bytes32 id, address user) {
     requireInvariant preciseCreditCorrect(id, user);
     require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";
@@ -157,8 +155,7 @@ rule updatePositionViewProperties(env e, Midnight.Market obligation, bytes32 id,
     assert mapFactor(currentContract.marketState[id].lossFactor) == 0 => newCredit == 0 && fee == 0, "no credit/fee on total loss factor";
 }
 
-/// When lastLossFactor matches the market and lastAccrual matches now, updatePositionView
-/// returns the stored credit (slash is a no-op and no new fee accrues).
+/// When lastLossFactor matches the market and lastAccrual matches now, updatePositionView returns the stored credit (slash is a no-op and no new fee accrues).
 rule updatePositionViewEqualsCreditWhenSynced(env e, Midnight.Market market, bytes32 id, address user) {
     requireInvariant noCreditWhenLastLossFactorMaxed(id, user);
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
