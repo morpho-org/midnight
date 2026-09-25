@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-import "UpdatedCredit.spec";
-
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
@@ -167,5 +165,7 @@ rule updatePositionViewEqualsCreditWhenSynced(env e, Midnight.Market market, byt
     require lastLossFactor(id, user) == lossFactor(id), "loss factor is up to date";
     require lastAccrual(id, user) == e.block.timestamp, "lastAccrual is up to date";
 
-    assert updatedCredit(e, market, id, user) == credit(id, user);
+    uint128 newCredit;
+    newCredit, _, _ = updatePositionView(e, market, id, user);
+    assert newCredit == credit(id, user);
 }

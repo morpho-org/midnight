@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-import "UpdatedCredit.spec";
-
 using Utils as Utils;
 
 methods {
@@ -70,7 +68,9 @@ rule updatePositionSyncsCreditWithView(env e, Midnight.Market market, address us
 
     updatePosition(e, market, user);
 
-    assert updatedCredit(e, market, id, user) == credit(id, user);
+    uint128 viewCredit;
+    viewCredit, _, _ = updatePositionView(e, market, id, user);
+    assert viewCredit == credit(id, user);
 }
 
 /// Withdraw.
