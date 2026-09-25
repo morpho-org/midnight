@@ -36,8 +36,7 @@ methods {
 
 /// Update position.
 
-// updatePosition can only decrease user's credit (through slashing and fee accrual), sets it to the post-update value, only changes credit of user at the market id, and accrues fee to continuousFeeCredit, the user's lastLossFactor matches the market, and lastAccrual matches the block timestamp.
-.  The up-to-date credit equals the stored credit.
+// updatePosition can only decrease user's credit (through slashing and fee accrual), sets it to the post-update value, only changes credit of user at the market id, and accrues fee to continuousFeeCredit, the user's lastLossFactor matches the market, and lastAccrual matches the block timestamp. The up-to-date credit equals the stored credit.
 rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 anyId, address anyUser) {
     bytes32 id = Utils.toId(market);
 
