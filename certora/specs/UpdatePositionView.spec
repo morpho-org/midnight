@@ -114,7 +114,7 @@ hook Sstore position[KEY bytes32 id][KEY address owner].lastAccrual uint128 newL
     lastAccrualMirror[id][owner] = newLast;
 }
 
-/// Properties
+/// PROPERTIES
 
 strong invariant preciseCreditCorrect(bytes32 id, address owner)
     checkCreditDivInvariant(id, owner);
