@@ -36,9 +36,12 @@ methods {
 
 /// Update position.
 
-// updatePosition can only decrease user's credit (through slashing and fee accrual), sets it to the post-update value, only changes credit of user at the market id, and accrues fee to continuousFeeCredit.
+// updatePosition can only decrease user's credit (through slashing and fee accrual), sets it to the post-update value, only changes credit of user at the market id, and accrues fee to continuousFeeCredit, the user's lastLossFactor matches the market, and lastAccrual matches the block timestamp.
+.  The up-to-date credit equals the stored credit.
 rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 anyId, address anyUser) {
     bytes32 id = Utils.toId(market);
+
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
 
     uint256 creditBefore = credit(id, user);
     uint128 updatedUserCredit;
@@ -58,15 +61,8 @@ rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 
     assert pendingFee(id, user) == newPendingFee;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
     assert credit(id, user) <= creditBefore;
-}
-
-// After updatePosition, the up-to-date credit equals the stored credit.
-rule updatePositionSyncsCreditWithView(env e, Midnight.Market market, address user) {
-    bytes32 id = Utils.toId(market);
-
-    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
-
-    updatePosition(e, market, user);
+    assert lastLossFactor(id, user) == lossFactor(id);
+    assert lastAccrual(id, user) == e.block.timestamp;
 
     uint128 viewCredit;
     viewCredit, _, _ = updatePositionView(e, market, id, user);
@@ -74,18 +70,6 @@ rule updatePositionSyncsCreditWithView(env e, Midnight.Market market, address us
 }
 
 /// Withdraw.
-
-// After updatePosition, the user's lastLossFactor matches the market and lastAccrual matches the block timestamp.
-rule updatePositionSyncsLossFactorAndLastAccrual(env e, Midnight.Market market, address user) {
-    bytes32 id = Utils.toId(market);
-
-    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
-
-    updatePosition(e, market, user);
-
-    assert lastLossFactor(id, user) == lossFactor(id);
-    assert lastAccrual(id, user) == e.block.timestamp;
-}
 
 // withdraw decreases onBehalf's post-update credit by exactly units and only changes credit of onBehalf at the market id.
 rule withdrawEffects(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
