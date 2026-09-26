@@ -5,6 +5,8 @@ methods {
 
     function lossFactor(bytes32) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
 
     function _.price() external => NONDET;
 

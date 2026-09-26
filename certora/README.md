@@ -15,6 +15,7 @@ Global invariants on positions, markets and accounting.
   Rules also pin down `take`/`liquidate` input-output consistency: zero inputs give zero outputs, and `take` raises the claimable settlement fee by exactly the buyer/seller spread.
   It also shows that neither credit nor debt can grow once a market's loss factor is maxed out, and that every enabled `LLTV` tier is at most `WAD` while every enabled liquidation cursor is strictly below `WAD`.
 - [`BalanceEffects.spec`](specs/BalanceEffects.spec) pins down the exact credit, debt and collateral effect of every entry point.
+  `onlyBadDebtDesyncsCreditFromView` excludes `take`, which is checked by `onlyBadDebtDesyncsCreditFromViewOnTake` in [`BalanceEffectsOnTake.conf`](confs/BalanceEffectsOnTake.conf) at depth 0, with transient storage summarized.
 - [`WithdrawableMonotonicity.spec`](specs/WithdrawableMonotonicity.spec) checks how withdrawable assets move: up on `repay` and `liquidate`, down by exactly the amount on `withdraw` and `claimContinuousFee`, and unchanged otherwise.
   It checks the claimable settlement fee the same way: up on `take`, down on `claimSettlementFee`, and unchanged otherwise.
 - [`CreatedMarkets.spec`](specs/CreatedMarkets.spec) checks the well-formedness invariants of a created market: a non-empty collateral list, strictly sorted by token, with no zero token, and every entry with an enabled `LLTV` tier, an enabled liquidation cursor, and a `maxLif <= 2 * WAD`.
