@@ -15,6 +15,7 @@ Global invariants on positions, markets and accounting.
   Rules also pin down `take`/`liquidate` input-output consistency: zero inputs give zero outputs, and `take` raises the claimable settlement fee by exactly the buyer/seller spread.
   It also shows that neither credit nor debt can grow once a market's loss factor is maxed out, and that every enabled `LLTV` tier is at most `WAD` while every enabled liquidation cursor is strictly below `WAD`.
 - [`BalanceEffects.spec`](specs/BalanceEffects.spec) pins down the exact credit, debt and collateral effect of every entry point.
+  It also checks that `updatePosition` syncs a user's stored credit with the up-to-date credit returned by the view, and syncs the user's loss factor and accrual timestamp.
 - [`WithdrawableMonotonicity.spec`](specs/WithdrawableMonotonicity.spec) checks how withdrawable assets move: up on `repay` and `liquidate`, down by exactly the amount on `withdraw` and `claimContinuousFee`, and unchanged otherwise.
   It checks the claimable settlement fee the same way: up on `take`, down on `claimSettlementFee`, and unchanged otherwise.
 - [`CreatedMarkets.spec`](specs/CreatedMarkets.spec) checks the well-formedness invariants of a created market: a non-empty collateral list, strictly sorted by token, with no zero token, and every entry with an enabled `LLTV` tier, an enabled liquidation cursor, and a `maxLif <= 2 * WAD`.
@@ -23,6 +24,7 @@ Global invariants on positions, markets and accounting.
 - [`LossFactor.spec`](specs/LossFactor.spec) checks that only `liquidate` changes a market's loss factor, and only when bad debt is realized (total units decrease), and that `updatePosition` syncs the user's `lastLossFactor` to the market's.
   It also checks that the loss-factor arithmetic in `updatePosition` and `liquidate` does not revert on a created market.
 - [`UpdateBeforeCredit.spec`](specs/UpdateBeforeCredit.spec) checks that credit is never loaded or stored before `_updatePosition` has run for that position.
+- [`UpdatePositionView.spec`](specs/UpdatePositionView.spec) checks the properties of the accrued position view, including that when a user's loss factor and accrual timestamp are current, the view returns the stored credit, and that a user with a saturated loss factor has no credit.
 - [`MarketNotReadBeforeCreated.spec`](specs/MarketNotReadBeforeCreated.spec) checks that no code path reads a non-empty market or position field before the market is created (its `tickSpacing` is still zero).
 - [`NetCredit.spec`](specs/NetCredit.spec) checks the net credit of a position, its up-to-date credit minus its pending continuous fee.
   Only `withdraw`, `take` and `liquidate` can change it, `withdraw` can only decrease it and leaves other positions untouched, and a `take` moves only the buyer's and the seller's.
