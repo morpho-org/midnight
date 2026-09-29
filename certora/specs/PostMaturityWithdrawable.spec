@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-import "UpdatedCredit.spec";
-
 using Utils as Utils;
 
 methods {
@@ -43,7 +41,8 @@ rule withdrawableOnlyDecreasesOnWithdrawOrClaimContinuousFee(env e, method f, ca
 rule withdrawDecreaseBoundedByCredit(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver) {
     bytes32 id = summaryToId(market);
     bytes32 otherid;
-    uint256 creditBefore = updatedCredit(e, market, id, onBehalf);
+    uint128 creditBefore;
+    creditBefore, _, _ = updatePositionView(e, market, id, onBehalf);
     uint256 withdrawableBefore = withdrawable(id);
     uint256 withdrawableOtherBefore = withdrawable(otherid);
 
