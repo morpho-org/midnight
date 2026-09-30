@@ -25,3 +25,12 @@ interface IFlashLoanCallback {
     function onFlashLoan(address caller, address[] memory tokens, uint256[] memory assets, bytes memory data) external returns (bytes32);
 }
 // forgefmt: disable-end
+
+interface IBuyerAssetsBound {
+    /// @notice Returns the callback's funding bound in loan-token assets.
+    /// @dev The bound does not guarantee that the callback will succeed.
+    function buyerAssetsBound(bytes32 id, Market memory market, address buyer, bytes memory data)
+        external
+        view
+        returns (uint256);
+}
