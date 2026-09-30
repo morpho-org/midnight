@@ -24,8 +24,8 @@ interface IRepayCallback {
 interface IFlashLoanCallback {
     function onFlashLoan(address caller, address[] memory tokens, uint256[] memory assets, bytes memory data) external returns (bytes32);
 }
-// forgefmt: disable-end
 
 interface IBuyerAssetsBound {
     function buyerAssetsBound(bytes32 id, Market memory market, address buyer, bytes memory data) external view returns (uint256);
 }
+// forgefmt: disable-end
