@@ -47,7 +47,7 @@ contract RateRatifierV1 is IRateRatifierV1 {
         return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 
-    /// @dev Permissioned to not let people extract the signature of a batch and start taking before or take even though the batch reverted.
+    /// @dev Permissioned to not let people extract the signature of a batch and start taking before or take even though the batch reverted. Both the caller and the signer are subject to the same authorization as setIsRootRatified.
     function setIsRootRatifiedWithSig(
         address maker,
         bytes32 root,
