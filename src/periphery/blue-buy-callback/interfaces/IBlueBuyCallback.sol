@@ -2,11 +2,10 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity >=0.5.0;
 
-import {IBuyCallback} from "../../../interfaces/ICallbacks.sol";
-import {Market} from "../../../interfaces/IMidnight.sol";
+import {IBuyCallback, IBuyerAssetsBound} from "../../../interfaces/ICallbacks.sol";
 import {Authorization, Signature} from "../../../../lib/morpho-blue/src/interfaces/IMorpho.sol";
 
-interface IBlueBuyCallback is IBuyCallback {
+interface IBlueBuyCallback is IBuyCallback, IBuyerAssetsBound {
     /// ERRORS ///
     error AuthorizationExpired();
     error InconsistentLoanToken();
@@ -28,10 +27,6 @@ interface IBlueBuyCallback is IBuyCallback {
     function nonce() external view returns (uint256);
 
     /// FUNCTIONS ///
-    function buyerAssetsBound(bytes32 id, Market memory market, address buyer, bytes memory data)
-        external
-        view
-        returns (uint256);
     function setAuthorization(address authorized, bool newIsAuthorized) external;
     function setAuthorizationWithSig(Authorization memory authorization, Signature memory signature) external;
     function skim(address token) external;
