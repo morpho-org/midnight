@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
+import "MulDivAxioms.spec";
+
 using Utils as Utils;
 
 methods {
@@ -24,6 +26,12 @@ methods {
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
+    // Same summarization as Healthiness.spec: mulDiv is a deterministic ghost.
+    // A nondeterministic overflow flag overapproximates reverts. The rules below
+    // assume only the MulDiv.spec facts they need, via MulDivAxioms.spec.
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
     // Summaries over-approximating the behavior of transient storage.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
     function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
@@ -38,6 +46,34 @@ methods {
     function _.transfer(address, uint256) external => NONDET;
 }
 
+/// HELPERS
+
+function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) {
+        revert();
+    }
+    return require_uint256(ghostMulDivDown(a, b, d));
+}
+
+function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) {
+        revert();
+    }
+    return require_uint256(ghostMulDivUp(a, b, d));
+}
+
+// Facts from MulDiv.spec used when a view is compared to stored credit.
+// Zero is quantified because the fee numerator is the post-slash pending fee, which this spec does not name.
+// Identity is quantified because take and updatePosition replace credit before the next view.
+function requireMulDivCreditAxioms() {
+    require forall mathint b. forall mathint d. axiomMathMulDivDownZeroA(b, d), "mulDivZero in MulDiv.spec";
+    require forall mathint a. forall mathint d. axiomMathMulDivDownZeroB(a, d), "mulDivZero in MulDiv.spec";
+    require forall mathint a. forall mathint d. axiomMathMulDivUpZeroB(a, d), "mulDivZero in MulDiv.spec";
+    require forall mathint a. forall mathint x. axiomMathMulDivDownIdentity(a, x), "mulDivIdentity in MulDiv.spec";
+}
+
 /// Update position.
 
 // updatePosition can only decrease user's credit (through slashing and fee accrual), sets it to the post-update value, only changes credit of user at the market id, and accrues fee to continuousFeeCredit, the user's lastLossFactor matches the market, and lastAccrual matches the block timestamp. The up-to-date credit equals the stored credit.
@@ -45,6 +81,7 @@ rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 
     bytes32 id = Utils.toId(market);
 
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+    requireMulDivCreditAxioms();
 
     uint256 creditBefore = credit(id, user);
     uint128 updatedUserCredit;
@@ -72,13 +109,14 @@ rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 
     assert viewCredit == credit(id, user);
 }
 
-// If stored credit already equals the up-to-date credit, they can diverge only when this market's loss factor increases (bad debt is socialized; see lossFactorChangesIffBadDebt). take is checked by onlyBadDebtDesyncsCreditFromViewOnTake.
-rule onlyBadDebtDesyncsCreditFromView(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> !f.isView && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
+// If stored credit already equals the up-to-date credit, they can diverge only when this market's loss factor increases (bad debt is socialized; see lossFactorChangesIffBadDebt).
+rule onlyBadDebtDesyncsCreditFromView(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> !f.isView } {
     bytes32 id = Utils.toId(market);
 
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
     require lastAccrual(id, user) <= e.block.timestamp, "time is increasing";
     require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactorLeqMarketLossFactor in Midnight";
+    requireMulDivCreditAxioms();
 
     uint128 viewCreditBefore;
     viewCreditBefore, _, _ = updatePositionView(e, market, id, user);
@@ -93,32 +131,13 @@ rule onlyBadDebtDesyncsCreditFromView(env e, method f, calldataarg args, Midnigh
     assert viewCreditAfter != credit(id, user) => lossFactor(id) != lossFactorBefore;
 }
 
-// Same as onlyBadDebtDesyncsCreditFromView, instantiated on take.
-rule onlyBadDebtDesyncsCreditFromViewOnTake(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, Midnight.Market market, address user) {
-    bytes32 id = Utils.toId(market);
-
-    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
-    require lastAccrual(id, user) <= e.block.timestamp, "time is increasing";
-    require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactorLeqMarketLossFactor in Midnight";
-
-    uint128 viewCreditBefore;
-    viewCreditBefore, _, _ = updatePositionView(e, market, id, user);
-    require viewCreditBefore == credit(id, user);
-
-    uint128 lossFactorBefore = lossFactor(id);
-
-    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
-
-    uint128 viewCreditAfter;
-    viewCreditAfter, _, _ = updatePositionView(e, market, id, user);
-    assert viewCreditAfter != credit(id, user) => lossFactor(id) != lossFactorBefore;
-}
-
 /// Withdraw.
 
 // withdraw decreases onBehalf's post-update credit by exactly units and only changes credit of onBehalf at the market id.
 rule withdrawEffects(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
     bytes32 id = Utils.toId(market);
+
+    requireMulDivCreditAxioms();
 
     uint128 updatedUserCredit;
     uint128 userFee;
@@ -141,6 +160,7 @@ rule withdrawEffects(env e, Midnight.Market market, uint256 units, address onBeh
 // take changes maker's and taker's net credit-debt by +/- units relative to their post-update values and only changes credit of maker and taker and debt of maker and taker at the market id.
 rule takeEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes32 anyId, address anyUser) {
     bytes32 id = Utils.toId(offer.market);
+    requireMulDivCreditAxioms();
 
     uint128 makerCreditBefore;
     makerCreditBefore, _, _ = updatePositionView(e, offer.market, id, offer.maker);
@@ -171,6 +191,7 @@ rule takeBuyerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 u
     bytes32 id = Utils.toId(offer.market);
 
     address buyer = offer.buy ? offer.maker : taker;
+    requireMulDivCreditAxioms();
     uint256 buyerDebtBefore = debt(id, buyer);
     uint128 buyerUpdatedCreditBefore;
     buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, buyer);
@@ -191,6 +212,7 @@ rule takeSellerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 
     bytes32 id = Utils.toId(offer.market);
 
     address seller = offer.buy ? taker : offer.maker;
+    requireMulDivCreditAxioms();
     uint256 sellerDebtBefore = debt(id, seller);
     uint128 sellerUpdatedCreditBefore;
     sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, seller);
