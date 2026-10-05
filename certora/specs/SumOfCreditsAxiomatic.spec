@@ -387,7 +387,7 @@ rule positionCreditPlusContinuousFeeLeTotalUnits(bytes32 id, address user) {
     //     == credit * PRECISION * marketIndex   (assoc/comm)
     //     == userCDI * userIndex * marketIndex  (preciseCreditCorrect)
     //     == userCDI * marketIndex * userIndex  (assoc/comm)
-    //     <= sumCDI * marketIndex * userIndex   (step 0)
+    //     <= sumCDI * marketIndex * userIndex   (userCDI part of sumCDI)
     //     <= backing * PRECISION * userIndex    (step 1)
     //     == backing * userIndex * PRECISION    (assoc/comm)
     // and divide by PRECISION and userIndex.
