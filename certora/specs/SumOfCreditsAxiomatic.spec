@@ -26,6 +26,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function totalUnits(bytes32 id) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
     function continuousFeeCredit(bytes32 id) external returns (uint128) envfree;
     function lossFactor(bytes32) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
@@ -79,6 +80,7 @@ ghost mapping(bytes32 => mathint) sumPreciseCreditDivIndex {
 
 ghost mapping(bytes32 => mapping(address => mathint)) preciseCreditDivIndex {
     init_state axiom forall bytes32 id. forall address user. preciseCreditDivIndex[id][user] == 0;
+    init_state axiom forall bytes32 id. (usum address user. preciseCreditDivIndex[id][user]) == 0;
     axiom forall bytes32 id. forall address user. preciseCreditDivIndex[id][user] >= 0;
 }
 
@@ -152,6 +154,7 @@ function updateCreditDivIndex(bytes32 id, address owner, uint128 newCredit, uint
     // This is sound because we can assume PRECISION to be large enough to
     // be divisible by ownerLossIndex.
     require ownerLossIndex > 0 => multiply(value, ownerLossIndex) == multiply(newCredit, PRECISION), "PRECISION is divisible by ownerLossIndex";
+    require value >= 0, "value is the non-negative quotient newCredit * PRECISION / ownerLossIndex";
 
     mathint newCDI = (ownerLossIndex == 0 || newCredit == 0) ? 0 : value;
     preciseCreditDivIndex[id][owner] = newCDI;
@@ -347,4 +350,56 @@ rule sumOfCreditsLeTotalUnitsPreservedByTake(bytes32 id, env e, uint256 units, a
         require axiomDistributivity(sellerCreditDecrease - buyerCreditIncrease, buyerCreditIncrease, PRECISION), "axiom";
     }
     assert sumOfCreditsBody(id);
+}
+
+// The ghost sum is the sum of the per-user values.
+strong invariant sumPreciseCreditDivIndexIsSum(bytes32 id)
+    sumPreciseCreditDivIndex[id] == (usum address u. preciseCreditDivIndex[id][u]);
+
+// Per-position consequence of sumOfCreditsLeTotalUnits, stated in the form used by updatePositionView:
+// the loss-adjusted credit of any single position plus continuousFeeCredit is at most totalUnits.
+rule positionCreditPlusContinuousFeeLeTotalUnits(bytes32 id, address user) {
+    requireInvariant sumOfCreditsLeTotalUnits(id);
+    requireInvariant sumPreciseCreditDivIndexIsSum(id);
+    requireInvariant preciseCreditCorrect(id, user);
+    require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactorLeqMarketLossFactor in Midnight";
+
+    uint128 credit = credit(id, user);
+    mathint marketIndex = max_uint128 - lossFactor(id);
+    mathint userIndex = max_uint128 - lastLossFactor(id, user);
+    mathint postSlashCredit = userIndex > 0 ? mathMulDivDown(credit, marketIndex, userIndex) : 0;
+
+    mathint userCDI = preciseCreditDivIndex[id][user];
+    mathint sumCDI = sumPreciseCreditDivIndex[id];
+    mathint backing = totalUnits(id) - continuousFeeCredit(id);
+
+    // Step 1: the invariant reads sumCDI * marketIndex <= backing * PRECISION; in particular backing >= 0.
+    require axiomDistributivity(backing, continuousFeeCredit(id), PRECISION), "axiom";
+    require axiomLeMulPos(0, backing, PRECISION), "axiom";
+
+    // Step 2: postSlashCredit * userIndex <= credit * marketIndex, or postSlashCredit == 0 if marketIndex == 0.
+    require axiomMathMulDivDownZeroB(credit, userIndex), "axiom";
+    require axiomMathMulDivDownRoundsDownMultiply(credit, marketIndex, userIndex), "axiom";
+
+    // Step 3: chain
+    //   postSlashCredit * userIndex * PRECISION
+    //     <= credit * marketIndex * PRECISION   (step 2)
+    //     == credit * PRECISION * marketIndex   (assoc/comm)
+    //     == userCDI * userIndex * marketIndex  (preciseCreditCorrect)
+    //     == userCDI * marketIndex * userIndex  (assoc/comm)
+    //     <= sumCDI * marketIndex * userIndex   (userCDI part of sumCDI)
+    //     <= backing * PRECISION * userIndex    (step 1)
+    //     == backing * userIndex * PRECISION    (assoc/comm)
+    // and divide by PRECISION and userIndex.
+    require axiomLeMulPos(multiply(postSlashCredit, userIndex), multiply(credit, marketIndex), PRECISION), "axiom";
+    require axiomAssocComm(credit, marketIndex, PRECISION), "axiom";
+    require axiomAssocComm(userCDI, userIndex, marketIndex), "axiom";
+    require axiomLeMulPos(userCDI, sumCDI, marketIndex), "axiom";
+    require axiomLeMulPos(multiply(userCDI, marketIndex), multiply(sumCDI, marketIndex), userIndex), "axiom";
+    require axiomLeMulPos(multiply(sumCDI, marketIndex), multiply(backing, PRECISION), userIndex), "axiom";
+    require axiomAssocComm(backing, PRECISION, userIndex), "axiom";
+    require axiomLeMulPos(multiply(postSlashCredit, userIndex), multiply(backing, userIndex), PRECISION), "axiom";
+    require axiomLeMulPos(postSlashCredit, backing, userIndex), "axiom";
+
+    assert continuousFeeCredit(id) + postSlashCredit <= totalUnits(id);
 }

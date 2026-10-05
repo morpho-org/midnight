@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
+import "MulDivAxioms.spec";
+
 using Utils as Utils;
 
 methods {
@@ -11,6 +13,7 @@ methods {
     function withdrawable(bytes32 id) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function lossFactor(bytes32 id) external returns (uint128) envfree;
     function liquidationLocked(bytes32 id, address user) external returns (bool) envfree;
     function tickSpacing(bytes32 id) external returns (uint8) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
@@ -42,33 +45,34 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
 
-persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256;
-
-persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256;
-
 function summaryMulDivDown(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (d == 0 || x * y >= 2 ^ 256) {
         revert();
     }
-    uint256 result = ghostMulDivDown(x, y, d);
-    require result * d <= x * y, "see mulDivDownRoundsDown in MulDiv.spec";
-    require (result + 1) * d > x * y, "see mulDivDownTightBound in MulDiv.spec";
-    require y <= d => result <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
-    require x <= d => result <= y, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
-    require y == d => result == x, "see mulDivIdentity in MulDiv.spec";
-    return result;
+    require axiomMathMulDivDownRoundsDown(x, y, d), "axiom";
+    require axiomMathMulDivDownTightBound(x, y, d), "axiom";
+    require axiomMathMulDivDownArgumentLesserThanDenominatorA(x, y, d), "axiom";
+    require axiomMathMulDivDownArgumentLesserThanDenominatorB(x, y, d), "axiom";
+    require axiomMathMulDivDownIdentity(x, y), "axiom";
+    return require_uint256(ghostMulDivDown(x, y, d));
 }
 
 function summaryMulDivUp(uint256 x, uint256 y, uint256 d) returns uint256 {
     if (d == 0 || x * y + d - 1 >= 2 ^ 256) {
         revert();
     }
-    uint256 result = ghostMulDivUp(x, y, d);
-    require result * d >= x * y, "see mulDivUpRoundsUp in MulDiv.spec";
-    require result * d <= x * y + d - 1, "see mulDivUpUpperBound in MulDiv.spec";
-    require y <= d => result <= x, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
-    require x <= d => result <= y, "see mulDivArgumentLesserThanDenominator in MulDiv.spec";
-    return result;
+    require axiomMathMulDivUpRoundsUp(x, y, d), "axiom";
+    require axiomMathMulDivUpUpperBound(x, y, d), "axiom";
+    require axiomMathMulDivUpArgumentLesserThanDenominatorA(x, y, d), "axiom";
+    require axiomMathMulDivUpArgumentLesserThanDenominatorB(x, y, d), "axiom";
+    return require_uint256(ghostMulDivUp(x, y, d));
+}
+
+function postSlashCredit(bytes32 id, address user) returns mathint {
+    uint128 credit = credit(id, user);
+    mathint marketIndex = max_uint128 - lossFactor(id);
+    mathint userIndex = max_uint128 - lastLossFactor(id, user);
+    return userIndex > 0 ? mathMulDivDown(credit, marketIndex, userIndex) : 0;
 }
 
 /// The market's lossFactor is only modified by liquidate.
@@ -102,7 +106,7 @@ rule updatePositionSyncsLastLossFactor(env e, Midnight.Market market, address us
 
     updatePosition(e, market, user);
 
-    assert lastLossFactor(id, user) == currentContract.marketState[id].lossFactor;
+    assert lastLossFactor(id, user) == lossFactor(id);
 }
 
 /// Assuming that the market is created, the loss factor computation in updatePosition does not revert.
@@ -110,11 +114,11 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
     require marketIsCreated(market), "market must be created";
-    require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
+    require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
     require pendingFee(id, user) <= credit(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
-    require currentContract.marketState[id].continuousFeeCredit + pendingFee(id, user) <= max_uint128, "Total credit should be bounded by 2^128 and an increase of continuous fee credit should corresponds to a similar decrease of credit";
+    require currentContract.marketState[id].continuousFeeCredit + postSlashCredit(id, user) <= totalUnits(id), "positionCreditPlusContinuousFeeLeTotalUnits in SumOfCreditsAxiomatic.spec";
 
     require e.msg.value == 0, "Midnight is not payable";
     updatePosition@withrevert(e, market, user);
@@ -126,7 +130,7 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
 rule updatePositionViewDoesNotRevert(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
-    require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
+    require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
     require pendingFee(id, user) <= credit(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
@@ -175,7 +179,7 @@ rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
 rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
-    require lastLossFactor(id, user) == currentContract.marketState[id].lossFactor, "lastLossFactor synced with market";
+    require lastLossFactor(id, user) == lossFactor(id), "lastLossFactor synced with market";
     require lastLossFactor(id, user) < max_uint128, "lossFactor not saturated";
     require pendingFee(id, user) <= credit(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
@@ -250,9 +254,9 @@ rule withdrawDoesNotRevert(env e, Midnight.Market market, uint256 units, address
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
 
     // These assumptions are proved in other spec files.
-    require lastLossFactor(id, onBehalf) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight.spec";
+    require lastLossFactor(id, onBehalf) <= lossFactor(id), "lastLossFactorLeqMarketLossFactor in Midnight.spec";
     require pendingFee(id, onBehalf) <= credit(id, onBehalf), "pendingContinuousFeeBoundedByCredit in Midnight.spec";
-    require currentContract.marketState[id].continuousFeeCredit + updatedUserCredit + accruedFee <= totalUnits(id), "sumOfCreditsLeTotalUnits in SumOfCreditsAxiomatic.spec";
+    require currentContract.marketState[id].continuousFeeCredit + postSlashCredit(id, onBehalf) <= totalUnits(id), "positionCreditPlusContinuousFeeLeTotalUnits in SumOfCreditsAxiomatic.spec";
     require withdrawable(id) <= totalUnits(id), "totalUnitsEqualsSumNegativeDebtPlusWithdrawable in Midnight.spec (sumDebt >= 0 because it sums up unsigned values)";
 
     withdraw@withrevert(e, market, units, onBehalf, receiver);
