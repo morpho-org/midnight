@@ -109,7 +109,7 @@ rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 
     assert viewCredit == credit(id, user);
 }
 
-// If stored credit already equals the up-to-date credit, they can diverge only when this market's loss factor increases (bad debt is socialized; see lossFactorChangesIffBadDebt).
+// If stored credit already equals the up-to-date credit, they can diverge on the same timestamp only when this market's loss factor increases (bad debt is socialized; see lossFactorChangesIffBadDebt).
 rule onlyBadDebtDesyncsCreditFromView(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> !f.isView } {
     bytes32 id = Utils.toId(market);
 
