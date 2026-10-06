@@ -35,6 +35,13 @@ methods {
     // Assume ERC20 tokens transfer correctly: no fee taking from sender or receiver, no rebasing, no blacklisting, no transfer limits.
     function _.transfer(address a, uint256 v) external with(env e) => CVL_transferFrom(e, calledContract, e.msg.sender, a, v) expect(bool);
     function _.transferFrom(address src, address a, uint256 v) external with(env e) => CVL_transferFrom(e, calledContract, src, a, v) expect(bool);
+
+    // Views stay NONDET. -havocAllByDefault would otherwise summarize them as HAVOC_ALL.
+    function _.price() external => NONDET;
+    function _.canIncreaseCredit(address) external => NONDET;
+    function _.canIncreaseDebt(address) external => NONDET;
+    function _.canLiquidate(address) external => NONDET;
+    function _.isRatified(Midnight.Offer, bytes, address) external => NONDET;
 }
 
 /// HELPERS

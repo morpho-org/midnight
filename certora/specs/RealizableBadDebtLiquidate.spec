@@ -35,6 +35,9 @@ methods {
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => NONDET;
     function _.onFlashLoan(address, address[], uint256[], bytes) external => NONDET;
+
+    // Views stay NONDET. -havocAllByDefault would otherwise summarize them as HAVOC_ALL.
+    function _.canLiquidate(address) external => NONDET;
 }
 
 /// HELPERS

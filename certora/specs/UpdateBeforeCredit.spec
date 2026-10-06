@@ -16,6 +16,22 @@ methods {
     // Summarize _updatePosition so that its credit reads/writes do not fire the hooks below.
     function _updatePosition(Midnight.Market memory, bytes32 id, address user) internal returns (uint128, uint128, uint128) => summaryUpdatePosition(id, user);
     function hasCredit(bytes32 id, address user) internal returns (bool) => summaryHasCredit(id, user);
+
+    // Explicit HAVOC_ECF so -havocAllByDefault does not summarize these as HAVOC_ALL.
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => HAVOC_ECF;
+    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => HAVOC_ECF;
+    function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => HAVOC_ECF;
+    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => HAVOC_ECF;
+    function _.onFlashLoan(address, address[], uint256[], bytes) external => HAVOC_ECF;
+    function _.transfer(address, uint256) external => HAVOC_ECF;
+    function _.transferFrom(address, address, uint256) external => HAVOC_ECF;
+
+    // Views stay NONDET. -havocAllByDefault would otherwise summarize them as HAVOC_ALL.
+    function _.price() external => NONDET;
+    function _.canIncreaseCredit(address) external => NONDET;
+    function _.canIncreaseDebt(address) external => NONDET;
+    function _.canLiquidate(address) external => NONDET;
+    function _.isRatified(Midnight.Offer, bytes, address) external => NONDET;
 }
 
 /// HELPERS

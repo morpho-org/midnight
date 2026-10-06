@@ -39,7 +39,20 @@ methods {
     // maxLif is deterministic for each (lltv, liquidationCursor) pair.
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifGhost(lltv, liquidationCursor);
 
-    // Unresolved callbacks and token calls use AUTO/HAVOC_ECF, which models non-reentrant callees.
+    // Callbacks and token calls are HAVOC_ECF, which models non-reentrant callees.
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => HAVOC_ECF;
+    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => HAVOC_ECF;
+    function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => HAVOC_ECF;
+    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => HAVOC_ECF;
+    function _.onFlashLoan(address, address[], uint256[], bytes) external => HAVOC_ECF;
+    function _.transfer(address, uint256) external => HAVOC_ECF;
+    function _.transferFrom(address, address, uint256) external => HAVOC_ECF;
+
+    // Views stay NONDET. -havocAllByDefault would otherwise summarize them as HAVOC_ALL.
+    function _.canIncreaseCredit(address) external => NONDET;
+    function _.canIncreaseDebt(address) external => NONDET;
+    function _.canLiquidate(address) external => NONDET;
+    function _.isRatified(Midnight.Offer, bytes, address) external => NONDET;
 }
 
 /// HELPERS
