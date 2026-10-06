@@ -120,7 +120,7 @@ rule onlyBadDebtDesyncsCreditFromView(env e, method f, calldataarg args, Midnigh
 
     uint128 viewCreditBefore;
     viewCreditBefore, _, _ = updatePositionView(e, market, id, user);
-    require viewCreditBefore == credit(id, user);
+    require viewCreditBefore == credit(id, user), "Credit is in sync with view";
 
     uint128 lossFactorBefore = lossFactor(id);
 
