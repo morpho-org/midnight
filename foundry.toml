@@ -80,3 +80,10 @@ evm_version = "paris"
 name = "999999-paris"
 optimizer_runs = 999999
 evm_version = "paris"
+
+# Opt-in profile that executes tests against Tempo's gas schedule (TIP-1000 state
+# creation surcharges) instead of plain Ethereum gas costs. Not part of the
+# default profile because it makes storage-heavy tests (e.g. testMaxCollaterals)
+# blow past realistic gas limits. Run with: FOUNDRY_PROFILE=tempo forge test ...
+[profile.tempo]
+hardfork = "tempo:T14"
