@@ -45,12 +45,6 @@ methods {
 
     // Explicit HAVOC_ECF so -havocAllByDefault does not summarize these as HAVOC_ALL.
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => HAVOC_ECF;
-
-    // Views stay NONDET. -havocAllByDefault would otherwise summarize them as HAVOC_ALL.
-    function _.price() external => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
-    function _.canLiquidate(address) external => NONDET;
 }
 
 ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {

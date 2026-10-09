@@ -53,9 +53,6 @@ methods {
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => HAVOC_ECF;
     function _.onFlashLoan(address, address[], uint256[], bytes) external => HAVOC_ECF;
     function _.transfer(address, uint256) external => HAVOC_ECF;
-
-    // Views stay NONDET. -havocAllByDefault would otherwise summarize them as HAVOC_ALL.
-    function _.canLiquidate(address) external => NONDET;
 }
 
 /// HELPERS

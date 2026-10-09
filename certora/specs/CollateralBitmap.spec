@@ -32,12 +32,6 @@ methods {
     function _.onFlashLoan(address, address[], uint256[], bytes) external => HAVOC_ECF;
     function _.transfer(address, uint256) external => HAVOC_ECF;
     function _.transferFrom(address, address, uint256) external => HAVOC_ECF;
-
-    // Views stay NONDET. -havocAllByDefault would otherwise summarize them as HAVOC_ALL.
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
-    function _.canLiquidate(address) external => NONDET;
-    function _.isRatified(Midnight.Offer, bytes, address) external => NONDET;
 }
 
 /// HELPERS

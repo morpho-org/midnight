@@ -27,17 +27,11 @@ methods {
     // All external calls are assumed non-reentrant / non-reverting: we reason about the function bodies for safety properties.
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
-    function _.isRatified(Midnight.Offer, bytes, address) external => NONDET;
-    function _.canIncreaseCredit(address) external => NONDET;
-    function _.canIncreaseDebt(address) external => NONDET;
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => NONDET;
     function _.onFlashLoan(address, address[], uint256[], bytes) external => NONDET;
-
-    // Views stay NONDET. -havocAllByDefault would otherwise summarize them as HAVOC_ALL.
-    function _.canLiquidate(address) external => NONDET;
 }
 
 /// HELPERS
