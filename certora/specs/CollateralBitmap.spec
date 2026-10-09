@@ -23,6 +23,7 @@ methods {
     // We summarize these by ghost functions, i.e., arbitrary deterministic functions and axiomatize the axioms we need.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
 }
 
 /// HELPERS
