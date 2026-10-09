@@ -315,6 +315,7 @@ contract Midnight is IMidnight {
     /// @dev In particular, if the settlement fee gets increased, it might implicitly cancel offers with very low price.
     /// @dev All sellerAssets are reachable with the units input, and all buyerAssets are reachable only if buyerPrice <= WAD.
     /// @dev The seller cannot be liquidated during the callbacks of a take.
+    /// @dev When onSell is called, the onBuy callback may have changed the state of Midnight.
     /// @dev Returns buyerAssets and sellerAssets.
     function take(
         Offer memory offer,
