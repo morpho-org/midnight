@@ -31,7 +31,7 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDiv(x, y, d);
 }
 
-/// HELPERS ///
+/// HELPERS
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
@@ -43,7 +43,7 @@ persistent ghost mapping(bytes32 => uint256) maturityOfId;
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
     bytes32 id = Utils.hashMarket(market);
-    require maturityOfId[id] == to_mathint(market.maturity), "remember the maturity of the market";
+    require maturityOfId[id] == market.maturity, "remember the maturity of the market";
     return id;
 }
 
@@ -56,7 +56,7 @@ persistent ghost mapping(bytes32 => mathint) sumDebt {
 }
 
 hook Sstore position[KEY bytes32 id][KEY address owner].debt uint128 newDebt (uint128 oldDebt) {
-    sumDebt[id] = sumDebt[id] - to_mathint(oldDebt) + to_mathint(newDebt);
+    sumDebt[id] = sumDebt[id] - oldDebt + newDebt;
 }
 
 // Monotonic clock: the greatest block.timestamp observed so far.
@@ -137,10 +137,10 @@ rule creditAndDebtCannotIncreaseWhenLossFactorIsMaxed(bytes32 id, address user, 
     assert debt(id, user) <= debtBefore;
 }
 
-/// INVARIANTS ///
+/// PROPERTIES
 
 strong invariant totalUnitsEqualsSumNegativeDebtPlusWithdrawable(bytes32 id)
-    to_mathint(totalUnits(id)) == sumDebt[id] + to_mathint(withdrawable(id));
+    totalUnits(id) == sumDebt[id] + withdrawable(id);
 
 strong invariant defaultContinuousFeeBoundedAll()
     forall address token. currentContract.defaultContinuousFee[token] <= MAX_CONTINUOUS_FEE();
@@ -179,7 +179,7 @@ rule noRemainingContinuousFeeWithoutCredit(bytes32 id, address user) {
 strong invariant lastLossFactorLeqMarketLossFactor(bytes32 id, address user)
     lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor;
 
-/// A user cannot have both credit and debt.
+// A user cannot have both credit and debt.
 strong invariant noCreditAndDebt(bytes32 id, address user)
     credit(id, user) == 0 || debt(id, user) == 0;
 

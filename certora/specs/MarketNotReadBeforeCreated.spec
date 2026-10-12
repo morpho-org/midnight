@@ -12,12 +12,12 @@ methods {
     function IdLib.toId(Midnight.Market memory) internal returns (bytes32) => NONDET;
 }
 
-/// GHOSTS ///
+/// HELPERS
 
-/// Whether a field of a market was read before that market was created.
+// Whether a field of a market was read before that market was created.
 persistent ghost mapping(bytes32 => bool) marketReadBeforeCreated;
 
-/// HOOKS ///
+/// HOOKS
 
 hook Sload uint128 val marketState[KEY bytes32 id].totalUnits {
     if (currentContract.marketState[id].tickSpacing == 0) marketReadBeforeCreated[id] = true;
@@ -95,10 +95,10 @@ hook Sload uint128 val position[KEY bytes32 id][KEY address user].collateral[IND
     if (currentContract.marketState[id].tickSpacing == 0) marketReadBeforeCreated[id] = true;
 }
 
-/// RULES ///
+/// PROPERTIES
 
-/// Check that no code path reads a field of a market before that market is created. We exclude only the pure storage getters.
-/// updatePositionView and isHealthy are also excluded: they read position fields before any createdness check, but their behavior on an uncreated market is proven by updatePositionViewIsZeroIfMarketNotCreated and marketIsHealthyIfNotCreated in NotCreatedMarket.spec.
+// Check that no code path reads a field of a market before that market is created. We exclude only the pure storage getters.
+// updatePositionView and isHealthy are also excluded: they read position fields before any createdness check, but their behavior on an uncreated market is proven by updatePositionViewIsZeroIfMarketNotCreated and marketIsHealthyIfNotCreated in NotCreatedMarket.spec.
 rule marketNotReadBeforeCreated(env e, method f, calldataarg args, bytes32 id)
 filtered {
     f -> f.selector != sig:marketState(bytes32).selector

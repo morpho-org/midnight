@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-// Property: liquidating ahead of an oracle price drop cannot worsen the post-drop realizable bad debt.
-//
-// Concretely:  In the reference scenario there is no liquidation just a price drop and the
-// bad debt is measured at the dropped price pDrop.
-// In the second scenario there was a liquidate at some price >= pDrop before the price drop.
-// The total bad debt in the second scenario (the bad debt before measured at initial price plus
-// the additional bad debt after liquidating measured a the dropped price) must not exceed the
-// bad debt in the reference scenario without a liquidation.
-//
-// This shows that timely liquidations before a price drop are never disadvantageous to the creditors.
-
 import "BitmapSummaries.spec";
 import "MulDivAxioms.spec";
 
 using Utils as Utils;
+
+/// Property: liquidating ahead of an oracle price drop cannot worsen the post-drop realizable bad debt.
+///
+/// Concretely:  In the reference scenario there is no liquidation just a price drop and the
+/// bad debt is measured at the dropped price pDrop.
+/// In the second scenario there was a liquidate at some price >= pDrop before the price drop.
+/// The total bad debt in the second scenario (the bad debt before measured at initial price plus
+/// the additional bad debt after liquidating measured a the dropped price) must not exceed the
+/// bad debt in the reference scenario without a liquidation.
+///
+/// This shows that timely liquidations before a price drop are never disadvantageous to the creditors.
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -47,7 +47,7 @@ methods {
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => HAVOC_ECF;
 }
 
-/// SUMMARIES / GHOSTS ///
+/// HELPERS
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -77,7 +77,7 @@ function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
 }
 
-/// RULES ///
+/// PROPERTIES
 
 // Realizable bad debt cannot increase from liquidating before a price drop.
 // If price drop happens after a liquidate, the total bad debt is less than if the liquidate
@@ -86,7 +86,7 @@ rule postDropRbdLiquidateNonIncrease(env e, Midnight.Market market, uint256 coll
     bytes32 id = summaryToId(market);
 
     mathint maxLif = maxLifGhost(market.collateralParams[collateralIndex].lltv, market.collateralParams[collateralIndex].liquidationCursor);
-    require maxLif >= to_mathint(WAD()), "see maxLifIsAtLeastWad in ExactMath.spec";
+    require maxLif >= WAD(), "see maxLifIsAtLeastWad in ExactMath.spec";
 
     uint256 price;
     uint256 pDrop;

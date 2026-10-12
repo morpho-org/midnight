@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// EQUIVALENCE OF REVERTS: activating the continuous fee never makes `take` revert in new ways, provided the fee doesn't exceed the offer's continuousFeeCap.
-// Assumptions:
-// * Price oracles don't revert and return the same price for both `take` calls.
-// * Gates are deterministic and don't revert (they can return false, but then they do it in both calls).
-// * Callbacks and ratifier succeed.
-// * No reverts caused by tickToPrice or settlementFee.
-// * Token transfers don't revert or change the state of the contract. 
-
 import "BitmapSummaries.spec";
 import "MulDivAxioms.spec";
 
 using Utils as Utils;
+
+/// Equivalence of reverts: activating the continuous fee never makes `take` revert in new ways, provided the fee doesn't exceed the offer's continuousFeeCap.
+/// Assumptions:
+/// - Price oracles don't revert and return the same price for both `take` calls.
+/// - Gates are deterministic and don't revert (they can return false, but then they do it in both calls).
+/// - Callbacks and ratifier succeed.
+/// - No reverts caused by tickToPrice or settlementFee.
+/// - Token transfers don't revert or change the state of the contract.
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -49,11 +49,9 @@ methods {
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 }
 
-/// CONSTANTS ///
+/// HELPERS
 
 definition MAX_TTM() returns mathint = 100 * 365 * 86400;
-
-/// DETERMINISTIC GHOST SUMMARIES ///
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
@@ -93,7 +91,7 @@ function deterministicSuccess() returns bytes32 {
     return Utils.callbackSuccess();
 }
 
-/// RULE ///
+/// PROPERTIES
 
 // Activating the continuous fee never makes `take` revert in new ways, provided the fee doesn't exceed the offer's continuousFeeCap.
 // We prove this relationally: run take twice from the same pre-state, differing only in the market's fee rate.

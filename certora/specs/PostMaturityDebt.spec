@@ -20,13 +20,13 @@ methods {
     // so every re-entrant entry point is in scope.
 }
 
-/// HELPERS ///
+/// HELPERS
 
 function summaryToId(Midnight.Market market) returns bytes32 {
     return Utils.hashMarket(market);
 }
 
-/// RULE ///
+/// PROPERTIES
 
 // Post maturity, the debt cannot increase
 rule debtCannotIncreasePostMaturity(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> !f.isView } {

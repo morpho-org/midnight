@@ -32,11 +32,11 @@ contract RateRatifierV1 is IRateRatifierV1 {
         MIDNIGHT = _midnight;
     }
 
-    function isRootRatified(address maker, bytes32 root) public view returns (bool) {
+    function isRootRatified(address maker, bytes32 root) external view returns (bool) {
         return ratification[maker][root].isRootRatified;
     }
 
-    function rootNonce(address maker, bytes32 root) public view returns (uint128) {
+    function rootNonce(address maker, bytes32 root) external view returns (uint128) {
         return ratification[maker][root].rootNonce;
     }
 
@@ -47,7 +47,7 @@ contract RateRatifierV1 is IRateRatifierV1 {
         return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 
-    /// @dev Permissioned to not let people extract the signature of a batch and start taking before or take even though the batch reverted.
+    /// @dev Permissioned to not let people extract the signature of a batch and start taking before or take even though the batch reverted. Both the caller and the signer are subject to the same authorization as setIsRootRatified.
     function setIsRootRatifiedWithSig(
         address maker,
         bytes32 root,

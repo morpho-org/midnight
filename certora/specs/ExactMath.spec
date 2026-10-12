@@ -20,14 +20,14 @@ rule maxLifIsAtLeastWad(uint256 lltv, uint256 liquidationCursor) {
     assert maxLif(lltv, liquidationCursor) >= WAD();
 }
 
-/// Check that mulDivUp(a, lltv, WAD()) <= mulDivUp(a, WAD(), lif)
+// Check that mulDivUp(a, lltv, WAD()) <= mulDivUp(a, WAD(), lif)
 rule mulDivLifLLTV(uint256 a, uint256 lif, uint256 lltv) {
     // lif > 0, see rule maxLifIsAtLeastWad.
     assert lltv * lif <= WAD() * WAD() => MulDiv.mulDivUp(a, lltv, WAD()) <= MulDiv.mulDivUp(a, WAD(), lif);
 }
 
-/// Check that for created markets with LLTV < WAD, the imprecision of maxRepaid computation is bounded by a factor of 1000.
-/// The imprecision is the difference between maxRepaid and minimum needed to fit the requirement newDebt >= newMaxDebt.
+// Check that for created markets with LLTV < WAD, the imprecision of maxRepaid computation is bounded by a factor of 1000.
+// The imprecision is the difference between maxRepaid and minimum needed to fit the requirement newDebt >= newMaxDebt.
 rule maxRepaidImprecisionFactorIsAtMostOneThousand(uint256 lltv, uint256 lif) {
     require lltv < WAD(), "assume that lltv < WAD";
     require lltv == WAD() || lltv * lif <= 999 * 10 ^ 15 * WAD(), "see createdMarketsRespectMaxLifBound in CreatedMarkets.spec";

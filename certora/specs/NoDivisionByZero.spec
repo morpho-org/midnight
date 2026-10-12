@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
-// Proves that no division by zero occurs in mulDivDown or mulDivUp.
-//
-// All other Solidity divisions in the codebase use non-zero denominators:
-// - settlementFee: divides by (end - start), always a positive constant from the breakpoint table.
-// - setMarketSettlementFee / setDefaultSettlementFee: divide by CBP (1e12).
-// - liquidate: divides by TIME_TO_MAX_LIF (60 minutes = 3600).
-// - tickToPrice: divides by 5e12 or a value greater than 1e18.
-// - wExp, used in tickToPrice: divides by non-zero constants.
-// Therefore, we only look for division by zero in mulDivDown and mulDivUp in this file.
-
 import "BitmapSummaries.spec";
 
 using Utils as Utils;
+
+/// Proves that no division by zero occurs in mulDivDown or mulDivUp.
+///
+/// All other Solidity divisions in the codebase use non-zero denominators:
+/// - settlementFee: divides by (end - start), always a positive constant from the breakpoint table.
+/// - setMarketSettlementFee / setDefaultSettlementFee: divide by CBP (1e12).
+/// - liquidate: divides by TIME_TO_MAX_LIF (60 minutes = 3600).
+/// - tickToPrice: divides by 5e12 or a value greater than 1e18.
+/// - wExp, used in tickToPrice: divides by non-zero constants.
+/// Therefore, we only look for division by zero in mulDivDown and mulDivUp in this file.
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
@@ -38,7 +38,7 @@ methods {
     function maxLif(uint256 lltv, uint256 liquidationCursor) internal returns (uint256) => maxLifSummary(lltv, liquidationCursor);
 }
 
-/// GHOSTS ///
+/// HELPERS
 
 persistent ghost address globalMarketLoanToken;
 
@@ -67,14 +67,7 @@ persistent ghost address globalMarketLiquidatorGate;
 
 persistent ghost bytes32 globalId;
 
-/// HOOKS ///
-
-// Follows from lastLossFactorLeqMarketLossFactor in Midnight.spec.
-hook Sload uint128 value position[KEY bytes32 id][KEY address user].lastLossFactor {
-    require value <= currentContract.marketState[id].lossFactor;
-}
-
-/// SUMMARIES ///
+/// SUMMARIES
 
 ghost ghostPrice(address) returns uint256;
 
@@ -123,7 +116,14 @@ function mulDivUpSummary(uint256 x, uint256 y, uint256 d) returns uint256 {
     return result;
 }
 
-/// RULES ///
+/// HOOKS
+
+// Follows from lastLossFactorLeqMarketLossFactor in Midnight.spec.
+hook Sload uint128 value position[KEY bytes32 id][KEY address user].lastLossFactor {
+    require value <= currentContract.marketState[id].lossFactor;
+}
+
+/// PROPERTIES
 
 // The liquidate function is verified in a separate rule (noDivisionByZeroLiquidate).
 rule noDivisionByZero(method f, env e, calldataarg args) filtered { f -> f.contract == currentContract && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
 
+import "MulDivAxioms.spec";
+
 using Utils as Utils;
 
 methods {
@@ -10,6 +12,8 @@ methods {
     function credit(bytes32 id, address user) external returns (uint128) envfree;
     function debt(bytes32 id, address user) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
+    function lossFactor(bytes32 id) external returns (uint128) envfree;
     function collateral(bytes32 id, address user, uint256 index) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
@@ -22,6 +26,16 @@ methods {
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
 
+    // Same summarization as Healthiness.spec: mulDiv is a deterministic ghost.
+    // A nondeterministic overflow flag overapproximates reverts. The rules below
+    // assume only the MulDiv.spec facts they need, via MulDivAxioms.spec.
+    function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
+    function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
+
+    // Summaries over-approximating the behavior of transient storage.
+    function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
+    function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
+
     // Assume no reentrancy: callbacks and token transfers do not re-enter Midnight.
     // This is justified because the properties we verify are about the effect of each function's own body on credit and debt, not the effect of the full transaction including callbacks.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
@@ -32,11 +46,42 @@ methods {
     function _.transfer(address, uint256) external => NONDET;
 }
 
-/// UPDATE POSITION ///
+/// HELPERS
 
-/// updatePosition can only decrease user's credit (through slashing and fee accrual), sets it to the post-update value, only changes credit of user at the market id, and accrues fee to continuousFeeCredit.
+function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) {
+        revert();
+    }
+    return require_uint256(ghostMulDivDown(a, b, d));
+}
+
+function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
+    bool overflow;
+    if (overflow || d == 0) {
+        revert();
+    }
+    return require_uint256(ghostMulDivUp(a, b, d));
+}
+
+// Facts from MulDiv.spec used when a view is compared to stored credit.
+// Zero is quantified because the fee numerator is the post-slash pending fee, which this spec does not name.
+// Identity is quantified because take and updatePosition replace credit before the next view.
+function requireMulDivCreditAxioms() {
+    require forall mathint b. forall mathint d. axiomMathMulDivDownZeroA(b, d), "mulDivZero in MulDiv.spec";
+    require forall mathint a. forall mathint d. axiomMathMulDivDownZeroB(a, d), "mulDivZero in MulDiv.spec";
+    require forall mathint a. forall mathint d. axiomMathMulDivUpZeroB(a, d), "mulDivZero in MulDiv.spec";
+    require forall mathint a. forall mathint x. axiomMathMulDivDownIdentity(a, x), "mulDivIdentity in MulDiv.spec";
+}
+
+/// Update position.
+
+// updatePosition can only decrease user's credit (through slashing and fee accrual), sets it to the post-update value, only changes credit of user at the market id, and accrues fee to continuousFeeCredit, the user's lastLossFactor matches the market, and lastAccrual matches the block timestamp. The up-to-date credit equals the stored credit.
 rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 anyId, address anyUser) {
     bytes32 id = Utils.toId(market);
+
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+    requireMulDivCreditAxioms();
 
     uint256 creditBefore = credit(id, user);
     uint128 updatedUserCredit;
@@ -56,13 +101,43 @@ rule updatePositionEffects(env e, Midnight.Market market, address user, bytes32 
     assert pendingFee(id, user) == newPendingFee;
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
     assert credit(id, user) <= creditBefore;
+    assert lastLossFactor(id, user) == lossFactor(id);
+    assert lastAccrual(id, user) == e.block.timestamp;
+
+    uint128 viewCredit;
+    viewCredit, _, _ = updatePositionView(e, market, id, user);
+    assert viewCredit == credit(id, user);
 }
 
-/// WITHDRAW ///
+// If stored credit already equals the up-to-date credit, they can diverge on the same timestamp only when this market's loss factor increases (bad debt is socialized; see lossFactorChangesIffBadDebt).
+rule onlyBadDebtDesyncsCreditFromView(env e, method f, calldataarg args, Midnight.Market market, address user) filtered { f -> !f.isView } {
+    bytes32 id = Utils.toId(market);
 
-/// withdraw decreases onBehalf's post-update credit by exactly units and only changes credit of onBehalf at the market id.
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+    require lastAccrual(id, user) <= e.block.timestamp, "time is increasing";
+    require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactorLeqMarketLossFactor in Midnight";
+    requireMulDivCreditAxioms();
+
+    uint128 viewCreditBefore;
+    viewCreditBefore, _, _ = updatePositionView(e, market, id, user);
+    require viewCreditBefore == credit(id, user), "Credit is in sync with view";
+
+    uint128 lossFactorBefore = lossFactor(id);
+
+    f(e, args);
+
+    uint128 viewCreditAfter;
+    viewCreditAfter, _, _ = updatePositionView(e, market, id, user);
+    assert viewCreditAfter != credit(id, user) => lossFactor(id) != lossFactorBefore;
+}
+
+/// Withdraw.
+
+// withdraw decreases onBehalf's post-update credit by exactly units and only changes credit of onBehalf at the market id.
 rule withdrawEffects(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver, bytes32 anyId, address anyUser) {
     bytes32 id = Utils.toId(market);
+
+    requireMulDivCreditAxioms();
 
     uint128 updatedUserCredit;
     uint128 userFee;
@@ -80,11 +155,12 @@ rule withdrawEffects(env e, Midnight.Market market, uint256 units, address onBeh
     assert continuousFeeCredit(id) == feeAmountBefore + userFee;
 }
 
-/// TAKE ///
+/// Take.
 
-/// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values and only changes credit of maker and taker and debt of maker and taker at the market id.
+// take changes maker's and taker's net credit-debt by +/- units relative to their post-update values and only changes credit of maker and taker and debt of maker and taker at the market id.
 rule takeEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, bytes32 anyId, address anyUser) {
     bytes32 id = Utils.toId(offer.market);
+    requireMulDivCreditAxioms();
 
     uint128 makerCreditBefore;
     makerCreditBefore, _, _ = updatePositionView(e, offer.market, id, offer.maker);
@@ -108,13 +184,14 @@ rule takeEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units,
     assert anyId != id || (anyUser != offer.maker && anyUser != taker) => credit(anyId, anyUser) == otherCreditBefore;
 }
 
-/// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
-/// Buyer's credit is non-decreasing relative to its post-update value and can increase by at most take units.
-/// Buyer's debt is non-increasing and can decrease by at most take units.
+// The buyer side cannot newly become a borrower: buyer's debt is non-increasing. If buyer's credit increased, then buyer's debt is zero after the take.
+// Buyer's credit is non-decreasing relative to its post-update value and can increase by at most take units.
+// Buyer's debt is non-increasing and can decrease by at most take units.
 rule takeBuyerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     bytes32 id = Utils.toId(offer.market);
 
     address buyer = offer.buy ? offer.maker : taker;
+    requireMulDivCreditAxioms();
     uint256 buyerDebtBefore = debt(id, buyer);
     uint128 buyerUpdatedCreditBefore;
     buyerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, buyer);
@@ -128,13 +205,14 @@ rule takeBuyerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 u
     assert debt(id, buyer) >= buyerDebtBefore - units;
 }
 
-/// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
-/// Seller's debt is non-decreasing, and can increase by at most take units.
-/// Seller's credit is non-increasing relative to its post-update value and can decrease by at most take units.
+// The seller side cannot newly become a lender: seller's credit is non-increasing relative to its post-update value. If seller's debt increased, then seller's credit is zero after the take.
+// Seller's debt is non-decreasing, and can increase by at most take units.
+// Seller's credit is non-increasing relative to its post-update value and can decrease by at most take units.
 rule takeSellerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     bytes32 id = Utils.toId(offer.market);
 
     address seller = offer.buy ? taker : offer.maker;
+    requireMulDivCreditAxioms();
     uint256 sellerDebtBefore = debt(id, seller);
     uint128 sellerUpdatedCreditBefore;
     sellerUpdatedCreditBefore, _, _ = updatePositionView(e, offer.market, id, seller);
@@ -148,9 +226,9 @@ rule takeSellerEffects(env e, Midnight.Offer offer, bytes ratifierData, uint256 
     assert credit(id, seller) >= sellerUpdatedCreditBefore - units;
 }
 
-/// REPAY ///
+/// Repay.
 
-/// Repay decreases onBehalf's debt by exactly units and only changes position[id][onBehalf].debt
+// Repay decreases onBehalf's debt by exactly units and only changes position[id][onBehalf].debt
 rule repayEffects(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data, bytes32 anyId, address anyUser) {
     bytes32 id = Utils.toId(market);
 
@@ -165,10 +243,10 @@ rule repayEffects(env e, Midnight.Market market, uint256 units, address onBehalf
     assert anyUser != onBehalf || anyId != id => debt(anyId, anyUser) == otherDebtBefore;
 }
 
-/// LIQUIDATE ///
+/// Liquidate.
 
-/// Liquidate decreases the borrower's debt by at least repaidUnits,
-/// and only changes position[id][borrower].debt.
+// Liquidate decreases the borrower's debt by at least repaidUnits,
+// and only changes position[id][borrower].debt.
 rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, bool postMaturityMode) {
     bytes32 id = Utils.toId(market);
 
@@ -185,9 +263,9 @@ rule liquidateEffects(env e, Midnight.Market market, uint256 collateralIndex, ui
     assert anyUser != borrower || anyId != id => debt(anyId, anyUser) == otherDebtBefore;
 }
 
-/// ALL OTHER FUNCTIONS ///
+/// All other functions.
 
-/// Functions other than take, withdraw, repay, liquidate, updatePosition, and withdrawCollateral do not change any user's credit or debt.
+// Functions other than take, withdraw, repay, liquidate, updatePosition, and withdrawCollateral do not change any user's credit or debt.
 rule creditAndDebtUnchangedByOtherFunctions(method f, env e, calldataarg args, bytes32 id, address user)
 filtered {
     f -> !f.isView
@@ -204,9 +282,9 @@ filtered {
     assert debt(id, user) == debtBefore;
 }
 
-/// SUPPLY COLLATERAL ///
+/// Supply collateral.
 
-/// supplyCollateral increases onBehalf's collateral by exactly assets, and only changes position[id][onBehalf].collateral[collateralIndex].
+// supplyCollateral increases onBehalf's collateral by exactly assets, and only changes position[id][onBehalf].collateral[collateralIndex].
 rule supplyCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, bytes32 anyId, address anyUser, uint256 anyIndex) {
     bytes32 id = Utils.toId(market);
 
@@ -219,9 +297,9 @@ rule supplyCollateralEffects(env e, Midnight.Market market, uint256 collateralIn
     assert anyUser != onBehalf || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
 }
 
-/// WITHDRAW COLLATERAL ///
+/// Withdraw collateral.
 
-/// withdrawCollateral decreases onBehalf's collateral by exactly assets, and only changes position[id][onBehalf].collateral[collateralIndex].
+// withdrawCollateral decreases onBehalf's collateral by exactly assets, and only changes position[id][onBehalf].collateral[collateralIndex].
 rule withdrawCollateralCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf, address receiver, bytes32 anyId, address anyUser, uint256 anyIndex) {
     bytes32 id = Utils.toId(market);
 
@@ -234,9 +312,9 @@ rule withdrawCollateralCollateralEffects(env e, Midnight.Market market, uint256 
     assert anyUser != onBehalf || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
 }
 
-/// LIQUIDATE (COLLATERAL) ///
+/// Liquidate (collateral).
 
-/// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult, and only changes position[id][borrower].collateral[collateralIndex].
+// liquidate decreases the borrower's collateral at collateralIndex by exactly seizedResult, and only changes position[id][borrower].collateral[collateralIndex].
 rule liquidateCollateralEffects(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bytes32 anyId, address anyUser, uint256 anyIndex, bool postMaturityMode) {
     bytes32 id = Utils.toId(market);
 
@@ -250,9 +328,9 @@ rule liquidateCollateralEffects(env e, Midnight.Market market, uint256 collatera
     assert anyUser != borrower || anyId != id || anyIndex != collateralIndex => collateral(anyId, anyUser, anyIndex) == otherCollateralBefore;
 }
 
-/// ALL OTHER FUNCTIONS (COLLATERAL) ///
+/// All other functions (collateral).
 
-/// Functions other than supplyCollateral, withdrawCollateral, and liquidate do not change any user's collateral.
+// Functions other than supplyCollateral, withdrawCollateral, and liquidate do not change any user's collateral.
 rule collateralUnchangedByOtherFunctions(method f, env e, calldataarg args, bytes32 id, address user, uint256 colIdx)
 filtered {
     f -> !f.isView

@@ -35,7 +35,7 @@ methods {
     // External calls are assumed non-reverting: we verify that reverts do not happen in the function's bodies.
 }
 
-/// HELPERS ///
+/// HELPERS
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
@@ -75,7 +75,9 @@ function postSlashCredit(bytes32 id, address user) returns mathint {
     return userIndex > 0 ? mathMulDivDown(credit, marketIndex, userIndex) : 0;
 }
 
-/// The market's lossFactor is only modified by liquidate.
+/// PROPERTIES
+
+// The market's lossFactor is only modified by liquidate.
 rule onlyLiquidateChangesMarketLossFactor(bytes32 id, method f, env e, calldataarg args) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     uint128 lossFactorBefore = currentContract.marketState[id].lossFactor;
 
@@ -84,7 +86,7 @@ rule onlyLiquidateChangesMarketLossFactor(bytes32 id, method f, env e, calldataa
     assert currentContract.marketState[id].lossFactor == lossFactorBefore;
 }
 
-/// In liquidate, the market's lossFactor changes if and only if bad debt is realized (totalUnits decreases).
+// In liquidate, the market's lossFactor changes if and only if bad debt is realized (totalUnits decreases).
 rule lossFactorChangesIffBadDebt(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, address callback, bytes data, bool postMaturityMode) {
     bytes32 id = summaryToId(market);
     uint128 lossFactorBefore = currentContract.marketState[id].lossFactor;
@@ -100,7 +102,7 @@ rule lossFactorChangesIffBadDebt(env e, Midnight.Market market, uint256 collater
     assert lossFactorChanged <=> badDebtOccurred;
 }
 
-/// After updatePosition, the user's lastLossFactor is synced to the market's lossFactor.
+// After updatePosition, the user's lastLossFactor is synced to the market's lossFactor.
 rule updatePositionSyncsLastLossFactor(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
@@ -109,7 +111,7 @@ rule updatePositionSyncsLastLossFactor(env e, Midnight.Market market, address us
     assert lastLossFactor(id, user) == lossFactor(id);
 }
 
-/// Assuming that the market is created, the loss factor computation in updatePosition does not revert.
+// Assuming that the market is created, the loss factor computation in updatePosition does not revert.
 rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
@@ -126,7 +128,7 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
     assert !lastReverted, "updatePosition should not revert under valid state";
 }
 
-/// The loss factor computation in updatePositionView does not revert.
+// The loss factor computation in updatePositionView does not revert.
 rule updatePositionViewDoesNotRevert(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
@@ -141,7 +143,7 @@ rule updatePositionViewDoesNotRevert(env e, Midnight.Market market, address user
     assert !lastReverted, "updatePositionView should not revert under valid state";
 }
 
-/// updatePosition is idempotent: a second call in the same env leaves the relevant position state unchanged and accrues no new fee.
+// updatePosition is idempotent: a second call in the same env leaves the relevant position state unchanged and accrues no new fee.
 rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
@@ -175,7 +177,7 @@ rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
     assert currentContract.marketState[id].continuousFeeCredit == cfcAfterFirst;
 }
 
-/// When the user's lastLossFactor is in sync with the market's lossFactor (and not saturated), updatePosition does not slash: credit and pendingFee only decrease by the accrued fee.
+// When the user's lastLossFactor is in sync with the market's lossFactor (and not saturated), updatePosition does not slash: credit and pendingFee only decrease by the accrued fee.
 rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
@@ -199,7 +201,7 @@ rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market ma
     assert pendingFee(id, user) + accruedFee == pendingFeeBefore;
 }
 
-/// When lastAccrual is already at block.timestamp, updatePosition preserves continuousFeeCredit.
+// When lastAccrual is already at block.timestamp, updatePosition preserves continuousFeeCredit.
 rule updatePositionPreservesContinuousFeeCreditWhenLastAccrualIsUpToDate(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
@@ -213,7 +215,7 @@ rule updatePositionPreservesContinuousFeeCreditWhenLastAccrualIsUpToDate(env e, 
     assert continuousFeeCreditAfter == continuousFeeCreditBefore;
 }
 
-/// The loss factor arithmetic in liquidate does not revert under valid state. Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path. Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
+// The loss factor arithmetic in liquidate does not revert under valid state. Uses seizedAssets=0, repaidUnits=0 to isolate the bad debt realization path. Uses collateralBitmap=0 to skip the collateral loop, ensuring badDebt == position.debt.
 rule liquidateLossFactorDoesNotRevert(env e, Midnight.Market market, address borrower, bytes data) {
     bytes32 id = summaryToId(market);
 

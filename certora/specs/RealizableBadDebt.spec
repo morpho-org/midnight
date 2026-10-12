@@ -38,7 +38,7 @@ methods {
     function _.onFlashLoan(address, address[], uint256[], bytes) external => NONDET;
 }
 
-/// SUMMARIES / GHOSTS ///
+/// HELPERS
 
 definition WAD() returns uint256 = 10 ^ 18;
 
@@ -74,7 +74,7 @@ function marketIsCreated(Midnight.Market market) returns (bool) {
     return tickSpacing(summaryToId(market)) > 0;
 }
 
-/// RULES ///
+/// PROPERTIES
 
 // No non-liquidate function may increase realizableBadDebt of a position.
 rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight.Market market, address borrower) filtered { f -> !f.isView && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {

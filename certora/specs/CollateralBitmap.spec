@@ -25,14 +25,16 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 }
 
-/// SUMMARY ///
+/// HELPERS
 
 persistent ghost summaryMulDivDown(uint256, uint256, uint256) returns uint256 {
-    /* proved in mulDivZero in MulDiv.spec */
+    // proved in mulDivZero in MulDiv.spec
     axiom forall uint256 b. forall uint256 d. d > 0 => summaryMulDivDown(0, b, d) == 0;
 }
 
 persistent ghost summaryMulDivUp(uint256, uint256, uint256) returns uint256;
+
+/// PROPERTIES
 
 // Check that a collateral bit is set exactly when there is collateral for that index.
 strong invariant nonZeroCollateralsAreActivated(bytes32 id, address user, uint256 collateralIndex)

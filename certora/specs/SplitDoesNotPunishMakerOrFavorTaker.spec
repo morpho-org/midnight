@@ -34,7 +34,7 @@ methods {
     function UtilsLib.tGet(uint256, bytes32, address) internal returns (bool) => NONDET;
 }
 
-/// GHOSTS ///
+/// HELPERS
 
 // ghostMulDivDown(a, b, d) abstracts floor(a*b/d). Axioms are proven as rules in MulDiv.spec.
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
@@ -50,15 +50,15 @@ persistent ghost ghostMulDivUp(uint256, uint256, uint256) returns uint256 {
     axiom forall uint256 a. forall uint256 b. forall uint256 c. forall uint256 x. forall uint256 d. d != 0 && a == b + c => ghostMulDivUp(a, x, d) <= ghostMulDivUp(b, x, d) + ghostMulDivUp(c, x, d) && ghostMulDivUp(a, x, d) + 1 >= ghostMulDivUp(b, x, d) + ghostMulDivUp(c, x, d);
 }
 
-/// SUMMARY FUNCTIONS ///
-
 function summaryToId(Midnight.Market market) returns (bytes32) {
     return Utils.hashMarket(market);
 }
 
-/// Splitting an offer does not punish the maker or favor the taker on asset amounts.
-/// When offer.buy (maker=buyer, taker=seller): Maker pays less or equal (within 1 wei) when split, taker receives less or equal when split.
-/// When !offer.buy (maker=seller, taker=buyer): Maker receives more or equal (within 1 wei) when split, taker pays more or equal when split.
+/// PROPERTIES
+
+// Splitting an offer does not punish the maker or favor the taker on asset amounts.
+// When offer.buy (maker=buyer, taker=seller): Maker pays less or equal (within 1 wei) when split, taker receives less or equal when split.
+// When !offer.buy (maker=seller, taker=buyer): Maker receives more or equal (within 1 wei) when split, taker pays more or equal when split.
 rule splitDoesNotPunishMakerOrFavorTaker(env e, uint256 unitsA, uint256 unitsB, uint256 unitsC, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, Midnight.Offer offer, bytes ratifierData) {
     require unitsA == require_uint256(unitsB + unitsC), "unitsA must be equal to unitsB + unitsC";
 

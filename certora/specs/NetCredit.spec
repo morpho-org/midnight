@@ -27,7 +27,7 @@ methods {
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
 }
 
-/// HELPERS ///
+/// HELPERS
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
@@ -48,8 +48,6 @@ hook TIMESTAMP() uint newTimestamp {
     require newTimestamp < 2 ^ 63, "safe as it corresponds to some time very far into the future.";
     lastTimestamp = newTimestamp;
 }
-
-/// SUMMARY FUNCTIONS ///
 
 persistent ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
     // proved in mulDivZero in MulDiv.spec
@@ -94,11 +92,11 @@ persistent ghost mapping(bytes32 => mathint) maturityOfId;
 
 function summaryToId(Midnight.Market market) returns (bytes32) {
     bytes32 id = Utils.hashMarket(market);
-    require maturityOfId[id] == to_mathint(market.maturity), "remember the maturity of the market";
+    require maturityOfId[id] == market.maturity, "remember the maturity of the market";
     return id;
 }
 
-/// The up-to-date face value of a lender's position: credit - pendingFee after slashing and fee accrual.
+// The up-to-date face value of a lender's position: credit - pendingFee after slashing and fee accrual.
 function netCredit(env e, Midnight.Market market, address user) returns mathint {
     bytes32 id = summaryToId(market);
     uint128 credit;
@@ -110,21 +108,19 @@ function netCredit(env e, Midnight.Market market, address user) returns mathint 
     return credit - pending;
 }
 
-/// INVARIANTS ///
+/// PROPERTIES
 
-/// Once a position has been accrued at or after maturity, its pending fee is fully realized and stays
-/// at zero: the continuous fee only accrues up to maturity, so there is nothing left to accrue.
-/// This implies that the net credit is equal to the credit once a position has been accrued at or after maturity.
+// Once a position has been accrued at or after maturity, its pending fee is fully realized and stays
+// at zero: the continuous fee only accrues up to maturity, so there is nothing left to accrue.
+// This implies that the net credit is equal to the credit once a position has been accrued at or after maturity.
 invariant pendingFeeZeroAfterMaturity(Midnight.Market market, bytes32 id, address user)
     summaryToId(market) == id && lastAccrual(id, user) >= market.maturity => pendingFee(id, user) == 0;
 
 // A created market's maturity, recorded in maturityOfId at creation, is at most MAX_TTM in the future.
 strong invariant maturityBoundedById(bytes32 id)
-    tickSpacing(id) > 0 => maturityOfId[id] <= to_mathint(lastTimestamp) + MAX_TTM();
+    tickSpacing(id) > 0 => maturityOfId[id] <= lastTimestamp + MAX_TTM();
 
-/// RULES ///
-
-/// The up-to-date face value of a lender's position (credit - pendingFee) can only change by withdrawing, taking, or liquidating. Every other function leaves it unchanged.
+// The up-to-date face value of a lender's position (credit - pendingFee) can only change by withdrawing, taking, or liquidating. Every other function leaves it unchanged.
 rule netCreditUnaffected(env e, method f, calldataarg args, Midnight.Market market, address user)
 filtered {
     f -> !f.isView
@@ -141,7 +137,7 @@ filtered {
     assert netCreditAfter == netCreditBefore;
 }
 
-/// Withdrawing on behalf of another account does not change an unrelated user's net credit.
+// Withdrawing on behalf of another account does not change an unrelated user's net credit.
 rule withdrawDoesNotChangeOtherNetCredit(env e, Midnight.Market withdrawMarket, uint256 units, address onBehalf, address receiver, Midnight.Market market, address user) {
     require user != onBehalf || summaryToId(withdrawMarket) != summaryToId(market), "withdrawing for someone else or on another market";
 
@@ -154,7 +150,7 @@ rule withdrawDoesNotChangeOtherNetCredit(env e, Midnight.Market withdrawMarket, 
     assert netCreditAfter == netCreditBefore;
 }
 
-/// Withdrawing cannot increase net credit.
+// Withdrawing cannot increase net credit.
 rule withdrawNetCreditNonIncreasing(env e, Midnight.Market withdrawMarket, uint256 units, address onBehalf, address receiver, Midnight.Market market, address user) {
     mathint netCreditBefore = netCredit(e, market, user);
 
@@ -165,7 +161,7 @@ rule withdrawNetCreditNonIncreasing(env e, Midnight.Market withdrawMarket, uint2
     assert netCreditAfter <= netCreditBefore;
 }
 
-/// Taking does not change the net credit of a user that is neither the taker nor the offer's maker.
+// Taking does not change the net credit of a user that is neither the taker nor the offer's maker.
 rule takeDoesNotChangeOtherNetCredit(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, Midnight.Market market, address user) {
     require (user != taker && user != offer.maker) || summaryToId(offer.market) != summaryToId(market), "user is not involved in the take or another market";
 
@@ -178,7 +174,7 @@ rule takeDoesNotChangeOtherNetCredit(env e, Midnight.Offer offer, bytes ratifier
     assert netCreditAfter == netCreditBefore;
 }
 
-/// Taking does not decrease the net credit of a buyer in a take, and does not increase the net credit of a seller in a take.
+// Taking does not decrease the net credit of a buyer in a take, and does not increase the net credit of a seller in a take.
 rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user) {
     mathint netCreditBefore = netCredit(e, offer.market, user);
 
@@ -199,7 +195,7 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
     assert user == seller => netCreditAfter <= netCreditBefore;
 }
 
-/// Liquidating does not change any user's net credit as long as no bad debt is realized on the same market, i.e. the market loss factor is unchanged by the liquidation.
+// Liquidating does not change any user's net credit as long as no bad debt is realized on the same market, i.e. the market loss factor is unchanged by the liquidation.
 rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidateMarket, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
     uint128 lossFactorBefore = lossFactor(id);
@@ -216,7 +212,7 @@ rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidate
     assert netCreditAfter == netCreditBefore;
 }
 
-/// Liquidation cannot increase net credit.
+// Liquidation cannot increase net credit.
 rule liquidateNetCreditNonIncreasing(env e, Midnight.Market liquidateMarket, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market market, address user) {
     mathint netCreditBefore = netCredit(e, market, user);
 

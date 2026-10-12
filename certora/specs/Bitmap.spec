@@ -9,8 +9,6 @@ methods {
     function countBits(uint128 bitmap) external returns (uint256) envfree;
 }
 
-/// RULES ///
-
 rule zeroBitmapEmpty(uint256 bit) {
     bool isBitSet = getBit(0, bit);
     assert !isBitSet, "zero bitmap has no bit set";

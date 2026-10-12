@@ -32,7 +32,7 @@ methods {
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
 }
 
-/// HELPERS ///
+/// HELPERS
 
 ghost mapping(address => bool) makerRatified {
     init_state axiom forall address a. makerRatified[a] == false;
@@ -44,10 +44,12 @@ function CVL_isRatified(Midnight.Offer offer) returns bytes32 {
     return result;
 }
 
-/// CREDIT AND DEBT CHANGE RULES ///
+/// PROPERTIES
 
-/// An unauthorized caller cannot change a user's credit and debt except via liquidate and updatePosition.
-/// Assumes no reentrancy: callbacks (onBuy, onSell) and token transfers are not modeled as re-entering Midnight, so re-entrant credit and debt changes are not covered.
+/// Credit and debt change rules.
+
+// An unauthorized caller cannot change a user's credit and debt except via liquidate and updatePosition.
+// Assumes no reentrancy: callbacks (onBuy, onSell) and token transfers are not modeled as re-entering Midnight, so re-entrant credit and debt changes are not covered.
 rule onlyAuthorizedCanChangeCreditAndDebtExceptLiquidateAndUpdatePosition(env e, method f, calldataarg args, bytes32 id, address user) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector && f.selector != sig:updatePosition(Midnight.Market, address).selector } {
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
@@ -60,10 +62,10 @@ rule onlyAuthorizedCanChangeCreditAndDebtExceptLiquidateAndUpdatePosition(env e,
     assert (creditAfter == creditBefore && debtAfter == debtBefore) || userIsAuthorized || makerRatified[user];
 }
 
-/// COLLATERAL CHANGE RULES ///
+/// Collateral change rules.
 
-/// An unauthorized caller cannot change a user's collateral except via liquidate.
-/// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant collateral changes are not covered.
+// An unauthorized caller cannot change a user's collateral except via liquidate.
+// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant collateral changes are not covered.
 rule onlyAuthorizedCanChangeCollateralExceptLiquidate(env e, method f, calldataarg args, bytes32 id, address user, uint256 collateralIndex) filtered { f -> f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
@@ -74,11 +76,11 @@ rule onlyAuthorizedCanChangeCollateralExceptLiquidate(env e, method f, calldataa
     assert collateralAfter == collateralBefore || userIsAuthorized;
 }
 
-/// CONSUMED CHANGE RULES ///
+/// Consumed change rules.
 
-/// An unauthorized caller cannot change a user's consumed except via take.
-/// For take, unauthorizedTakeFails, takeRequiresMakerConsent, and takeOnlyAuthorizedCanChangeDebt show that take can only change this consumed: consumed[offer.maker][offer.group], only with the right authorizations.
-/// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant consumed changes are not covered.
+// An unauthorized caller cannot change a user's consumed except via take.
+// For take, unauthorizedTakeFails, takeRequiresMakerConsent, and takeOnlyAuthorizedCanChangeDebt show that take can only change this consumed: consumed[offer.maker][offer.group], only with the right authorizations.
+// Assumes no reentrancy: callbacks and token transfers are not modeled as re-entering Midnight, so re-entrant consumed changes are not covered.
 rule onlyAuthorizedCanChangeConsumedExceptTake(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> !f.isView && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
     bool userIsAuthorized = user == e.msg.sender || isAuthorized(user, e.msg.sender);
 
@@ -89,9 +91,9 @@ rule onlyAuthorizedCanChangeConsumedExceptTake(env e, method f, calldataarg args
     assert consumedAfter == consumedBefore || userIsAuthorized;
 }
 
-/// AUTHORIZATION CHANGE RULES ///
+/// Authorization change rules.
 
-/// An unauthorized caller cannot change a user's isAuthorized mapping.
+// An unauthorized caller cannot change a user's isAuthorized mapping.
 rule onlyAuthorizedCanChangeIsAuthorized(env e, method f, calldataarg args, address authorizer, address authorized) filtered { f -> !f.isView } {
     bool authorizerIsAuthorized = authorizer == e.msg.sender || isAuthorized(authorizer, e.msg.sender);
 
@@ -102,9 +104,9 @@ rule onlyAuthorizedCanChangeIsAuthorized(env e, method f, calldataarg args, addr
     assert isAuthorizedAfter == isAuthorizedBefore || authorizerIsAuthorized;
 }
 
-/// ACCESS CONTROL ///
+/// Access control rules.
 
-/// take requires the caller to be the taker or authorized by the taker
+// take requires the caller to be the taker or authorized by the taker
 rule unauthorizedTakeFails(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
     bool senderAuthorized = isAuthorized(taker, e.msg.sender);
     take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
@@ -112,9 +114,9 @@ rule unauthorizedTakeFails(env e, Midnight.Offer offer, bytes ratifierData, uint
     assert e.msg.sender == taker || senderAuthorized;
 }
 
-/// ISOLATION ///
+/// Isolation rules.
 
-/// setIsAuthorized only changes the specified (onBehalf, authorized) pair.
+// setIsAuthorized only changes the specified (onBehalf, authorized) pair.
 rule setIsAuthorizedIsolation(env e, address onBehalf, address authorized, bool val, address otherUser, address otherAuthorized) {
     require otherUser != onBehalf || otherAuthorized != authorized;
 

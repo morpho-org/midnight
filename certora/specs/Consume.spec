@@ -18,7 +18,7 @@ methods {
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
 }
 
-///  Only setConsumed and take can modify the consumed mapping.
+//  Only setConsumed and take can modify the consumed mapping.
 rule onlySetConsumedAndTakeChangeConsumed(env e, method f, calldataarg args, address user, bytes32 group) filtered { f -> f.selector != sig:setConsumed(bytes32, uint128, address).selector && f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector } {
     uint256 consumedBefore = consumed(user, group);
 
@@ -27,7 +27,7 @@ rule onlySetConsumedAndTakeChangeConsumed(env e, method f, calldataarg args, add
     assert consumed(user, group) == consumedBefore;
 }
 
-/// Calling setConsumed only affects onBehalf's consumed value for the given group. No other (user, group) pair is modified.
+// Calling setConsumed only affects onBehalf's consumed value for the given group. No other (user, group) pair is modified.
 rule setConsumedOnlyAffectsOnBehalf(env e, bytes32 group, uint128 amount, address onBehalf, address otherUser, bytes32 otherGroup) {
     uint256 otherConsumedBefore = consumed(otherUser, otherGroup);
 
@@ -37,7 +37,7 @@ rule setConsumedOnlyAffectsOnBehalf(env e, bytes32 group, uint128 amount, addres
     assert (otherUser != onBehalf || otherGroup != group) => consumed(otherUser, otherGroup) == otherConsumedBefore;
 }
 
-/// Calling take only affects the maker's consumed value for the offer's group. No other (user, group) pair is modified.
+// Calling take only affects the maker's consumed value for the offer's group. No other (user, group) pair is modified.
 rule takeOnlyAffectsMakerConsumed(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user, bytes32 group) {
     uint256 consumedBefore = consumed(user, group);
 
@@ -47,7 +47,7 @@ rule takeOnlyAffectsMakerConsumed(env e, Midnight.Offer offer, bytes ratifierDat
     assert (user != offer.maker || group != offer.group) => consumed(user, group) == consumedBefore;
 }
 
-/// The consumed mapping is non-decreasing: no function can decrease consumed[user][group].
+// The consumed mapping is non-decreasing: no function can decrease consumed[user][group].
 rule consumeNonDecreasing(env e, method f, calldataarg args, address user, bytes32 group) {
     uint256 consumedBefore = consumed(user, group);
 
@@ -56,7 +56,7 @@ rule consumeNonDecreasing(env e, method f, calldataarg args, address user, bytes
     assert consumed(user, group) >= consumedBefore;
 }
 
-/// After a successful take, consumed[offer.maker][offer.group] does not exceed the effective max.
+// After a successful take, consumed[offer.maker][offer.group] does not exceed the effective max.
 rule takeConsumedBoundedByMax(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
@@ -64,7 +64,7 @@ rule takeConsumedBoundedByMax(env e, Midnight.Offer offer, bytes ratifierData, u
     assert offer.maxAssets == 0 => consumed(offer.maker, offer.group) <= offer.maxUnits;
 }
 
-/// After a successful take in units mode, the change in consumed equals the units taken.
+// After a successful take in units mode, the change in consumed equals the units taken.
 rule takeConsumedDelta(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     require offer.maxAssets == 0;
 
@@ -75,7 +75,7 @@ rule takeConsumedDelta(env e, Midnight.Offer offer, bytes ratifierData, uint256 
     assert consumed(offer.maker, offer.group) == consumedBefore + units;
 }
 
-/// If consumed[offer.maker][offer.group] is already at or above maxUnits before a take in units mode, it remains unchanged.
+// If consumed[offer.maker][offer.group] is already at or above maxUnits before a take in units mode, it remains unchanged.
 rule takeConsumedAtMaxUnchangedUnits(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     require offer.maxAssets == 0;
 
@@ -86,7 +86,7 @@ rule takeConsumedAtMaxUnchangedUnits(env e, Midnight.Offer offer, bytes ratifier
     assert consumedBefore >= offer.maxUnits => consumed(offer.maker, offer.group) == consumedBefore;
 }
 
-/// If consumed is already at or above maxAssets before a take in assets mode, it remains unchanged.
+// If consumed is already at or above maxAssets before a take in assets mode, it remains unchanged.
 rule takeConsumedAtMaxUnchangedAssets(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     require offer.maxUnits == 0;
 
@@ -97,7 +97,7 @@ rule takeConsumedAtMaxUnchangedAssets(env e, Midnight.Offer offer, bytes ratifie
     assert consumedBefore >= offer.maxAssets => consumed(offer.maker, offer.group) == consumedBefore;
 }
 
-/// A fully-consumed offer in units mode only allows no-op takes.
+// A fully-consumed offer in units mode only allows no-op takes.
 rule fullyConsumedOfferRevertsOnNonTrivialTake(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     require offer.maxAssets == 0;
 

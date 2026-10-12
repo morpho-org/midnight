@@ -59,7 +59,7 @@ filtered {
     assert withdrawableAfter == withdrawableBefore;
 }
 
-/// CLAIMABLE SETTLEMENT FEE ///
+/// Claimable settlement fee.
 
 rule claimDecreasesClaimableSettlementFee(env e, address token, uint256 amount, address receiver) {
     uint256 before = claimableSettlementFee(token);

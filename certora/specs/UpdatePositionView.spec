@@ -5,19 +5,19 @@ methods {
 
     function lossFactor(bytes32) external returns (uint128) envfree;
     function lastLossFactor(bytes32 id, address user) external returns (uint128) envfree;
+    function lastAccrual(bytes32 id, address user) external returns (uint128) envfree;
+    function credit(bytes32 id, address user) external returns (uint128) envfree;
 
-    /// PRICE / ORACLE ///
     function _.price() external => NONDET;
 
-    /// SAFE TRANSFERS ///
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
 
-    /// MUL/DIV — function summaries that compute the exact value in mathint.
+    // mulDivDown and mulDivUp — function summaries that compute the exact value in mathint.
     function UtilsLib.mulDivDown(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivDown(x, y, d);
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => summaryMulDivUp(x, y, d);
 
-    /// MISC INTERNALS irrelevant to credit / loss-factor tracking ///
+    // Misc internals irrelevant to credit / loss-factor tracking
     function IdLib.toId(Midnight.Market memory) internal returns (bytes32) => NONDET;
     function IdLib.storeInCode(Midnight.Market memory) internal returns (address) => NONDET;
     function UtilsLib.msb(uint128) internal returns (uint256) => NONDET;
@@ -26,7 +26,7 @@ methods {
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
-    /// EXTERNAL CALLBACKS — collapse path explosion for strong invariants. ///
+    // External callbacks — collapse path explosion for strong invariants.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
     function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => NONDET;
@@ -34,7 +34,8 @@ methods {
     function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => NONDET;
 }
 
-/// MULDIV FUNCTION SUMMARIES ///
+/// HELPERS
+
 function summaryMulDivDown(uint256 a, uint256 b, uint256 d) returns uint256 {
     bool overflow;
     if (overflow || d == 0) {
@@ -50,8 +51,6 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     }
     return require_uint256((a * b + (d - 1)) / d);
 }
-
-/// GHOSTS ///
 
 persistent ghost mathint PRECISION {
     axiom PRECISION > 0;
@@ -69,8 +68,6 @@ ghost mapping(bytes32 => mapping(address => mathint)) lastAccrualMirror {
     init_state axiom forall bytes32 id. forall address user. lastAccrualMirror[id][user] == 0;
 }
 
-/// HELPER FUNCTIONS ///
-
 // Map factor to 1 - factor, for easier math.
 definition mapFactor(mathint factor) returns mathint = 2 ^ 128 - 1 - factor;
 
@@ -78,7 +75,7 @@ definition cvlCredit(bytes32 id, address owner) returns uint128 = currentContrac
 
 definition cvlLastLossFactor(bytes32 id, address owner) returns uint128 = currentContract.position[id][owner].lastLossFactor;
 
-/// HOOKS ///
+/// HOOKS
 
 function updateCreditDivFactor(bytes32 id, address owner, uint128 newCredit, uint128 newFactor) {
     mathint ownerLossFactor = mapFactor(newFactor);
@@ -117,12 +114,20 @@ hook Sstore position[KEY bytes32 id][KEY address owner].lastAccrual uint128 newL
     lastAccrualMirror[id][owner] = newLast;
 }
 
-/// INVARIANTS ///
+/// PROPERTIES
 
 strong invariant preciseCreditCorrect(bytes32 id, address owner)
     checkCreditDivInvariant(id, owner);
 
-/// RULES ///
+// When lastLossFactor is saturated, updatePositionView zeros credit, so the stored credit is 0.
+strong invariant noCreditWhenLastLossFactorMaxed(bytes32 id, address user)
+    lastLossFactor(id, user) == max_uint128 => credit(id, user) == 0
+    {
+        preserved with (env e) {
+            require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactorLeqMarketLossFactor in Midnight";
+            require pendingFeeMirror[id][user] <= credit(id, user), "pendingContinuousFeeBoundedByCredit in Midnight";
+        }
+    }
 
 rule updatePositionViewProperties(env e, Midnight.Market obligation, bytes32 id, address user) {
     requireInvariant preciseCreditCorrect(id, user);
@@ -148,4 +153,16 @@ rule updatePositionViewProperties(env e, Midnight.Market obligation, bytes32 id,
     assert newCredit <= oldCredit, "slashing and fee accrual only decrease credit";
     assert newPendingFee <= oldPendingFee, "fee deduction only decreases pending";
     assert mapFactor(currentContract.marketState[id].lossFactor) == 0 => newCredit == 0 && fee == 0, "no credit/fee on total loss factor";
+}
+
+/// When lastLossFactor matches the market and lastAccrual matches now, updatePositionView returns the stored credit (slash is a no-op and no new fee accrues).
+rule updatePositionViewEqualsCreditWhenSynced(env e, Midnight.Market market, bytes32 id, address user) {
+    requireInvariant noCreditWhenLastLossFactorMaxed(id, user);
+    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
+    require lastLossFactor(id, user) == lossFactor(id), "loss factor is up to date";
+    require lastAccrual(id, user) == e.block.timestamp, "lastAccrual is up to date";
+
+    uint128 newCredit;
+    newCredit, _, _ = updatePositionView(e, market, id, user);
+    assert newCredit == credit(id, user);
 }

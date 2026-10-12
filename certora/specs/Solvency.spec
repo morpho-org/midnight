@@ -37,9 +37,9 @@ methods {
     function _.transferFrom(address src, address a, uint256 v) external with(env e) => CVL_transferFrom(e, calledContract, src, a, v) expect(bool);
 }
 
-/// HELPERS ///
+/// HELPERS
 
-// ERC20 summaries.
+/// ERC20 summaries.
 
 // Token balances: token => user => balance.
 ghost mapping(address => mapping(address => uint256)) tokenBalances;
@@ -56,20 +56,20 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
     
         // Settle pending settlement fee receipts only on the exact fee transfer expected by take().
-        if (dest == currentContract && pendingFeeReceipt[token] == to_mathint(value)) {
+        if (dest == currentContract && pendingFeeReceipt[token] == value) {
             pendingFeeReceipt[token] = 0;
         }
     }
     return success;
 }
 
-// UtilsLib summaries.
+/// UtilsLib summaries.
 
 ghost CVL_mulDivDown(uint256, uint256, uint256) returns uint256;
 
 ghost CVL_mulDivUp(uint256, uint256, uint256) returns uint256;
 
-// IdLib summaries.
+/// IdLib summaries.
 
 // Mapping from market id to its loan token.
 ghost mapping(bytes32 => address) loantoken;
@@ -90,7 +90,7 @@ function CVL_toId(Midnight.Market market) returns bytes32 {
     return id;
 }
 
-// Callbacks summaries.
+/// Callbacks summaries.
 
 // Mapping from token to flashloan amount.
 // We use persistent ghost to ensure these values are not changed by the callback.
@@ -107,7 +107,7 @@ function CVL_flashLoanEnd(address token, uint256 amount) {
     flashloans[token] = flashloans[token] - amount;
 }
 
-// Define collateral sum and withdrawable sum.
+/// Define collateral sum and withdrawable sum.
 
 definition collateralSum(address token) returns mathint = usum bytes32 id, address owner. collateralMirror[id][owner][token];
 
@@ -153,7 +153,7 @@ hook Sstore claimableSettlementFee[KEY address token] uint256 newVal (uint256 ol
     }
 }
 
-/// INVARIANTS AND RULES ///
+/// PROPERTIES
 
 // For any token, the pending settlement fee receipt after a transaction is 0: every claimableSettlementFee increment in take is paid back in by the same-function inbound transfer.
 weak invariant pendingFeeReceiptZero(address token)

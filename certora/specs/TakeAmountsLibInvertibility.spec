@@ -32,7 +32,7 @@ methods {
     // Assume no reentrancy: callbacks and transfers do not re-enter Midnight.
 }
 
-/// HELPERS ///
+/// HELPERS
 
 function summaryToId(Midnight.Market market) returns bytes32 {
     return Utils.hashMarket(market);
@@ -70,7 +70,7 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
     return require_uint256(ghostMulDivUp(a, b, d));
 }
 
-/// TAKE AMOUNTS LIB INVERTIBILITY ///
+/// PROPERTIES
 
 // Invertibility of TakeAmountsLib.buyerAssetsToUnits.
 //
