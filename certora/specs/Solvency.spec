@@ -9,6 +9,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function claimableSettlementFee(address token) external returns (uint256) envfree;
+    function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
 
     // Summarize mulDivUp and mulDivDown by ghost functions. This is for performance of the prover.
     function UtilsLib.mulDivDown(uint256 a, uint256 b, uint256 denominator) internal returns (uint256) => CVL_mulDivDown(a, b, denominator);
@@ -186,6 +187,17 @@ hook Sstore claimableSettlementFee[KEY address token] uint256 newVal (uint256 ol
 
 /// PROPERTIES
 
+// Midnight never authorizes anyone, so Midnight can be neither the taker nor the maker in take().
+// This matters because a token may allow transferFrom without allowance when from == msg.sender, so Midnight must never be the payer.
+strong invariant midnightAuthorizesNobody(address authorized)
+    !isAuthorized(currentContract, authorized)
+    {
+        preserved with (env e) {
+            require e.msg.sender != currentContract, "only external calls";
+            requireInvariant midnightAuthorizesNobody(e.msg.sender);
+        }
+    }
+
 // For any good token, the pending receipt after a transaction is 0: every claimableSettlementFee increment in take and every withdrawable increment in repay and liquidate is paid in by the same-function inbound transfer.
 weak invariant pendingReceiptZero(address token)
     goodToken[token] => pendingReceipt[token] == 0;
@@ -209,8 +221,8 @@ strong invariant tokenBalanceCorrect(address token)
             requireInvariant pendingReceiptZero(token);
             inFlashLoan = false;
             require e.msg.sender != currentContract, "only external calls";
-            require taker != currentContract, "no settlement with contract";
-            require offer.maker != currentContract, "no settlement with contract";
+            requireInvariant midnightAuthorizesNobody(e.msg.sender);
+            requireInvariant midnightAuthorizesNobody(offer.ratifier);
             require offer.callback != currentContract, "midnight reverts on callbacks";
             require takerCallback != currentContract, "midnight reverts on callbacks";
         }
