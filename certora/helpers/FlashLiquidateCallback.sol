@@ -11,54 +11,38 @@ interface IHavoc {
 }
 
 contract FlashLiquidateCallback is ILiquidateCallback, IRepayCallback, IFlashLoanCallback {
-    // forge-lint: disable-next-item(empty-block) dummy function to insert the flashloan logic in the spec.
-    function startFlashloan(address token, uint256 amount) internal {}
-
-    // forge-lint: disable-next-item(empty-block) dummy function to insert the flashloan logic in the spec.
-    function endFlashloan(address token, uint256 amount) internal {}
-
     function onLiquidate(
         address,
         bytes32,
-        Market memory market,
+        Market memory,
         uint256,
         uint256,
-        uint256 repaidUnits,
+        uint256,
         address,
         address,
         bytes memory data,
         uint256
     ) external returns (bytes32) {
-        startFlashloan(market.loanToken, repaidUnits);
         address account = abi.decode(data, (address));
         IHavoc(account).havoc();
-        endFlashloan(market.loanToken, repaidUnits);
         return CALLBACK_SUCCESS;
     }
 
-    function onRepay(bytes32, Market memory market, uint256 units, address, bytes memory data)
+    function onRepay(bytes32, Market memory, uint256, address, bytes memory data)
         external
         returns (bytes32)
     {
-        startFlashloan(market.loanToken, units);
         address account = abi.decode(data, (address));
         IHavoc(account).havoc();
-        endFlashloan(market.loanToken, units);
         return CALLBACK_SUCCESS;
     }
 
-    function onFlashLoan(address, address[] calldata tokens, uint256[] calldata amounts, bytes calldata data)
+    function onFlashLoan(address, address[] calldata, uint256[] calldata, bytes calldata data)
         external
         returns (bytes32)
     {
-        for (uint256 i = 0; i < tokens.length; i++) {
-            startFlashloan(tokens[i], amounts[i]);
-        }
         address account = abi.decode(data, (address));
         IHavoc(account).havoc();
-        for (uint256 i = 0; i < tokens.length; i++) {
-            endFlashloan(tokens[i], amounts[i]);
-        }
         return CALLBACK_SUCCESS;
     }
 }

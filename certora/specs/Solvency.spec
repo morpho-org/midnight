@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 
 using Utils as Utils;
+using Havoc as havocHelper;
 
 methods {
     function Utils.hashMarket(Midnight.Market) external returns (bytes32) envfree;
@@ -23,18 +24,21 @@ methods {
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
-    // Hook on callbacks, this adds no assumption: see FlashLiquidateCallback.sol and the summaries below.
+    // Callbacks can reenter and change the state arbitrarily, this adds no assumption: see FlashLiquidateCallback.sol.
+    // The gaps until tokens are paid back are tracked by pendingReceipt and flashloans, see CVL_transferFrom.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
     function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
     function _.onFlashLoan(address caller, address[] tokens, uint256[] amounts, bytes data) external => DISPATCHER(true);
     function _.onLiquidate(address liquidator, bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, bytes data, uint256 badDebt) external => DISPATCHER(true);
     function _.onRepay(bytes32 id, Midnight.Market market, uint256 units, address onBehalf, bytes data) external => DISPATCHER(true);
-    function FlashLiquidateCallback.startFlashloan(address token, uint256 amount) internal => CVL_flashLoanStart(token, amount);
-    function FlashLiquidateCallback.endFlashloan(address token, uint256 amount) internal => CVL_flashLoanEnd(token, amount);
 
-    // Assume ERC20 tokens transfer correctly: no fee taking from sender or receiver, no rebasing, no blacklisting, no transfer limits.
+    // Good ERC20 tokens transfer correctly: no fee taking from sender or receiver, no rebasing, no blacklisting, no transfer limits.
+    // Bad ERC20 tokens can do anything, including reentering Midnight and changing all balances, see CVL_transferFrom.
     function _.transfer(address a, uint256 v) external with(env e) => CVL_transferFrom(e, calledContract, e.msg.sender, a, v) expect(bool);
     function _.transferFrom(address src, address a, uint256 v) external with(env e) => CVL_transferFrom(e, calledContract, src, a, v) expect(bool);
+
+    // Used to model arbitrary behavior of bad tokens.
+    function _.havocAll() external => HAVOC_ALL;
 }
 
 /// HELPERS
@@ -44,7 +48,21 @@ methods {
 // Token balances: token => user => balance.
 ghost mapping(address => mapping(address => uint256)) tokenBalances;
 
+// Tokens that behave correctly. The solvency invariant is only proven for these tokens.
+// We use persistent ghost so that bad tokens cannot change which tokens are good.
+persistent ghost mapping(address => bool) goodToken;
+
 function CVL_transferFrom(env e, address token, address src, address dest, uint256 value) returns bool {
+    // Bad tokens can change the whole state arbitrarily, including all token balances, and return an arbitrary value.
+    // Since tokenBalanceCorrect is a strong invariant, it is asserted before and assumed after the havoc.
+    if (!goodToken[token]) {
+        env eHavoc;
+        address dummy;
+        havocHelper.callHavoc(eHavoc, dummy);
+        bool result;
+        return result;
+    }
+
     if (tokenBalances[token][src] < value || tokenBalances[token][dest] + value >= 2 ^ 256) {
         revert();
     }
@@ -54,10 +72,18 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
     if (success) {
         tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
-    
-        // Settle pending settlement fee receipts only on the exact fee transfer expected by take().
-        if (dest == currentContract && pendingFeeReceipt[token] == value) {
-            pendingFeeReceipt[token] = 0;
+
+        // Settle pending receipts only on the exact inbound transfer expected by take(), repay() and liquidate().
+        if (dest == currentContract && pendingReceipt[token] == value) {
+            pendingReceipt[token] = 0;
+        }
+
+        // In flashLoan(), every outbound transfer lends tokens and every inbound transfer pays them back.
+        if (inFlashLoan && src == currentContract) {
+            flashloans[token] = flashloans[token] + value;
+        }
+        if (inFlashLoan && dest == currentContract) {
+            flashloans[token] = flashloans[token] - value;
         }
     }
     return success;
@@ -72,10 +98,12 @@ ghost CVL_mulDivUp(uint256, uint256, uint256) returns uint256;
 /// IdLib summaries.
 
 // Mapping from market id to its loan token.
-ghost mapping(bytes32 => address) loantoken;
+// We use persistent ghost as the loan token of a market id never changes, also not when bad tokens havoc the state.
+persistent ghost mapping(bytes32 => address) loantoken;
 
 // Mapping from market id and collateral index to the corresponding collateral token.
-ghost mapping(bytes32 => mapping(uint128 => address)) collateralToken;
+// We use persistent ghost as the collateral tokens of a market id never change, also not when bad tokens havoc the state.
+persistent ghost mapping(bytes32 => mapping(uint128 => address)) collateralToken;
 
 ghost hash(bytes32) returns bytes32;
 
@@ -92,19 +120,15 @@ function CVL_toId(Midnight.Market market) returns bytes32 {
 
 /// Callbacks summaries.
 
-// Mapping from token to flashloan amount.
+// Whether the current top-level call is flashLoan(). It is set in the preserved blocks and rules below.
+// We use persistent ghost so that reentrant calls cannot change it.
+persistent ghost bool inFlashLoan;
+
+// Mapping from token to the amount lent out by flashLoan() and not yet paid back, see CVL_transferFrom.
 // We use persistent ghost to ensure these values are not changed by the callback.
-// This is justified as we prove the rule flashloansPaidBack which ensures that the flashloan amount after the callback is the same as before.
+// This is justified as we prove the rule flashLoansPaidBack which ensures that the flashloan amount after a call is the same as before.
 persistent ghost mapping(address => mathint) flashloans {
     init_state axiom (forall address token. flashloans[token] == 0);
-}
-
-function CVL_flashLoanStart(address token, uint256 amount) {
-    flashloans[token] = flashloans[token] + amount;
-}
-
-function CVL_flashLoanEnd(address token, uint256 amount) {
-    flashloans[token] = flashloans[token] - amount;
 }
 
 /// Define collateral sum and withdrawable sum.
@@ -139,37 +163,51 @@ hook Sload uint128 value marketState[KEY bytes32 id].withdrawable {
 
 hook Sstore marketState[KEY bytes32 id].withdrawable uint128 newWithdrawable (uint128 oldWithdrawable) {
     withdrawableMirror[id][loantoken[id]] = newWithdrawable;
+
+    // The withdrawable is only incremented in repay and liquidate, before the inbound transfer of the same amount.
+    if (newWithdrawable > oldWithdrawable) {
+        pendingReceipt[loantoken[id]] = pendingReceipt[loantoken[id]] + newWithdrawable - oldWithdrawable;
+    }
 }
 
-// Settlement fee receipts pending settlement: claimableSettlementFee is incremented in take before the inbound fee transfer happens, so we track the gap and clear it in CVL_transferFrom.
-persistent ghost mapping(address => mathint) pendingFeeReceipt {
-    init_state axiom (forall address token. pendingFeeReceipt[token] == 0);
+// Receipts pending settlement: claimableSettlementFee is incremented in take, and withdrawable is incremented in repay and liquidate, before the corresponding inbound transfer happens.
+// We track the gap and clear it in CVL_transferFrom.
+// We use persistent ghost so that reentrant calls cannot change it, which is justified by the invariant pendingReceiptZero.
+persistent ghost mapping(address => mathint) pendingReceipt {
+    init_state axiom (forall address token. pendingReceipt[token] == 0);
 }
 
 hook Sstore claimableSettlementFee[KEY address token] uint256 newVal (uint256 oldVal) {
     // Except for claimSettlementFee, the claimableSettlementFee is non-decreasing, see WithdrawableMonotonicity.spec.
     if (newVal > oldVal) {
-        pendingFeeReceipt[token] = pendingFeeReceipt[token] + newVal - oldVal;
+        pendingReceipt[token] = pendingReceipt[token] + newVal - oldVal;
     }
 }
 
 /// PROPERTIES
 
-// For any token, the pending settlement fee receipt after a transaction is 0: every claimableSettlementFee increment in take is paid back in by the same-function inbound transfer.
-weak invariant pendingFeeReceiptZero(address token)
-    pendingFeeReceipt[token] == 0;
+// For any good token, the pending receipt after a transaction is 0: every claimableSettlementFee increment in take and every withdrawable increment in repay and liquidate is paid in by the same-function inbound transfer.
+weak invariant pendingReceiptZero(address token)
+    goodToken[token] => pendingReceipt[token] == 0;
 
-// For any token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable settlement fee amounts for that token minus the flash loaned amount.
-// Note: this invariant is strong, so it also holds before each external call.
+// For any good token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable settlement fee amounts for that token minus the flash loaned amount.
+// Note: this invariant is strong, so it also holds before each external call, in particular before each transfer of a bad token.
 strong invariant tokenBalanceCorrect(address token)
-    tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableSettlementFee(token) - flashloans[token] - pendingFeeReceipt[token]
+    goodToken[token] => tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableSettlementFee(token) - flashloans[token] - pendingReceipt[token]
     {
         preserved with (env e) {
-            requireInvariant pendingFeeReceiptZero(token);
+            requireInvariant pendingReceiptZero(token);
             require e.msg.sender != currentContract, "only external calls";
+            inFlashLoan = false;
+        }
+        preserved flashLoan(address[] tokens, uint256[] assets, address callback, bytes data) with (env e) {
+            requireInvariant pendingReceiptZero(token);
+            require e.msg.sender != currentContract, "only external calls";
+            inFlashLoan = true;
         }
         preserved take(Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) with (env e) {
-            requireInvariant pendingFeeReceiptZero(token);
+            requireInvariant pendingReceiptZero(token);
+            inFlashLoan = false;
             require e.msg.sender != currentContract, "only external calls";
             require taker != currentContract, "no settlement with contract";
             require offer.maker != currentContract, "no settlement with contract";
@@ -183,6 +221,7 @@ strong invariant tokenBalanceCorrect(address token)
 rule flashLoansPaidBack(method f, address token) {
     env e;
     calldataarg args;
+    inFlashLoan = f.selector == sig:flashLoan(address[], uint256[], address, bytes).selector;
     mathint oldFlashLoan = flashloans[token];
     f(e, args);
     assert flashloans[token] == oldFlashLoan, "flashloan repaid";
@@ -191,4 +230,12 @@ rule flashLoansPaidBack(method f, address token) {
 // For any token, the amount of flash loans after a transaction is 0.
 // With tokenBalanceCorrect, this proves that for any token, the balance of the contract is always greater than or equal to the sum of all collateral and withdrawable amounts for that token.
 weak invariant flashLoansZero(address token)
-    flashloans[token] == 0;
+    flashloans[token] == 0
+    {
+        preserved {
+            inFlashLoan = false;
+        }
+        preserved flashLoan(address[] tokens, uint256[] assets, address callback, bytes data) with (env e) {
+            inFlashLoan = true;
+        }
+    }
