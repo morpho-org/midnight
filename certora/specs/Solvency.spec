@@ -66,7 +66,7 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
     if (success) {
         tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
-
+    
         // Every outbound transfer increases what Midnight is owed and every inbound transfer decreases it.
         // A transfer from Midnight to itself leaves it unchanged.
         if (src == currentContract) {
@@ -186,12 +186,7 @@ strong invariant tokenBalanceCorrect(address token)
 // The rule holds for any initial owed amount, so it also holds for calls reentering Midnight from a callback.
 // With the init_state axiom of owed, this proves that the owed amount is non-positive after each transaction.
 // With tokenBalanceCorrect, this proves that for any good token, after each transaction the balance of the contract is greater than or equal to the sum of all collateral, withdrawable, and claimable settlement fee amounts for that token.
-rule owedPaidBack(env e, method f, calldataarg args, address token)
-filtered {
-    f -> f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector
-        && f.selector != sig:repay(Midnight.Market, uint256, address, address, bytes).selector
-        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
-} {
+rule owedPaidBack(env e, method f, calldataarg args, address token) filtered { f -> f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector && f.selector != sig:repay(Midnight.Market, uint256, address, address, bytes).selector && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector } {
     require goodToken[token], "only good tokens";
     require e.msg.sender != currentContract, "only external calls";
     mathint owedBefore = owed[token];
@@ -205,6 +200,7 @@ filtered {
 rule owedPaidBackTake(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, address token) {
     require goodToken[token], "only good tokens";
     require e.msg.sender != currentContract, "only external calls";
+
     // Midnight can be neither the taker nor the maker, so it is never the payer.
     requireInvariant midnightAuthorizesNobody(e.msg.sender);
     requireInvariant midnightAuthorizesNobody(offer.ratifier);
