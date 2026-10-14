@@ -25,14 +25,6 @@ methods {
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
 
-    // Callbacks can reenter and change the state arbitrarily, this adds no assumption: see FlashLiquidateCallback.sol.
-    // The gaps until tokens are paid back are tracked by pendingReceipt and flashloans, see CVL_transferFrom.
-    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => NONDET;
-    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => NONDET;
-    function _.onFlashLoan(address caller, address[] tokens, uint256[] amounts, bytes data) external => DISPATCHER(true);
-    function _.onLiquidate(address liquidator, bytes32 id, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, address receiver, bytes data, uint256 badDebt) external => DISPATCHER(true);
-    function _.onRepay(bytes32 id, Midnight.Market market, uint256 units, address onBehalf, bytes data) external => DISPATCHER(true);
-
     // Good ERC20 tokens transfer correctly: no fee taking from sender or receiver, no rebasing, no blacklisting, no transfer limits.
     // Bad ERC20 tokens can do anything, including reentering Midnight and changing all balances, see CVL_transferFrom.
     function _.transfer(address a, uint256 v) external with(env e) => CVL_transferFrom(e, calledContract, e.msg.sender, a, v) expect(bool);
@@ -50,11 +42,11 @@ methods {
 ghost mapping(address => mapping(address => uint256)) tokenBalances;
 
 // Tokens that behave correctly. The solvency invariant is only proven for these tokens.
-// We use persistent ghost so that bad tokens cannot change which tokens are good.
+// We use persistent ghost and this mapping never changes.
 persistent ghost mapping(address => bool) goodToken;
 
 function CVL_transferFrom(env e, address token, address src, address dest, uint256 value) returns bool {
-    // Bad tokens can change the whole state arbitrarily, including all token balances, and return an arbitrary value.
+    // Bad tokens can change the whole state arbitrarily, including token balances, and return an arbitrary value.
     // Since tokenBalanceCorrect is a strong invariant, it is asserted before and assumed after the havoc.
     if (!goodToken[token]) {
         env eHavoc;
@@ -64,6 +56,7 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
         return result;
     }
 
+    // Token transfer reverts if balance is not sufficient or receiver would overflow.
     if (tokenBalances[token][src] < value || tokenBalances[token][dest] + value >= 2 ^ 256) {
         revert();
     }
@@ -74,17 +67,13 @@ function CVL_transferFrom(env e, address token, address src, address dest, uint2
         tokenBalances[token][src] = assert_uint256(tokenBalances[token][src] - value);
         tokenBalances[token][dest] = assert_uint256(tokenBalances[token][dest] + value);
 
-        // Settle pending receipts only on the exact inbound transfer expected by take(), repay() and liquidate().
-        if (dest == currentContract && pendingReceipt[token] == value) {
-            pendingReceipt[token] = 0;
+        // Every outbound transfer increases what Midnight is owed and every inbound transfer decreases it.
+        // A transfer from Midnight to itself leaves it unchanged.
+        if (src == currentContract) {
+            owed[token] = owed[token] + value;
         }
-
-        // In flashLoan(), every outbound transfer lends tokens and every inbound transfer pays them back.
-        if (inFlashLoan && src == currentContract) {
-            flashloans[token] = flashloans[token] + value;
-        }
-        if (inFlashLoan && dest == currentContract) {
-            flashloans[token] = flashloans[token] - value;
+        if (dest == currentContract) {
+            owed[token] = owed[token] - value;
         }
     }
     return success;
@@ -119,17 +108,16 @@ function CVL_toId(Midnight.Market market) returns bytes32 {
     return id;
 }
 
-/// Callbacks summaries.
+/// Tokens owed to Midnight.
 
-// Whether the current top-level call is flashLoan(). It is set in the preserved blocks and rules below.
-// We use persistent ghost so that reentrant calls cannot change it.
-persistent ghost bool inFlashLoan;
-
-// Mapping from token to the amount lent out by flashLoan() and not yet paid back, see CVL_transferFrom.
-// We use persistent ghost to ensure these values are not changed by the callback.
-// This is justified as we prove the rule flashLoansPaidBack which ensures that the flashloan amount after a call is the same as before.
-persistent ghost mapping(address => mathint) flashloans {
-    init_state axiom (forall address token. flashloans[token] == 0);
+// Mapping from token to the amount Midnight is owed by the current call: the increase of the obligations (collateral, withdrawable and claimable settlement fees) minus the increase of the balance of Midnight.
+// It is increased by outbound transfers and obligation increases, and decreased by inbound transfers and obligation decreases, see CVL_transferFrom and the Sstore hooks below.
+// This covers flash loans, and obligations that are increased before the corresponding inbound transfer in take, repay and liquidate.
+// We use persistent ghost so that callbacks and bad tokens, which are modeled by havocs, cannot change it.
+// This is justified by the rules owedPaidBack*, which ensure that no call increases the owed amount.
+// Since it starts at zero and can only be decreased by any function, it will always be zero or negative between transactions.
+persistent ghost mapping(address => mathint) owed {
+    init_state axiom (forall address token. owed[token] == 0);
 }
 
 /// Define collateral sum and withdrawable sum.
@@ -148,7 +136,9 @@ hook Sload uint128 value position[KEY bytes32 id][KEY address owner].collateral[
 
 // Safe require as markets limit the number of collateralParams.
 hook Sstore position[KEY bytes32 id][KEY address owner].collateral[INDEX uint256 collateralIndex] uint128 newCollateral (uint128 oldCollateral) {
-    collateralMirror[id][owner][collateralToken[id][require_uint128(collateralIndex)]] = newCollateral;
+    address token = collateralToken[id][require_uint128(collateralIndex)];
+    collateralMirror[id][owner][token] = newCollateral;
+    owed[token] = owed[token] + newCollateral - oldCollateral;
 }
 
 definition withdrawableSum(address token) returns mathint = usum bytes32 id. withdrawableMirror[id][token];
@@ -164,25 +154,11 @@ hook Sload uint128 value marketState[KEY bytes32 id].withdrawable {
 
 hook Sstore marketState[KEY bytes32 id].withdrawable uint128 newWithdrawable (uint128 oldWithdrawable) {
     withdrawableMirror[id][loantoken[id]] = newWithdrawable;
-
-    // The withdrawable is only incremented in repay and liquidate, before the inbound transfer of the same amount.
-    if (newWithdrawable > oldWithdrawable) {
-        pendingReceipt[loantoken[id]] = pendingReceipt[loantoken[id]] + newWithdrawable - oldWithdrawable;
-    }
-}
-
-// Receipts pending settlement: claimableSettlementFee is incremented in take, and withdrawable is incremented in repay and liquidate, before the corresponding inbound transfer happens.
-// We track the gap and clear it in CVL_transferFrom.
-// We use persistent ghost so that reentrant calls cannot change it, which is justified by the invariant pendingReceiptZero.
-persistent ghost mapping(address => mathint) pendingReceipt {
-    init_state axiom (forall address token. pendingReceipt[token] == 0);
+    owed[loantoken[id]] = owed[loantoken[id]] + newWithdrawable - oldWithdrawable;
 }
 
 hook Sstore claimableSettlementFee[KEY address token] uint256 newVal (uint256 oldVal) {
-    // Except for claimSettlementFee, the claimableSettlementFee is non-decreasing, see WithdrawableMonotonicity.spec.
-    if (newVal > oldVal) {
-        pendingReceipt[token] = pendingReceipt[token] + newVal - oldVal;
-    }
+    owed[token] = owed[token] + newVal - oldVal;
 }
 
 /// PROPERTIES
@@ -198,56 +174,69 @@ strong invariant midnightAuthorizesNobody(address authorized)
         }
     }
 
-// For any good token, the pending receipt after a transaction is 0: every claimableSettlementFee increment in take and every withdrawable increment in repay and liquidate is paid in by the same-function inbound transfer.
-weak invariant pendingReceiptZero(address token)
-    goodToken[token] => pendingReceipt[token] == 0;
-
-// For any good token, the balance of the contract is always greater than or equal to the sum of all collateral, withdrawable, and claimable settlement fee amounts for that token minus the flash loaned amount.
-// Note: this invariant is strong, so it also holds before each external call, in particular before each transfer of a bad token.
+// For any good token, the balance of the contract plus the amount it is owed by the current call is always greater than or equal to the sum of all collateral, withdrawable, and claimable settlement fee amounts for that token.
+// Every step outside of havocs changes both sides by the same amount, see the definition of owed.
+// Note: this invariant is strong, so it also holds before each external call, in particular before each transfer of a bad token and each callback.
+// Since owed is never positive between transactions, the balance of good tokens will always cover the collateral, withdrawable, and claimable.
 strong invariant tokenBalanceCorrect(address token)
-    goodToken[token] => tokenBalances[token][currentContract] >= collateralSum(token) + withdrawableSum(token) + claimableSettlementFee(token) - flashloans[token] - pendingReceipt[token]
-    {
-        preserved with (env e) {
-            requireInvariant pendingReceiptZero(token);
-            require e.msg.sender != currentContract, "only external calls";
-            inFlashLoan = false;
-        }
-        preserved flashLoan(address[] tokens, uint256[] assets, address callback, bytes data) with (env e) {
-            requireInvariant pendingReceiptZero(token);
-            require e.msg.sender != currentContract, "only external calls";
-            inFlashLoan = true;
-        }
-        preserved take(Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) with (env e) {
-            requireInvariant pendingReceiptZero(token);
-            inFlashLoan = false;
-            require e.msg.sender != currentContract, "only external calls";
-            requireInvariant midnightAuthorizesNobody(e.msg.sender);
-            requireInvariant midnightAuthorizesNobody(offer.ratifier);
-            require offer.callback != currentContract, "midnight reverts on callbacks";
-            require takerCallback != currentContract, "midnight reverts on callbacks";
-        }
-    }
+    goodToken[token] => tokenBalances[token][currentContract] + owed[token] >= collateralSum(token) + withdrawableSum(token) + claimableSettlementFee(token);
 
-// For any token, the flash loans before and after a call is the same.
-// This rule is useful to prove that using persistent ghost for the flashloans mapping is sound.
-rule flashLoansPaidBack(method f, address token) {
-    env e;
-    calldataarg args;
-    inFlashLoan = f.selector == sig:flashLoan(address[], uint256[], address, bytes).selector;
-    mathint oldFlashLoan = flashloans[token];
+// For any good token, no call increases the owed amount: every obligation increase and every outbound transfer is matched by an obligation decrease or an inbound transfer of the same call.
+// The owed amount can decrease, for example when Midnight is the receiver of a withdrawal.
+// The rule holds for any initial owed amount, so it also holds for calls reentering Midnight from a callback.
+// With the init_state axiom of owed, this proves that the owed amount is non-positive after each transaction.
+// With tokenBalanceCorrect, this proves that for any good token, after each transaction the balance of the contract is greater than or equal to the sum of all collateral, withdrawable, and claimable settlement fee amounts for that token.
+rule owedPaidBack(env e, method f, calldataarg args, address token)
+filtered {
+    f -> f.selector != sig:take(Midnight.Offer, bytes, uint256, address, address, address, bytes).selector
+        && f.selector != sig:repay(Midnight.Market, uint256, address, address, bytes).selector
+        && f.selector != sig:liquidate(Midnight.Market, uint256, uint256, uint256, address, bool, address, address, bytes).selector
+} {
+    require goodToken[token], "only good tokens";
+    require e.msg.sender != currentContract, "only external calls";
+    mathint owedBefore = owed[token];
+
     f(e, args);
-    assert flashloans[token] == oldFlashLoan, "flashloan repaid";
+
+    assert owed[token] <= owedBefore, "owed tokens paid back";
 }
 
-// For any token, the amount of flash loans after a transaction is 0.
-// With tokenBalanceCorrect, this proves that for any token, the balance of the contract is always greater than or equal to the sum of all collateral and withdrawable amounts for that token.
-weak invariant flashLoansZero(address token)
-    flashloans[token] == 0
-    {
-        preserved {
-            inFlashLoan = false;
-        }
-        preserved flashLoan(address[] tokens, uint256[] assets, address callback, bytes data) with (env e) {
-            inFlashLoan = true;
-        }
-    }
+// Same as owedPaidBack for take.
+rule owedPaidBackTake(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData, address token) {
+    require goodToken[token], "only good tokens";
+    require e.msg.sender != currentContract, "only external calls";
+    // Midnight can be neither the taker nor the maker, so it is never the payer.
+    requireInvariant midnightAuthorizesNobody(e.msg.sender);
+    requireInvariant midnightAuthorizesNobody(offer.ratifier);
+    require offer.callback != currentContract, "Midnight reverts on callbacks";
+    require takerCallback != currentContract, "Midnight reverts on callbacks";
+    mathint owedBefore = owed[token];
+
+    take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
+
+    assert owed[token] <= owedBefore, "owed tokens paid back";
+}
+
+// Same as owedPaidBack for repay.
+rule owedPaidBackRepay(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data, address token) {
+    require goodToken[token], "only good tokens";
+    require e.msg.sender != currentContract, "only external calls";
+    require callback != currentContract, "Midnight reverts on callbacks";
+    mathint owedBefore = owed[token];
+
+    repay(e, market, units, onBehalf, callback, data);
+
+    assert owed[token] <= owedBefore, "owed tokens paid back";
+}
+
+// Same as owedPaidBack for liquidate.
+rule owedPaidBackLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, address token) {
+    require goodToken[token], "only good tokens";
+    require e.msg.sender != currentContract, "only external calls";
+    require callback != currentContract, "Midnight reverts on callbacks";
+    mathint owedBefore = owed[token];
+
+    liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
+
+    assert owed[token] <= owedBefore, "owed tokens paid back";
+}
