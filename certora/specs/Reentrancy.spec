@@ -38,22 +38,16 @@ hook ALL_TLOAD(uint _) uint _ {
 
 hook ALL_SSTORE(uint _, uint _) {
     storageAccessed = true;
-    if (hasCallAfterStorage) {
-        unsafeCall = true;
-    }
+    unsafeCall = unsafeCall || hasCallAfterStorage;
 }
 
 hook ALL_TSTORE(uint _, uint _) {
     storageAccessed = true;
-    if (hasCallAfterStorage) {
-        unsafeCall = true;
-    }
+    unsafeCall = unsafeCall || hasCallAfterStorage;
 }
 
 hook CALL(uint256 g, address addr, uint256 value, uint256 argsOffset, uint256 argsLength, uint256 retOffset, uint256 retLength) uint256 rc {
-    if (storageAccessed) {
-        hasCallAfterStorage = true;
-    }
+    hasCallAfterStorage = hasCallAfterStorage || storageAccessed;
 }
 
 // Check that calls are either before the first storage access or after the last store (excluding the effects of touchMarket, _updatePosition and tExchange).
