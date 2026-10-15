@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
+import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 import {VaultWhitelistEnterGate} from "../src/periphery/vault-whitelist-enter-gate/VaultWhitelistEnterGate.sol";
 import {
     IVaultWhitelistEnterGate,
@@ -796,9 +797,9 @@ contract VaultWhitelistEnterGateIntegrationTest is BaseTest {
         offer.continuousFeeCap = type(uint256).max;
 
         vm.prank(adapter);
-        loanToken.approve(address(midnight), type(uint256).max);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), type(uint256).max);
         vm.prank(depositor);
-        loanToken.approve(address(midnight), type(uint256).max);
+        ERC20Lib.safeApprove(address(loanToken), address(midnight), type(uint256).max);
         vm.mockCall(adapterFactory, abi.encodeCall(IMidnightAdapterFactory.midnight, ()), abi.encode(address(midnight)));
         vm.mockCall(
             adapterFactory, abi.encodeCall(IMidnightAdapterFactory.isMidnightAdapter, (adapter)), abi.encode(true)
