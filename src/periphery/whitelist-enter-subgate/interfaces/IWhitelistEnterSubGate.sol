@@ -44,7 +44,6 @@ interface IWhitelistEnterSubGate is IEnterSubGate {
     /// STORAGE GETTERS ///
     function CREDIT_OPEN() external view returns (bool);
     function DEBT_OPEN() external view returns (bool);
-    function roleSetter(bool creditSide) external view returns (address);
     function isWhitelister(bool creditSide, address account) external view returns (bool);
     function nonces(bytes32 marketId, bool creditSide, address whitelister, address account)
         external

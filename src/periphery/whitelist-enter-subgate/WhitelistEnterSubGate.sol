@@ -22,8 +22,10 @@ contract WhitelistEnterSubGate is IWhitelistEnterSubGate {
 
     mapping(bool creditSide => address) public roleSetter;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelister;
-    mapping(bytes32 marketId => mapping(bool creditSide => mapping(address whitelister => mapping(address account => uint256))))
-        public nonces;
+    mapping(
+        bytes32 marketId
+            => mapping(bool creditSide => mapping(address whitelister => mapping(address account => uint256)))
+    ) public nonces;
     mapping(bytes32 marketId => mapping(bool creditSide => mapping(address account => bool))) public isWhitelisted;
 
     /// CONSTRUCTOR ///

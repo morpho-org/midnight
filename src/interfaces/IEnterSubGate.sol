@@ -4,6 +4,7 @@ pragma solidity >=0.5.0;
 
 /// @dev Market-specific permission checks for an enter gate. This interface cannot serve as IEnterGate.
 interface IEnterSubGate {
+    function roleSetter(bool creditSide) external view returns (address);
     function canIncreaseCredit(bytes32 marketId, address account) external view returns (bool);
     function canIncreaseDebt(bytes32 marketId, address account) external view returns (bool);
 }
