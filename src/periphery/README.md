@@ -55,6 +55,9 @@ Each side has its own role setter, who grants or revokes the whitelister role on
 Whitelisters edit the lists directly with `setIsWhitelisted` or allow to edit the list by EIP-712 signatures used by `setIsWhitelistedWithSig`.
 `setIsWhitelistedWithSig` is a no-op instead of a revert when the signed nonce is stale and the account is already set to the signed value.
 A side can be made open at deployment, letting any account enter on that side (forever).
+The credit role setter can add trusted adapter factories, but cannot remove them.
+Anyone can transiently allow an account to increase credit until the end of the transaction when the account holds shares of an adapter's parent vault and the adapter has credit in a market using this gate.
+The transient allowance applies to every market using this gate.
 
 ### `VaultWhitelistEnterGateFactory`
 

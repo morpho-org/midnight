@@ -3,12 +3,18 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
+import {IMidnight, Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
+import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {VaultWhitelistEnterGate} from "../src/periphery/vault-whitelist-enter-gate/VaultWhitelistEnterGate.sol";
 import {
     IVaultWhitelistEnterGate,
+    IMidnightAdapter,
+    IMidnightAdapterFactory,
+    IVault,
     SET_IS_WHITELISTED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
 } from "../src/periphery/vault-whitelist-enter-gate/interfaces/IVaultWhitelistEnterGate.sol";
+import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 
 bytes constant SET_IS_WHITELISTED_TYPE =
     "SetIsWhitelisted(bool creditSide,address account,bool newIsWhitelisted,uint256 nonce,uint256 deadline)";
@@ -24,6 +30,11 @@ contract VaultWhitelistEnterGateTest is Test {
     address internal whitelister2;
     address internal alice = makeAddr("alice");
     address internal bob = makeAddr("bob");
+    address internal adapterFactory = makeAddr("adapterFactory");
+    address internal adapter = makeAddr("adapter");
+    address internal vault = makeAddr("vault");
+    address internal midnight = makeAddr("midnight");
+    bytes32 internal marketId = keccak256("marketId");
 
     function setUp() public {
         whitelisterPk = 0xA11CE;
@@ -569,5 +580,234 @@ contract VaultWhitelistEnterGateTest is Test {
         vm.expectRevert(IVaultWhitelistEnterGate.NotWhitelister.selector);
         vm.prank(caller);
         gate.multicall(data);
+    }
+
+    function testAddWhitelistedAdapterFactory(address factory) public {
+        vm.expectEmit();
+        emit IVaultWhitelistEnterGate.AddWhitelistedAdapterFactory(factory);
+        vm.prank(creditRoleSetter);
+        gate.addWhitelistedAdapterFactory(factory);
+        assertTrue(gate.isWhitelistedAdapterFactory(factory));
+
+        vm.prank(creditRoleSetter);
+        gate.addWhitelistedAdapterFactory(factory);
+        assertTrue(gate.isWhitelistedAdapterFactory(factory));
+    }
+
+    function testAddWhitelistedAdapterFactoryNotRoleSetter(address caller, address factory) public {
+        vm.assume(caller != creditRoleSetter);
+        vm.expectRevert(IVaultWhitelistEnterGate.NotRoleSetter.selector);
+        vm.prank(caller);
+        gate.addWhitelistedAdapterFactory(factory);
+    }
+
+    function testAddWhitelistedAdapterFactoryDebtRoleSetter(address factory) public {
+        vm.expectRevert(IVaultWhitelistEnterGate.NotRoleSetter.selector);
+        vm.prank(debtRoleSetter);
+        gate.addWhitelistedAdapterFactory(factory);
+    }
+
+    /// forge-config: default.isolate = false
+    function testTransientAllowIncreaseCredit(address caller) public {
+        _addWhitelistedAdapterFactory();
+        _mockTransientAllowance(true, false, address(gate), 1, 1);
+
+        vm.expectEmit();
+        emit IVaultWhitelistEnterGate.TransientAllowIncreaseCredit(caller, alice, adapterFactory, adapter, marketId);
+        vm.prank(caller);
+        gate.transientAllowIncreaseCredit(alice, adapterFactory, adapter, marketId);
+
+        assertTrue(gate.isTransientlyAllowed(alice));
+        assertTrue(gate.canIncreaseCredit(alice));
+        assertFalse(gate.canIncreaseDebt(alice));
+        assertFalse(gate.isTransientlyAllowed(bob));
+    }
+
+    function testTransientAllowIncreaseCreditAdapterFactoryNotWhitelisted() public {
+        _mockTransientAllowance(true, false, address(gate), 1, 1);
+
+        vm.expectRevert(IVaultWhitelistEnterGate.AdapterFactoryNotWhitelisted.selector);
+        gate.transientAllowIncreaseCredit(alice, adapterFactory, adapter, marketId);
+        assertFalse(gate.isTransientlyAllowed(alice));
+    }
+
+    function testTransientAllowIncreaseCreditNotAdapter() public {
+        _addWhitelistedAdapterFactory();
+        _mockTransientAllowance(false, false, address(gate), 1, 1);
+
+        vm.expectRevert(IVaultWhitelistEnterGate.NotAdapter.selector);
+        gate.transientAllowIncreaseCredit(alice, adapterFactory, adapter, marketId);
+        assertFalse(gate.isTransientlyAllowed(alice));
+    }
+
+    function testTransientAllowIncreaseCreditAccountIsAdapter() public {
+        _addWhitelistedAdapterFactory();
+        _mockTransientAllowance(true, true, address(gate), 1, 1);
+
+        vm.expectRevert(IVaultWhitelistEnterGate.AccountIsAdapter.selector);
+        gate.transientAllowIncreaseCredit(alice, adapterFactory, adapter, marketId);
+        assertFalse(gate.isTransientlyAllowed(alice));
+    }
+
+    function testTransientAllowIncreaseCreditIncorrectEnterGate() public {
+        _addWhitelistedAdapterFactory();
+        _mockTransientAllowance(true, false, address(0x1234), 1, 1);
+
+        vm.expectRevert(IVaultWhitelistEnterGate.IncorrectEnterGate.selector);
+        gate.transientAllowIncreaseCredit(alice, adapterFactory, adapter, marketId);
+        assertFalse(gate.isTransientlyAllowed(alice));
+    }
+
+    function testTransientAllowIncreaseCreditNoAdapterCredit() public {
+        _addWhitelistedAdapterFactory();
+        _mockTransientAllowance(true, false, address(gate), 0, 1);
+
+        vm.expectRevert(IVaultWhitelistEnterGate.NoAdapterCredit.selector);
+        gate.transientAllowIncreaseCredit(alice, adapterFactory, adapter, marketId);
+        assertFalse(gate.isTransientlyAllowed(alice));
+    }
+
+    function testTransientAllowIncreaseCreditNoVaultShares() public {
+        _addWhitelistedAdapterFactory();
+        _mockTransientAllowance(true, false, address(gate), 1, 0);
+
+        vm.expectRevert(IVaultWhitelistEnterGate.NoVaultShares.selector);
+        gate.transientAllowIncreaseCredit(alice, adapterFactory, adapter, marketId);
+        assertFalse(gate.isTransientlyAllowed(alice));
+    }
+
+    /// forge-config: default.isolate = true
+    function testAuthorizationClearedAfterTransaction() public {
+        _addWhitelistedAdapterFactory();
+        _mockTransientAllowance(true, false, address(gate), 1, 1);
+        this.allowAndCheckUser();
+        assertFalse(gate.isTransientlyAllowed(alice));
+        assertFalse(gate.canIncreaseCredit(alice));
+    }
+
+    function allowAndCheckUser() external {
+        gate.transientAllowIncreaseCredit(alice, adapterFactory, adapter, marketId);
+        assertTrue(gate.isTransientlyAllowed(alice));
+        assertTrue(gate.canIncreaseCredit(alice));
+    }
+
+    function testAuthorizationRevertsWithCaller() public {
+        _addWhitelistedAdapterFactory();
+        _mockTransientAllowance(true, false, address(gate), 1, 1);
+        vm.expectRevert(bytes("reverted"));
+        this.allowAndRevert();
+        assertFalse(gate.isTransientlyAllowed(alice));
+        assertFalse(gate.canIncreaseCredit(alice));
+    }
+
+    function allowAndRevert() external {
+        gate.transientAllowIncreaseCredit(alice, adapterFactory, adapter, marketId);
+        revert("reverted");
+    }
+
+    function _addWhitelistedAdapterFactory() internal {
+        vm.prank(creditRoleSetter);
+        gate.addWhitelistedAdapterFactory(adapterFactory);
+    }
+
+    function _mockTransientAllowance(
+        bool adapterIsAdapter,
+        bool accountIsAdapter,
+        address enterGate,
+        uint128 credit,
+        uint256 shares
+    ) internal {
+        Market memory market;
+        market.enterGate = enterGate;
+        vm.mockCall(adapterFactory, abi.encodeCall(IMidnightAdapterFactory.midnight, ()), abi.encode(midnight));
+        vm.mockCall(
+            adapterFactory,
+            abi.encodeCall(IMidnightAdapterFactory.isMidnightAdapter, (adapter)),
+            abi.encode(adapterIsAdapter)
+        );
+        vm.mockCall(
+            adapterFactory,
+            abi.encodeCall(IMidnightAdapterFactory.isMidnightAdapter, (alice)),
+            abi.encode(accountIsAdapter)
+        );
+        vm.mockCall(midnight, abi.encodeCall(IMidnight.toMarket, (marketId)), abi.encode(market));
+        vm.mockCall(midnight, abi.encodeCall(IMidnight.credit, (marketId, adapter)), abi.encode(credit));
+        vm.mockCall(adapter, abi.encodeCall(IMidnightAdapter.parentVault, ()), abi.encode(vault));
+        vm.mockCall(vault, abi.encodeCall(IVault.balanceOf, (alice)), abi.encode(shares));
+    }
+}
+
+contract VaultWhitelistEnterGateIntegrationTest is BaseTest {
+    VaultWhitelistEnterGate internal gate;
+    Market internal market;
+    Offer internal offer;
+    bytes32 internal marketId;
+    address internal adapterFactory = makeAddr("integrationAdapterFactory");
+    address internal adapter = makeAddr("integrationAdapter");
+    address internal depositor = makeAddr("integrationDepositor");
+
+    function setUp() public override {
+        super.setUp();
+
+        gate = new VaultWhitelistEnterGate(address(this), address(this), false, true);
+        gate.setIsWhitelister(true, address(this), true);
+        gate.setIsWhitelisted(true, adapter, true);
+        gate.addWhitelistedAdapterFactory(adapterFactory);
+
+        market.loanToken = address(loanToken);
+        market.chainId = block.chainid;
+        market.midnight = address(midnight);
+        market.maturity = vm.getBlockTimestamp() + 100;
+        market.collateralParams
+            .push(
+                CollateralParams({
+                    token: address(collateralToken1),
+                    lltv: LLTV,
+                    oracle: address(oracle1),
+                    liquidationCursor: LIQUIDATION_CURSOR
+                })
+            );
+        market.collateralParams = sortCollateralParams(market.collateralParams);
+        market.enterGate = address(gate);
+        marketId = toId(market);
+
+        offer.buy = false;
+        offer.maker = borrower;
+        offer.receiverIfMakerIsSeller = borrower;
+        offer.maxUnits = type(uint128).max;
+        offer.market = market;
+        offer.ratifier = address(dummyRatifier);
+        offer.expiry = vm.getBlockTimestamp() + 200;
+        offer.tick = MAX_TICK;
+        offer.continuousFeeCap = type(uint256).max;
+
+        vm.prank(adapter);
+        loanToken.approve(address(midnight), type(uint256).max);
+        vm.prank(depositor);
+        loanToken.approve(address(midnight), type(uint256).max);
+        vm.mockCall(adapterFactory, abi.encodeCall(IMidnightAdapterFactory.midnight, ()), abi.encode(address(midnight)));
+        vm.mockCall(
+            adapterFactory, abi.encodeCall(IMidnightAdapterFactory.isMidnightAdapter, (adapter)), abi.encode(true)
+        );
+        vm.mockCall(
+            adapterFactory, abi.encodeCall(IMidnightAdapterFactory.isMidnightAdapter, (depositor)), abi.encode(false)
+        );
+        vm.mockCall(adapter, abi.encodeCall(IMidnightAdapter.parentVault, ()), abi.encode(address(loanToken)));
+    }
+
+    /// forge-config: default.isolate = false
+    function testTransientAllowIncreaseCreditBypassesGate() public {
+        uint256 units = 1;
+        collateralize(market, borrower, units * 2);
+        deal(address(loanToken), adapter, units);
+        deal(address(loanToken), depositor, units);
+
+        take(units, adapter, offer);
+
+        vm.expectRevert(IMidnight.BuyerGatedFromIncreasingCredit.selector);
+        take(units, depositor, offer);
+
+        gate.transientAllowIncreaseCredit(depositor, adapterFactory, adapter, marketId);
+        take(units, depositor, offer);
     }
 }

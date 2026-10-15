@@ -4,14 +4,22 @@ pragma solidity 0.8.34;
 
 import {
     IVaultWhitelistEnterGate,
+    IMidnightAdapter,
+    IMidnightAdapterFactory,
+    IVault,
     SET_IS_WHITELISTED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IVaultWhitelistEnterGate.sol";
+import {IMidnight} from "../../interfaces/IMidnight.sol";
 
 /// @dev This gate can restrict which accounts can increase their credit or debt in a market.
 /// @dev Each side (credit, debt) has its own whitelist. Only whitelisted accounts can enter on that side.
 /// @dev Each side has its own role setter and whitelisters.
 /// @dev A side can be made open at deployment, letting any account enter on that side (forever).
+/// @dev The credit role setter can add adapter factories, but never remove them.
+/// @dev Anyone can transiently allow an account to increase credit until the end of the transaction if it holds shares of the parent vault of an adapter of a whitelisted factory that has credit in a market using this gate.
+/// @dev The allowance holds for every market using this gate.
+/// @dev Whitelisted factories are trusted for their midnight() and isMidnightAdapter() responses.
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are no longer valid.
 contract VaultWhitelistEnterGate is IVaultWhitelistEnterGate {
@@ -23,6 +31,7 @@ contract VaultWhitelistEnterGate is IVaultWhitelistEnterGate {
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelister;
     mapping(bool creditSide => mapping(address whitelister => mapping(address account => uint256))) public nonces;
     mapping(bool creditSide => mapping(address account => bool)) public isWhitelisted;
+    mapping(address adapterFactory => bool) public isWhitelistedAdapterFactory;
 
     /// CONSTRUCTOR ///
 
@@ -52,6 +61,12 @@ contract VaultWhitelistEnterGate is IVaultWhitelistEnterGate {
         require(isWhitelister[creditSide][msg.sender], NotWhitelister());
         isWhitelisted[creditSide][account] = newIsWhitelisted;
         emit SetIsWhitelisted(msg.sender, creditSide, account, newIsWhitelisted);
+    }
+
+    function addWhitelistedAdapterFactory(address adapterFactory) external {
+        require(msg.sender == roleSetter[true], NotRoleSetter());
+        isWhitelistedAdapterFactory[adapterFactory] = true;
+        emit AddWhitelistedAdapterFactory(adapterFactory);
     }
 
     /// @dev Allows to batch setIsWhitelisted with the take, without requiring a transaction from the whitelister.
@@ -92,8 +107,34 @@ contract VaultWhitelistEnterGate is IVaultWhitelistEnterGate {
         return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, block.chainid, address(this)));
     }
 
+    function transientAllowIncreaseCredit(address account, address adapterFactory, address adapter, bytes32 marketId)
+        external
+    {
+        require(isWhitelistedAdapterFactory[adapterFactory], AdapterFactoryNotWhitelisted());
+        require(IMidnightAdapterFactory(adapterFactory).isMidnightAdapter(adapter), NotAdapter());
+        require(!IMidnightAdapterFactory(adapterFactory).isMidnightAdapter(account), AccountIsAdapter());
+
+        address midnight = IMidnightAdapterFactory(adapterFactory).midnight();
+        require(IMidnight(midnight).toMarket(marketId).enterGate == address(this), IncorrectEnterGate());
+        require(IMidnight(midnight).credit(marketId, adapter) > 0, NoAdapterCredit());
+        require(IVault(IMidnightAdapter(adapter).parentVault()).balanceOf(account) > 0, NoVaultShares());
+
+        bytes32 slot = keccak256(abi.encode(account));
+        assembly ("memory-safe") {
+            tstore(slot, 1)
+        }
+        emit TransientAllowIncreaseCredit(msg.sender, account, adapterFactory, adapter, marketId);
+    }
+
+    function isTransientlyAllowed(address account) public view returns (bool allowed) {
+        bytes32 slot = keccak256(abi.encode(account));
+        assembly ("memory-safe") {
+            allowed := tload(slot)
+        }
+    }
+
     function canIncreaseCredit(address account) external view returns (bool) {
-        return CREDIT_OPEN || isWhitelisted[true][account];
+        return CREDIT_OPEN || isWhitelisted[true][account] || isTransientlyAllowed(account);
     }
 
     function canIncreaseDebt(address account) external view returns (bool) {
