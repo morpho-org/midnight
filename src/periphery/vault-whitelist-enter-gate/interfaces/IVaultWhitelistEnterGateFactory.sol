@@ -2,9 +2,9 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity >=0.5.0;
 
-interface IWhitelistEnterGateFactory {
+interface IVaultWhitelistEnterGateFactory {
     /// EVENTS ///
-    event CreateWhitelistEnterGate(
+    event CreateVaultWhitelistEnterGate(
         address indexed caller,
         address indexed gate,
         address creditRoleSetter,
@@ -15,10 +15,10 @@ interface IWhitelistEnterGateFactory {
     );
 
     /// STORAGE GETTERS ///
-    function isWhitelistEnterGate(address gate) external view returns (bool);
+    function isVaultWhitelistEnterGate(address gate) external view returns (bool);
 
     /// FUNCTIONS ///
-    function createWhitelistEnterGate(
+    function createVaultWhitelistEnterGate(
         address creditRoleSetter,
         address debtRoleSetter,
         bool creditOpen,

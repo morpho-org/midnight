@@ -10,7 +10,7 @@ bytes32 constant SET_IS_WHITELISTED_TYPEHASH = 0xa19ec4634ebb855ea0b75237f7a684a
 /// @dev keccak256("EIP712Domain(uint256 chainId,address verifyingContract)").
 bytes32 constant EIP712_DOMAIN_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
 
-interface IWhitelistEnterGate is IEnterGate {
+interface IVaultWhitelistEnterGate is IEnterGate {
     /// ERRORS ///
     error DeadlineExpired();
     error InvalidSigner();

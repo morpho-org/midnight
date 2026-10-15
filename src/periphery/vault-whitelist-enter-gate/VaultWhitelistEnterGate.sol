@@ -3,10 +3,10 @@
 pragma solidity 0.8.34;
 
 import {
-    IWhitelistEnterGate,
+    IVaultWhitelistEnterGate,
     SET_IS_WHITELISTED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
-} from "./interfaces/IWhitelistEnterGate.sol";
+} from "./interfaces/IVaultWhitelistEnterGate.sol";
 
 /// @dev This gate can restrict which accounts can increase their credit or debt in a market.
 /// @dev Each side (credit, debt) has its own whitelist. Only whitelisted accounts can enter on that side.
@@ -14,7 +14,7 @@ import {
 /// @dev A side can be made open at deployment, letting any account enter on that side (forever).
 /// @dev As with any enter gate, it does not prevent accounts from exiting the market.
 /// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed messages are no longer valid.
-contract WhitelistEnterGate is IWhitelistEnterGate {
+contract VaultWhitelistEnterGate is IVaultWhitelistEnterGate {
     /// STORAGE ///
     bool public immutable CREDIT_OPEN;
     bool public immutable DEBT_OPEN;

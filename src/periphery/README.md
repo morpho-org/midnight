@@ -46,7 +46,7 @@ An onchain mempool for Midnight.
 Its fallback publishes calldata in a `Data` event.
 Calldata is limited to 1,000,000 bytes.
 
-### `WhitelistEnterGate`
+### `VaultWhitelistEnterGate`
 
 An enter gate that restricts which accounts can increase their credit or debt in a Midnight market.
 
@@ -56,10 +56,10 @@ Whitelisters edit the lists directly with `setIsWhitelisted` or allow to edit th
 `setIsWhitelistedWithSig` is a no-op instead of a revert when the signed nonce is stale and the account is already set to the signed value.
 A side can be made open at deployment, letting any account enter on that side (forever).
 
-### `WhitelistEnterGateFactory`
+### `VaultWhitelistEnterGateFactory`
 
-Deploys a deterministic `WhitelistEnterGate` using `CREATE2` with a salt derived from the caller and a caller-provided pre-salt.
-The factory records gates in `isWhitelistEnterGate`.
+Deploys a deterministic `VaultWhitelistEnterGate` using `CREATE2` with a salt derived from the caller and a caller-provided pre-salt.
+The factory records gates in `isVaultWhitelistEnterGate`.
 
 ## Libraries
 
