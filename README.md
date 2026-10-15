@@ -25,4 +25,4 @@ Audits can be found in the [audits](./audits/) folder.
 
 ## Licences
 
-The primary license, BUSL-1.1, covers `src/Midnight.sol` (see [LICENSE](./LICENSE)). All other files are under MIT (see [LICENSE-MIT](./LICENSE-MIT)).
+The primary license, BUSL-1.1, covers `src/Midnight.sol` (see [LICENSE](./LICENSE)). All other files authored for this repository are under MIT (see [LICENSE-MIT](./LICENSE-MIT)); git submodules in `lib/` keep their own licenses.
