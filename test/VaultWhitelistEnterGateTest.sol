@@ -667,6 +667,16 @@ contract VaultWhitelistEnterGateTest is Test {
         assertFalse(gate.isTransientlyAllowed(alice));
     }
 
+    function testTransientAllowIncreaseCreditStaleAdapterCredit() public {
+        _addWhitelistedAdapterFactory();
+        _mockTransientAllowance(true, false, address(gate), 0, 1);
+        vm.mockCall(midnight, abi.encodeCall(IMidnight.credit, (marketId, adapter)), abi.encode(uint128(1)));
+
+        vm.expectRevert(IVaultWhitelistEnterGate.NoAdapterCredit.selector);
+        gate.transientAllowIncreaseCredit(alice, adapterFactory, adapter, marketId);
+        assertFalse(gate.isTransientlyAllowed(alice));
+    }
+
     function testTransientAllowIncreaseCreditNoVaultShares() public {
         _addWhitelistedAdapterFactory();
         _mockTransientAllowance(true, false, address(gate), 1, 0);
@@ -714,7 +724,7 @@ contract VaultWhitelistEnterGateTest is Test {
         bool adapterIsAdapter,
         bool accountIsAdapter,
         address enterGate,
-        uint128 credit,
+        uint128 newCredit,
         uint256 shares
     ) internal {
         Market memory market;
@@ -731,7 +741,11 @@ contract VaultWhitelistEnterGateTest is Test {
             abi.encode(accountIsAdapter)
         );
         vm.mockCall(midnight, abi.encodeCall(IMidnight.toMarket, (marketId)), abi.encode(market));
-        vm.mockCall(midnight, abi.encodeCall(IMidnight.credit, (marketId, adapter)), abi.encode(credit));
+        vm.mockCall(
+            midnight,
+            abi.encodeCall(IMidnight.updatePositionView, (market, marketId, adapter)),
+            abi.encode(newCredit, uint128(0), uint128(0))
+        );
         vm.mockCall(adapter, abi.encodeCall(IMidnightAdapter.parentVault, ()), abi.encode(vault));
         vm.mockCall(vault, abi.encodeCall(IVault.balanceOf, (alice)), abi.encode(shares));
     }

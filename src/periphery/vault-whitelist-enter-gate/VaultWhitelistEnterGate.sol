@@ -10,7 +10,7 @@ import {
     SET_IS_WHITELISTED_TYPEHASH,
     EIP712_DOMAIN_TYPEHASH
 } from "./interfaces/IVaultWhitelistEnterGate.sol";
-import {IMidnight} from "../../interfaces/IMidnight.sol";
+import {IMidnight, Market} from "../../interfaces/IMidnight.sol";
 
 /// @dev This gate can restrict which accounts can increase their credit or debt in a market.
 /// @dev Each side (credit, debt) has its own whitelist. Only whitelisted accounts can enter on that side.
@@ -115,8 +115,10 @@ contract VaultWhitelistEnterGate is IVaultWhitelistEnterGate {
         require(!IMidnightAdapterFactory(adapterFactory).isMidnightAdapter(account), AccountIsAdapter());
 
         address midnight = IMidnightAdapterFactory(adapterFactory).midnight();
-        require(IMidnight(midnight).toMarket(marketId).enterGate == address(this), IncorrectEnterGate());
-        require(IMidnight(midnight).credit(marketId, adapter) > 0, NoAdapterCredit());
+        Market memory market = IMidnight(midnight).toMarket(marketId);
+        require(market.enterGate == address(this), IncorrectEnterGate());
+        (uint128 newCredit,,) = IMidnight(midnight).updatePositionView(market, marketId, adapter);
+        require(newCredit > 0, NoAdapterCredit());
         require(IVault(IMidnightAdapter(adapter).parentVault()).balanceOf(account) > 0, NoVaultShares());
 
         bytes32 slot = keccak256(abi.encode(account));
