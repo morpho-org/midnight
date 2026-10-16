@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: MIT
 
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;

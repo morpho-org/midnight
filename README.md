@@ -25,5 +25,4 @@ Audits can be found in the [audits](./audits/) folder.
 
 ## Licences
 
-The primary license is the Business Source License 1.1 (BUSL-1.1), see [LICENSE](./LICENSE).
-However, all files in the following folders can also be licensed under GPL-2.0-or-later (as indicated in their SPDX headers), see [LICENSE-SECONDARY](./LICENSE-SECONDARY): `src/interfaces`, `src/libraries`, `src/ratifiers`, `src/periphery`, `test`, `certora`.
+The primary license, BUSL-1.1, covers `src/Midnight.sol` (see [LICENSE](./LICENSE)). All other files authored for this repository are under MIT (see [LICENSE-MIT](./LICENSE-MIT)).
