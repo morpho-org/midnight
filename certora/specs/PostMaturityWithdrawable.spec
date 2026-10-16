@@ -17,6 +17,15 @@ methods {
     // This spec needs the HAVOC_ECF semantics for all callbacks (take/liquidate/flashLoan) to prevent the callbacks from violating the property.
     // The code is still reentrancy safe as the callbacks can only call public functions and for these we check the properties here.
     // However, this cannot be checked with the Certora Prover and it would also require a more complicated spec, e.g., flashLoan can change withdrawable amount if the callback withdraws.
+
+    // Explicit HAVOC_ECF so -havocAllByDefault does not summarize these as HAVOC_ALL.
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => HAVOC_ECF;
+    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => HAVOC_ECF;
+    function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => HAVOC_ECF;
+    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => HAVOC_ECF;
+    function _.onFlashLoan(address, address[], uint256[], bytes) external => HAVOC_ECF;
+    function _.transfer(address, uint256) external => HAVOC_ECF;
+    function _.transferFrom(address, address, uint256) external => HAVOC_ECF;
 }
 
 /// HELPERS ///

@@ -146,7 +146,9 @@ Verification is performed according to the following modeling conventions:
 - `mulDivDown`/`mulDivUp` are replaced by ghost functions whose axioms are proven in [`MulDiv.spec`](specs/MulDiv.spec), and shared as [`MulDivAxioms.spec`](specs/MulDivAxioms.spec).
 - bitmap operations are replaced by the ghost summaries in [`BitmapSummaries.spec`](specs/BitmapSummaries.spec), justified by [`Bitmap.spec`](specs/Bitmap.spec).
 - ERC20 tokens are assumed well-behaved, see the comments in the respective files for more detail.
-- unless a property is specifically about callbacks, external calls are assumed not to re-enter Midnight.
+- configs pass `-havocAllByDefault true`, so an unresolved external call is `HAVOC_ALL`.
+  Specs that reason about a function body pin the non-reentrant callees (`onBuy`, `onSell`, `onRepay`, `onLiquidate`, `onFlashLoan`, `transfer`, `transferFrom`) to `HAVOC_ECF`.
+  `NoDebtWithoutCollateralNativeECF.conf` does not pass the flag: the lock lemmas share a spec with the `HAVOC_ALL` run, and `HAVOC_ALL` would let an external callee change the transient liquidation lock.
 
 # Getting started
 
