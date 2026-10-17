@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 
 import "BitmapSummaries.spec";
+import "MulDivAxioms.spec";
 
 using Utils as Utils;
 
@@ -43,9 +44,7 @@ methods {
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
-
-persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
+definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 persistent ghost maxLifGhost(uint256, uint256) returns uint256;
 
@@ -85,11 +84,10 @@ rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight
     // In that case the position must be healthy when the lock is removed later and no bad debt can be realized.
     require !liquidationLocked(id, borrower), "scope out the re-entrant case";
 
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA)";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivUpMonotoneA(a1, a2, b, d), "axiom";
+    require forall mathint a. forall mathint b. forall mathint d. axiomMathMulDivUpGeqMulDivDown(a, b, d), "axiom";
+    require forall mathint a. forall mathint lltv. forall mathint lif. axiomMathMulDivUpMonotoneBD(a, lltv, WAD(), WAD(), lif), "axiom";
 
-    require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(a, b, d) >= ghostMulDivDown(a, b, d), "Rounding up is at least rounding down (proven in MulDiv.spec as mulDivUpGeqMulDivDown)";
-
-    require forall mathint a. forall mathint lif. forall mathint lltv. a >= 0 && lltv * lif <= WAD() * WAD() => ghostMulDivUp(a, lltv, WAD()) <= ghostMulDivUp(a, WAD(), lif), "maxLif is at most 1/lltv";
     require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
 
     uint256 badDebtBefore = realizableBadDebt(market, id, borrower);
@@ -121,11 +119,13 @@ rule liquidateRealizesTotalUnits(env e, Midnight.Market market, uint256 collater
 rule healthyHasNoRealizableBadDebt(Midnight.Market market, address borrower) {
     bytes32 id = summaryToId(market);
 
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d), "Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA)";
+    // Per collateral: down(down(c, p, S), lltv, WAD) <= down(up(c, p, S), lltv, WAD) <= up(up(c, p, S), lltv, WAD) <= up(up(c, p, S), WAD, maxLif).
+    // The axioms are instantiated on the nested terms, so that the prover grounds them on the intermediate values.
+    require forall mathint c. forall mathint p. axiomMathMulDivUpGeqMulDivDown(c, p, ORACLE_PRICE_SCALE()), "axiom";
+    require forall mathint c. forall mathint p. forall mathint lltv. axiomMathMulDivDownMonotoneA(mathMulDivDown(c, p, ORACLE_PRICE_SCALE()), mathMulDivUp(c, p, ORACLE_PRICE_SCALE()), lltv, WAD()), "axiom";
+    require forall mathint c. forall mathint p. forall mathint lltv. axiomMathMulDivUpGeqMulDivDown(mathMulDivUp(c, p, ORACLE_PRICE_SCALE()), lltv, WAD()), "axiom";
+    require forall mathint c. forall mathint p. forall mathint lltv. forall mathint lif. axiomMathMulDivUpMonotoneBD(mathMulDivUp(c, p, ORACLE_PRICE_SCALE()), lltv, WAD(), WAD(), lif), "axiom";
 
-    require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(a, b, d) >= ghostMulDivDown(a, b, d), "Rounding up is at least rounding down (proven in MulDiv.spec as mulDivUpGeqMulDivDown)";
-
-    require forall mathint a. forall mathint lif. forall mathint lltv. a >= 0 && lltv * lif <= WAD() * WAD() => ghostMulDivUp(a, lltv, WAD()) <= ghostMulDivUp(a, WAD(), lif), "maxLif is at most 1/lltv";
     require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
 
     require isHealthy(market, id, borrower), "borrower is healthy";
