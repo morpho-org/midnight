@@ -9,6 +9,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function realizableBadDebt(Midnight.Market, bytes32, address) external returns (uint256) envfree;
+    function isHealthy(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function debt(bytes32, address) external returns (uint128) envfree;
     function totalUnits(bytes32) external returns (uint128) envfree;
     function liquidationLocked(bytes32, address) external returns (bool) envfree;
@@ -113,4 +114,21 @@ rule liquidateRealizesTotalUnits(env e, Midnight.Market market, uint256 collater
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     assert totalUnits(id) == totalUnitsBefore - badDebtBefore;
+}
+
+// A healthy position has no realizable bad debt, so liquidating it cannot write off any debt.
+// Together with notLiquidatableWhenLocked (Healthiness.spec) and the strong invariant isHealthy || liquidationLocked, this shows that liquidate() never writes off debt of a position that was healthy at the start of the transaction, even from inside a callback.
+rule healthyHasNoRealizableBadDebt(Midnight.Market market, address borrower) {
+    bytes32 id = summaryToId(market);
+
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivDown(a1, b, d) <= ghostMulDivDown(a2, b, d), "Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA)";
+
+    require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(a, b, d) >= ghostMulDivDown(a, b, d), "Rounding up is at least rounding down (proven in MulDiv.spec as mulDivUpGeqMulDivDown)";
+
+    require forall mathint a. forall mathint lif. forall mathint lltv. a >= 0 && lltv * lif <= WAD() * WAD() => ghostMulDivUp(a, lltv, WAD()) <= ghostMulDivUp(a, WAD(), lif), "maxLif is at most 1/lltv";
+    require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
+
+    require isHealthy(market, id, borrower), "borrower is healthy";
+
+    assert realizableBadDebt(market, id, borrower) == 0;
 }
