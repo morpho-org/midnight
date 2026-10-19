@@ -251,17 +251,11 @@ rule withdrawDoesNotRevert(env e, Midnight.Market market, uint256 units, address
     require e.msg.value == 0, "Midnight is not payable";
     require marketIsCreated(market), "market must be created";
 
-    // Timestamp assumptions.
-    require currentContract.position[id][onBehalf].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
-    require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
-
     // These assumptions are proved in other spec files.
-    require lastLossFactor(id, onBehalf) <= lossFactor(id), "lastLossFactorLeqMarketLossFactor in Midnight.spec";
-    require pendingFee(id, onBehalf) <= credit(id, onBehalf), "pendingContinuousFeeBoundedByCredit in Midnight.spec";
     require currentContract.marketState[id].continuousFeeCredit + postSlashCredit(id, onBehalf) <= totalUnits(id), "positionCreditPlusContinuousFeeLeTotalUnits in SumOfCreditsAxiomatic.spec";
     require withdrawable(id) <= totalUnits(id), "totalUnitsEqualsSumNegativeDebtPlusWithdrawable in Midnight.spec (sumDebt >= 0 because it sums up unsigned values)";
 
     withdraw@withrevert(e, market, units, onBehalf, receiver);
 
-    assert !lastReverted, "withdraw should not revert under valid state";
+    assert !lastReverted;
 }
