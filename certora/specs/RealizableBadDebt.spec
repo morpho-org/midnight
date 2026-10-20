@@ -88,7 +88,9 @@ rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight
     require forall mathint a. forall mathint b. forall mathint d. axiomMathMulDivUpGeqMulDivDown(a, b, d), "axiom";
     require forall mathint a. forall mathint lltv. forall mathint lif. axiomMathMulDivUpMonotoneBD(a, lltv, WAD(), WAD(), lif), "axiom";
 
-    require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "see createdMarketsHaveEnabledLltv in CreatedMarkets.spec and enabledLltvIsLessThanOrEqualToOne in Midnight.spec";
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].liquidationCursor < WAD(), "see createdMarketsHaveEnabledLiquidationCursor in CreatedMarkets.spec and enabledLiquidationCursorsIsLessThanOne in Midnight.spec";
+    require forall uint256 lltv. forall uint256 cursor. lltv <= WAD() && cursor < WAD() => lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
 
     uint256 badDebtBefore = realizableBadDebt(market, id, borrower);
 
@@ -126,7 +128,9 @@ rule healthyHasNoRealizableBadDebt(Midnight.Market market, address borrower) {
     require forall mathint c. forall mathint p. forall mathint lltv. axiomMathMulDivUpGeqMulDivDown(mathMulDivUp(c, p, ORACLE_PRICE_SCALE()), lltv, WAD()), "axiom";
     require forall mathint c. forall mathint p. forall mathint lltv. forall mathint lif. axiomMathMulDivUpMonotoneBD(mathMulDivUp(c, p, ORACLE_PRICE_SCALE()), lltv, WAD(), WAD(), lif), "axiom";
 
-    require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "see createdMarketsHaveEnabledLltv in CreatedMarkets.spec and enabledLltvIsLessThanOrEqualToOne in Midnight.spec";
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].liquidationCursor < WAD(), "see createdMarketsHaveEnabledLiquidationCursor in CreatedMarkets.spec and enabledLiquidationCursorsIsLessThanOne in Midnight.spec";
+    require forall uint256 lltv. forall uint256 cursor. lltv <= WAD() && cursor < WAD() => lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
 
     require isHealthy(market, id, borrower), "borrower is healthy";
 
