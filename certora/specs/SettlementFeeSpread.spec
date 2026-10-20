@@ -69,12 +69,15 @@ function requireSpreadAxioms(mathint units, mathint offerPrice, mathint fee) {
     require axiomMathMulDivDownCommutative(units, offerPrice - fee, WAD()), "axiom";
     require axiomMathMulDivUpCommutative(units, offerPrice, WAD()), "axiom";
     require axiomMathMulDivUpCommutative(units, offerPrice + fee, WAD()), "axiom";
+
     // Buy offer: the buyer pays floor(units * offerPrice / WAD) and the seller receives floor(units * (offerPrice - fee) / WAD).
     require axiomMathMulDivAddDownDown(offerPrice - fee, fee, units, WAD()), "axiom";
     require axiomMathMulDivAddDownUp(offerPrice - fee, fee, units, WAD()), "axiom";
+
     // Sell offer: the buyer pays ceil(units * (offerPrice + fee) / WAD) and the seller receives ceil(units * offerPrice / WAD).
     require axiomMathMulDivAddUpDown(offerPrice, fee, units, WAD()), "axiom";
     require axiomMathMulDivAddUpUp(offerPrice, fee, units, WAD()), "axiom";
+
     // Bound floor and ceil of fee * units / WAD by the exact quotient.
     require axiomMathMulDivDownTightBound(fee, units, WAD()), "axiom";
     require axiomMathMulDivUpUpperBound(fee, units, WAD()), "axiom";
