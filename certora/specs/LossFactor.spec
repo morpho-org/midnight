@@ -108,7 +108,7 @@ rule updatePositionSyncsLastLossFactor(env e, Midnight.Market market, address us
 
     updatePosition(e, market, user);
 
-    assert lastLossFactor(id, user) == currentContract.marketState[id].lossFactor;
+    assert lastLossFactor(id, user) == lossFactor(id);
 }
 
 // Assuming that the market is created, the loss factor computation in updatePosition does not revert.
@@ -116,7 +116,7 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
     require marketIsCreated(market), "market must be created";
-    require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
+    require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
     require pendingFee(id, user) <= credit(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
@@ -132,7 +132,7 @@ rule updatePositionDoesNotRevert(env e, Midnight.Market market, address user) {
 rule updatePositionViewDoesNotRevert(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
-    require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
+    require lastLossFactor(id, user) <= lossFactor(id), "lastLossFactor bounded by market lossFactor, already proved in Midnight.spec";
     require pendingFee(id, user) <= credit(id, user), "pending fee bounded by credit, already proved in Midnight.spec";
     require currentContract.position[id][user].lastAccrual <= e.block.timestamp, "lastAccrual <= block.timestamp by timestamp monotonicity";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
@@ -181,7 +181,7 @@ rule updatePositionIsIdempotent(env e, Midnight.Market market, address user) {
 rule updatePositionPreservesCreditWhenLossIndexCurrent(env e, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
 
-    require lastLossFactor(id, user) == currentContract.marketState[id].lossFactor, "lastLossFactor synced with market";
+    require lastLossFactor(id, user) == lossFactor(id), "lastLossFactor synced with market";
     require lastLossFactor(id, user) < max_uint128, "lossFactor not saturated";
     require pendingFee(id, user) <= credit(id, user), "see pendingContinuousFeeBoundedByCredit in Midnight.spec";
     require e.block.timestamp < 2 ^ 128, "reasonable timestamp";
