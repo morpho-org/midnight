@@ -63,24 +63,14 @@ function summaryMulDivUp(uint256 a, uint256 b, uint256 d) returns uint256 {
 }
 
 // Facts from MulDiv.spec relating the assets computed by take (units times the buyer or seller price) to units times the fee.
-// Commutativity turns the additivity axioms, stated in the first argument, into additivity in the price.
 function requireSpreadAxioms(mathint units, mathint offerPrice, mathint fee) {
-    require axiomMathMulDivDownCommutative(units, offerPrice, WAD()), "axiom";
-    require axiomMathMulDivDownCommutative(units, offerPrice - fee, WAD()), "axiom";
-    require axiomMathMulDivUpCommutative(units, offerPrice, WAD()), "axiom";
-    require axiomMathMulDivUpCommutative(units, offerPrice + fee, WAD()), "axiom";
-
     // Buy offer: the buyer pays floor(units * offerPrice / WAD) and the seller receives floor(units * (offerPrice - fee) / WAD).
-    require axiomMathMulDivAddDownDown(offerPrice - fee, fee, units, WAD()), "axiom";
-    require axiomMathMulDivAddDownUp(offerPrice - fee, fee, units, WAD()), "axiom";
+    require axiomMathMulDivAddDownDownB(units, offerPrice - fee, fee, WAD()), "axiom";
+    require axiomMathMulDivAddDownUpB(units, offerPrice - fee, fee, WAD()), "axiom";
 
     // Sell offer: the buyer pays ceil(units * (offerPrice + fee) / WAD) and the seller receives ceil(units * offerPrice / WAD).
-    require axiomMathMulDivAddUpDown(offerPrice, fee, units, WAD()), "axiom";
-    require axiomMathMulDivAddUpUp(offerPrice, fee, units, WAD()), "axiom";
-
-    // Bound floor and ceil of fee * units / WAD by the exact quotient.
-    require axiomMathMulDivDownTightBound(fee, units, WAD()), "axiom";
-    require axiomMathMulDivUpUpperBound(fee, units, WAD()), "axiom";
+    require axiomMathMulDivAddUpDownB(units, offerPrice, fee, WAD()), "axiom";
+    require axiomMathMulDivAddUpUpB(units, offerPrice, fee, WAD()), "axiom";
 }
 
 // Rounding always favors the maker:
@@ -100,7 +90,7 @@ rule makerFavorableRounding(env e, Midnight.Offer offer, bytes ratifierData, uin
     assert !offer.buy => sellerAssets * WAD() >= units * offerPrice;
 }
 
-// The spread between what the buyer pays and what the seller receives is at least floor(units * fee / WAD) and at most ceil(units * fee / WAD).
+// The spread between what the buyer pays and what the seller receives is at least mulDivDown(units, fee, WAD) and at most mulDivUp(units, fee, WAD).
 // Assume that the market is created.
 rule settlementFeeSpreadBounds(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
     bytes32 id;
@@ -118,8 +108,8 @@ rule settlementFeeSpreadBounds(env e, Midnight.Offer offer, bytes ratifierData, 
 
     require id == lastId, "id should be derived from market";
 
-    assert buyerAssets - sellerAssets >= (units * fee) / WAD();
-    assert buyerAssets - sellerAssets <= (units * fee + WAD() - 1) / WAD();
+    assert buyerAssets - sellerAssets >= mathMulDivDown(units, fee, WAD());
+    assert buyerAssets - sellerAssets <= mathMulDivUp(units, fee, WAD());
 }
 
 // Twin rule of settlementFeeSpreadBounds for a market that is not created yet at the start.
@@ -138,6 +128,6 @@ rule settlementFeeSpreadBoundsNotCreatedMarket(env e, Midnight.Offer offer, byte
 
     require id == lastId, "id should be derived from market";
 
-    assert buyerAssets - sellerAssets >= (units * fee) / WAD();
-    assert buyerAssets - sellerAssets <= (units * fee + WAD() - 1) / WAD();
+    assert buyerAssets - sellerAssets >= mathMulDivDown(units, fee, WAD());
+    assert buyerAssets - sellerAssets <= mathMulDivUp(units, fee, WAD());
 }

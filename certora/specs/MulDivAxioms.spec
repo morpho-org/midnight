@@ -61,6 +61,15 @@ definition axiomMathMulDivAddDownUp(mathint a1, mathint a2, mathint b, mathint d
 // Super-additivity lower bound for mathMulDivUp with one term rounded down: ceil(a1*b/d) + floor(a2*b/d) <= ceil((a1+a2)*b/d).
 definition axiomMathMulDivAddUpDown(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => mathMulDivUp(a1, b, d) + mathMulDivDown(a2, b, d) <= mathMulDivUp(a1 + a2, b, d);
 
+// Additivity axioms with the sum in the second argument.
+definition axiomMathMulDivAddDownDownB(mathint a, mathint b1, mathint b2, mathint d) returns bool = a >= 0 && b1 >= 0 && b2 >= 0 && d > 0 => mathMulDivDown(a, b1, d) + mathMulDivDown(a, b2, d) <= mathMulDivDown(a, b1 + b2, d);
+
+definition axiomMathMulDivAddUpUpB(mathint a, mathint b1, mathint b2, mathint d) returns bool = b1 >= 0 && b2 >= 0 => mathMulDivUp(a, b1 + b2, d) <= mathMulDivUp(a, b1, d) + mathMulDivUp(a, b2, d);
+
+definition axiomMathMulDivAddDownUpB(mathint a, mathint b1, mathint b2, mathint d) returns bool = b1 >= 0 && b2 >= 0 => mathMulDivDown(a, b1, d) + mathMulDivUp(a, b2, d) >= mathMulDivDown(a, b1 + b2, d);
+
+definition axiomMathMulDivAddUpDownB(mathint a, mathint b1, mathint b2, mathint d) returns bool = a >= 0 && b1 >= 0 && b2 >= 0 && d > 0 => mathMulDivUp(a, b1, d) + mathMulDivDown(a, b2, d) <= mathMulDivUp(a, b1 + b2, d);
+
 // The first two arguments can be swapped.
 definition axiomMathMulDivDownCommutative(mathint a, mathint b, mathint d) returns bool = mathMulDivDown(a, b, d) == mathMulDivDown(b, a, d);
 

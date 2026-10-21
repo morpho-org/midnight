@@ -92,6 +92,27 @@ rule mulDivAddUpDown(uint256 a1, uint256 a2, uint256 b, uint256 d) {
     assert mulDivUp(a1, b, d) + mulDivDown(a2, b, d) <= mulDivUp(a1plusa2, b, d);
 }
 
+// Additivity with the sum in the second argument.
+rule mulDivAddDownDownB(uint256 a, uint256 b1, uint256 b2, uint256 d) {
+    uint256 b1plusb2 = require_uint256(b1 + b2);
+    assert mulDivDown(a, b1, d) + mulDivDown(a, b2, d) <= mulDivDown(a, b1plusb2, d);
+}
+
+rule mulDivAddUpUpB(uint256 a, uint256 b1, uint256 b2, uint256 d) {
+    uint256 b1plusb2 = require_uint256(b1 + b2);
+    assert mulDivUp(a, b1plusb2, d) <= mulDivUp(a, b1, d) + mulDivUp(a, b2, d);
+}
+
+rule mulDivAddDownUpB(uint256 a, uint256 b1, uint256 b2, uint256 d) {
+    uint256 b1plusb2 = require_uint256(b1 + b2);
+    assert mulDivDown(a, b1, d) + mulDivUp(a, b2, d) >= mulDivDown(a, b1plusb2, d);
+}
+
+rule mulDivAddUpDownB(uint256 a, uint256 b1, uint256 b2, uint256 d) {
+    uint256 b1plusb2 = require_uint256(b1 + b2);
+    assert mulDivUp(a, b1, d) + mulDivDown(a, b2, d) <= mulDivUp(a, b1plusb2, d);
+}
+
 // The first two arguments can be swapped.
 rule mulDivCommutative(uint256 a, uint256 b, uint256 d) {
     assert mulDivDown(a, b, d) == mulDivDown(b, a, d);
@@ -225,6 +246,23 @@ rule mathMulDivAddDownUp(mathint a1, mathint a2, mathint b, mathint d) {
 // Super-additivity lower bound for mathMulDivUp with one term rounded down: ceil(a1*b/d) + floor(a2*b/d) <= ceil((a1+a2)*b/d).
 rule mathMulDivAddUpDown(mathint a1, mathint a2, mathint b, mathint d) {
     assert a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => mathMulDivUp(a1, b, d) + mathMulDivDown(a2, b, d) <= mathMulDivUp(a1 + a2, b, d);
+}
+
+// Additivity with the sum in the second argument.
+rule mathMulDivAddDownDownB(mathint a, mathint b1, mathint b2, mathint d) {
+    assert a >= 0 && b1 >= 0 && b2 >= 0 && d > 0 => mathMulDivDown(a, b1, d) + mathMulDivDown(a, b2, d) <= mathMulDivDown(a, b1 + b2, d);
+}
+
+rule mathMulDivAddUpUpB(mathint a, mathint b1, mathint b2, mathint d) {
+    assert b1 >= 0 && b2 >= 0 => mathMulDivUp(a, b1 + b2, d) <= mathMulDivUp(a, b1, d) + mathMulDivUp(a, b2, d);
+}
+
+rule mathMulDivAddDownUpB(mathint a, mathint b1, mathint b2, mathint d) {
+    assert b1 >= 0 && b2 >= 0 => mathMulDivDown(a, b1, d) + mathMulDivUp(a, b2, d) >= mathMulDivDown(a, b1 + b2, d);
+}
+
+rule mathMulDivAddUpDownB(mathint a, mathint b1, mathint b2, mathint d) {
+    assert a >= 0 && b1 >= 0 && b2 >= 0 && d > 0 => mathMulDivUp(a, b1, d) + mathMulDivDown(a, b2, d) <= mathMulDivUp(a, b1 + b2, d);
 }
 
 // The first two arguments can be swapped.
