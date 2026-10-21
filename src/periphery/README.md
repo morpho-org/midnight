@@ -46,22 +46,20 @@ An onchain mempool for Midnight.
 Its fallback publishes calldata in a `Data` event.
 Calldata is limited to 1,000,000 bytes.
 
-### `WhitelistEnterSubGate`
+### `WhitelistEnterGate`
 
-A subgate that restricts which accounts can increase their credit or debt in each Midnight market.
-The subgate does not implement Midnight's enter-gate interface and cannot be used directly as an enter gate.
+An enter gate that restricts which accounts can increase their credit or debt in a Midnight market.
 
-Each side (credit, debt) has its own whitelist per market: only whitelisted accounts can enter on that side.
-Each side has its own role setter, who grants or revokes the whitelister role on that side across all markets.
+Each side (credit, debt) has its own whitelist: only whitelisted accounts can enter on that side.
+Each side has its own role setter, who grants or revokes the whitelister role on that side.
 Whitelisters edit the lists directly with `setIsWhitelisted` or allow to edit the list by EIP-712 signatures used by `setIsWhitelistedWithSig`.
-Whitelist updates and signatures include the market ID. Nonces are separate for each market.
 `setIsWhitelistedWithSig` is a no-op instead of a revert when the signed nonce is stale and the account is already set to the signed value.
-A side can be made open at deployment, letting any account enter on that side in all markets (forever).
+A side can be made open at deployment, letting any account enter on that side (forever).
 
-### `WhitelistEnterSubGateFactory`
+### `WhitelistEnterGateFactory`
 
-Deploys a deterministic `WhitelistEnterSubGate` using `CREATE2` with a salt derived from the caller and a caller-provided pre-salt.
-The factory records subgates in `isWhitelistEnterSubGate`.
+Deploys a deterministic `WhitelistEnterGate` using `CREATE2` with a salt derived from the caller and a caller-provided pre-salt.
+The factory records gates in `isWhitelistEnterGate`.
 
 ## Libraries
 
