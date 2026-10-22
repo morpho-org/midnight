@@ -16,8 +16,6 @@ Compilation, testing and formatting are done with [forge](https://book.getfoundr
 If of interest, [BaseTest.sol](https://github.com/morpho-org/midnight/blob/main/test/BaseTest.sol) contains a re-usable testing setup and useful helpers.
 Optional helper contracts and libraries for interacting with Midnight are available in the [periphery folder](./src/periphery/).
 
-## Formal verification using Certora
-
 Formal verification of Midnight is done with the [Certora Prover](https://www.certora.com/prover).
 See the [Certora README](./certora/README.md) for the full list of verified properties and the modeling assumptions they rely on.
 
