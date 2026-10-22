@@ -18,7 +18,7 @@ Optional helper contracts and libraries for interacting with Midnight are availa
 
 ## Formal verification using Certora
 
-Midnight is formally verified with the [Certora Prover](https://www.certora.com/prover).
+Formal verification of Midnight is done with the [Certora Prover](https://www.certora.com/prover).
 See the [Certora README](./certora/README.md) for the full list of verified properties and the modeling assumptions they rely on.
 
 ## Audits
