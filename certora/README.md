@@ -22,7 +22,7 @@ Global invariants on positions, markets and accounting.
   Rules add that a market is created by the first interaction of each entry point, can only be created that way, and can never be deleted.
 - [`NotCreatedMarket.spec`](specs/NotCreatedMarket.spec) checks the converse: every state field of a market that was never created is empty.
 - [`LossFactor.spec`](specs/LossFactor.spec) checks that only `liquidate` changes a market's loss factor, and only when bad debt is realized (total units decrease), and that `updatePosition` syncs the user's `lastLossFactor` to the market's.
-  It also checks that the loss-factor arithmetic in `updatePosition` and `liquidate` does not revert on a created market.
+  It also checks that the loss-factor arithmetic in `updatePosition` and `liquidate` does not revert on a created market, and that `withdraw` does not revert if the user is authorized, has enough credit, and there is enough liquidity (`withdrawable`) in the market.
 - [`UpdateBeforeCredit.spec`](specs/UpdateBeforeCredit.spec) checks that credit is never loaded or stored before `_updatePosition` has run for that position.
 - [`UpdatePositionView.spec`](specs/UpdatePositionView.spec) checks the properties of the accrued position view, including that when a user's loss factor and accrual timestamp are current, the view returns the stored credit, and that a user with a saturated loss factor has no credit.
 - [`MarketNotReadBeforeCreated.spec`](specs/MarketNotReadBeforeCreated.spec) checks that no code path reads a non-empty market or position field before the market is created (its `tickSpacing` is still zero).
