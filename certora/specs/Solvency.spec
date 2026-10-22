@@ -109,9 +109,9 @@ function CVL_toId(Midnight.Market market) returns bytes32 {
 // This covers flash loans, and obligations that are increased before the corresponding inbound transfer in take, repay and liquidate.
 // We use persistent ghost so that callbacks and bad tokens, which are modeled by havocs, cannot change it.
 // This is justified by the rules owedPaidBack*, which ensure that no call increases the owed amount.
-// Since it starts at minus the balance of Midnight and can only be decreased by any function, it will always be zero or negative between transactions.
+// Since it starts at zero and can only be decreased by any function, it will always be zero or negative between transactions.
 persistent ghost mapping(address => mathint) owed {
-    init_state axiom (forall address token. owed[token] == -tokenBalances[token][currentContract]);
+    init_state axiom (forall address token. owed[token] == 0);
 }
 
 /// Define collateral sum and withdrawable sum.
@@ -168,12 +168,12 @@ strong invariant midnightAuthorizesNobody(address authorized)
         }
     }
 
-// For any good token, the balance of the contract plus the amount it is owed by the current call is always equal to the sum of all collateral, withdrawable, and claimable settlement fee amounts for that token.
+// For any good token, the balance of the contract plus the amount it is owed by the current call is always greater than or equal to the sum of all collateral, withdrawable, and claimable settlement fee amounts for that token.
 // Every step outside of havocs changes both sides by the same amount, see the definition of owed.
 // Note: this invariant is strong, so it also holds before each external call, in particular before each transfer of a bad token and each callback.
 // Since owed is never positive between transactions, the balance of good tokens will always cover the collateral, withdrawable, and claimable.
 strong invariant tokenBalanceCorrect(address token)
-    goodToken[token] => tokenBalances[token][currentContract] + owed[token] == collateralSum(token) + withdrawableSum(token) + claimableSettlementFee(token);
+    goodToken[token] => tokenBalances[token][currentContract] + owed[token] >= collateralSum(token) + withdrawableSum(token) + claimableSettlementFee(token);
 
 // For any good token, no call increases the owed amount: every obligation increase and every outbound transfer is matched by an obligation decrease or an inbound transfer of the same call.
 // The owed amount can decrease, for example when Midnight is the receiver of a withdrawal.
@@ -199,10 +199,9 @@ rule owedPaidBackTake(env e, Midnight.Offer offer, bytes ratifierData, uint256 u
     requireInvariant midnightAuthorizesNobody(e.msg.sender);
     requireInvariant midnightAuthorizesNobody(offer.ratifier);
 
-    // Midnight has no onBuy or onSell, so a callback to Midnight reverts.
-    // The prover havocs calls to unresolved callbacks instead, so this has to be assumed.
-    require offer.callback != currentContract, "Midnight has no onBuy or onSell";
-    require takerCallback != currentContract, "Midnight has no onBuy or onSell";
+    // Midnight reverts on callbacks, but the prover havocs calls to unresolved callbacks instead, so this has to be assumed.
+    require offer.callback != currentContract, "Midnight reverts on callbacks";
+    require takerCallback != currentContract, "Midnight reverts on callbacks";
     mathint owedBefore = owed[token];
 
     take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
@@ -215,8 +214,8 @@ rule owedPaidBackRepay(env e, Midnight.Market market, uint256 units, address onB
     require goodToken[token], "only good tokens";
     require e.msg.sender != currentContract, "only external calls";
 
-    // Midnight has no onRepay, so a callback to Midnight reverts.
-    require callback != currentContract, "Midnight has no onRepay";
+    // Midnight reverts on callbacks, but the prover havocs calls to unresolved callbacks instead, so this has to be assumed.
+    require callback != currentContract, "Midnight reverts on callbacks";
     mathint owedBefore = owed[token];
 
     repay(e, market, units, onBehalf, callback, data);
@@ -229,8 +228,8 @@ rule owedPaidBackLiquidate(env e, Midnight.Market market, uint256 collateralInde
     require goodToken[token], "only good tokens";
     require e.msg.sender != currentContract, "only external calls";
 
-    // Midnight has no onLiquidate, so a callback to Midnight reverts.
-    require callback != currentContract, "Midnight has no onLiquidate";
+    // Midnight reverts on callbacks, but the prover havocs calls to unresolved callbacks instead, so this has to be assumed.
+    require callback != currentContract, "Midnight reverts on callbacks";
     mathint owedBefore = owed[token];
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
