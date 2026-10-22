@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Morpho Association
 
 methods {
@@ -84,6 +84,18 @@ rule mulDivAddUpUpTight(uint256 a1, uint256 a2, uint256 b, uint256 d) {
 rule mulDivAddDownUp(uint256 a1, uint256 a2, uint256 b, uint256 d) {
     uint256 a1plusa2 = require_uint256(a1 + a2);
     assert mulDivDown(a1, b, d) + mulDivUp(a2, b, d) >= mulDivDown(a1plusa2, b, d);
+}
+
+// Super-additivity lower bound for mulDivUp with one term rounded down: ceil(a1*b/d) + floor(a2*b/d) <= ceil((a1+a2)*b/d).
+rule mulDivAddUpDown(uint256 a1, uint256 a2, uint256 b, uint256 d) {
+    uint256 a1plusa2 = require_uint256(a1 + a2);
+    assert mulDivUp(a1, b, d) + mulDivDown(a2, b, d) <= mulDivUp(a1plusa2, b, d);
+}
+
+// The first two arguments can be swapped.
+rule mulDivCommutative(uint256 a, uint256 b, uint256 d) {
+    assert mulDivDown(a, b, d) == mulDivDown(b, a, d);
+    assert mulDivUp(a, b, d) == mulDivUp(b, a, d);
 }
 
 // Rounding down the first scaling step cannot increase the result of a second scaling rounded up.
@@ -208,6 +220,17 @@ rule mathMulDivAddUpUpTight(mathint a1, mathint a2, mathint b, mathint d) {
 
 rule mathMulDivAddDownUp(mathint a1, mathint a2, mathint b, mathint d) {
     assert a1 >= 0 && a2 >= 0 => mathMulDivDown(a1, b, d) + mathMulDivUp(a2, b, d) >= mathMulDivDown(a1 + a2, b, d);
+}
+
+// Super-additivity lower bound for mathMulDivUp with one term rounded down: ceil(a1*b/d) + floor(a2*b/d) <= ceil((a1+a2)*b/d).
+rule mathMulDivAddUpDown(mathint a1, mathint a2, mathint b, mathint d) {
+    assert a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => mathMulDivUp(a1, b, d) + mathMulDivDown(a2, b, d) <= mathMulDivUp(a1 + a2, b, d);
+}
+
+// The first two arguments can be swapped.
+rule mathMulDivCommutative(mathint a, mathint b, mathint d) {
+    assert mathMulDivDown(a, b, d) == mathMulDivDown(b, a, d);
+    assert mathMulDivUp(a, b, d) == mathMulDivUp(b, a, d);
 }
 
 rule mathMulDivDownUpComposition(mathint a, mathint b, mathint c, mathint d) {

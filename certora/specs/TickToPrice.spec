@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Morpho Association
 
 methods {
@@ -30,6 +30,13 @@ rule wExpCasting(uint256 x) {
 }
 
 definition maxInput() returns int256 = assert_int256(lnOnePlusDelta() * (maxTick() / 2));
+
+// Useful for TickToPriceIsMonotonic.spec
+definition cvlMaxInput() returns int256 = 16817989975223754156;
+
+rule cvlMaxInputIsMaxInput() {
+    assert cvlMaxInput() == maxInput();
+}
 
 definition maxOutput() returns uint256 = 20134595243400876315901952;
 
