@@ -32,8 +32,8 @@ Global invariants on positions, markets and accounting.
   It also checks that the pending fee is zero once a position has been accrued at or after maturity.
 - [`PostMaturityDebt.spec`](specs/PostMaturityDebt.spec) checks that a position's debt can never increase after its market's maturity.
 - [`PostMaturityWithdrawable.spec`](specs/PostMaturityWithdrawable.spec) checks that it's not possible to manipulate a market's withdrawable liquidity post maturity: only `withdraw` and `claimContinuousFee` can decrease it, a withdrawal is bounded by the withdrawer's own credit, and `totalUnits` can only shrink once matured.
-- [`Reentrancy.spec`](specs/Reentrancy.spec) and [`ReentrancyView.spec`](specs/ReentrancyView.spec) check that within a single entry point, external calls, respectively external view calls, only happen before the first storage write or after the last one, so no external call observes an intermediate state.
-  The writes of `touchMarket` and `_updatePosition` are ignored, as they leave the state valid, and `Reentrancy.spec` also ignores the transient `LIQUIDATION_LOCK` writes of `UtilsLib.tExchange`, which deliberately happen after the external calls.
+- [`Reentrancy.spec`](specs/Reentrancy.spec) checks that within a single entry point, external (non-view) calls only happen before the first storage access (read or write) or after the last storage write, so that no external call observes an intermediate state and no write relies on a storage value that the call may have changed.
+- [`ReentrancyView.spec`](specs/ReentrancyView.spec) checks that within a single entry point, external view calls only happen before the first storage write or after the last one, so that no view call observes an intermediate state; reads around them are harmless since a view call cannot change the state.
 - [`SumOfCreditsAxiomatic.spec`](specs/SumOfCreditsAxiomatic.spec) checks that the sum of all lender's credit values (rescaled according to the math in UpdatePosition to the current loss factor) plus the continuous fee are backed by totalUnits (which is the sum of all recorded debts plus the withdrawable amount).
 
 ## Positions health and liquidation
