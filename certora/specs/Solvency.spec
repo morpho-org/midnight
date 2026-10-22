@@ -198,8 +198,11 @@ rule owedPaidBackTake(env e, Midnight.Offer offer, bytes ratifierData, uint256 u
     // Midnight can be neither the taker nor the maker, so it is never the payer.
     requireInvariant midnightAuthorizesNobody(e.msg.sender);
     requireInvariant midnightAuthorizesNobody(offer.ratifier);
-    require offer.callback != currentContract, "Midnight reverts on callbacks";
-    require takerCallback != currentContract, "Midnight reverts on callbacks";
+
+    // Midnight has no onBuy or onSell, so a callback to Midnight reverts.
+    // The prover havocs calls to unresolved callbacks instead, so this has to be assumed.
+    require offer.callback != currentContract, "Midnight has no onBuy or onSell";
+    require takerCallback != currentContract, "Midnight has no onBuy or onSell";
     mathint owedBefore = owed[token];
 
     take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
@@ -211,7 +214,9 @@ rule owedPaidBackTake(env e, Midnight.Offer offer, bytes ratifierData, uint256 u
 rule owedPaidBackRepay(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data, address token) {
     require goodToken[token], "only good tokens";
     require e.msg.sender != currentContract, "only external calls";
-    require callback != currentContract, "Midnight reverts on callbacks";
+
+    // Midnight has no onRepay, so a callback to Midnight reverts.
+    require callback != currentContract, "Midnight has no onRepay";
     mathint owedBefore = owed[token];
 
     repay(e, market, units, onBehalf, callback, data);
@@ -223,7 +228,9 @@ rule owedPaidBackRepay(env e, Midnight.Market market, uint256 units, address onB
 rule owedPaidBackLiquidate(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, address token) {
     require goodToken[token], "only good tokens";
     require e.msg.sender != currentContract, "only external calls";
-    require callback != currentContract, "Midnight reverts on callbacks";
+
+    // Midnight has no onLiquidate, so a callback to Midnight reverts.
+    require callback != currentContract, "Midnight has no onLiquidate";
     mathint owedBefore = owed[token];
 
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
