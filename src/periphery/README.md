@@ -26,11 +26,11 @@ The factory records callbacks in `callbackOf` and `isBlueBuyCallback`.
 Permissionlessly refinances a borrower's Midnight debt into a user-selected Morpho Blue market once the Midnight market reaches the configured start timestamp.
 It supplies the activated collateral to Blue before, through a callback, borrowing against it on Blue to reward the caller, repay the debt and withdraw the collateral on Midnight.
 
-Users and accounts they authorize on Midnight may enable multiple fallback configurations per Midnight market. 
-Users must authorize the contract on both Midnight and Blue. 
-Each configuration selects a Blue market, a Midnight market, start timestamp, end timestamp, caller incentive at start, caller incentive at end, and minimum rollable amount, and can later be disabled. 
-The caller incentive is a percentage of the debt, is capped at 100% and increases linearly between start and end. 
-The minimum rollable amount is the smallest debt a single roll can migrate, and is bypassed by a roll migrating the whole remaining Midnight debt, so a position can always be closed out. 
+Users and accounts they authorize on Midnight may enable multiple fallback configurations per Midnight market.
+Users must authorize the contract on both Midnight and Blue.
+Each configuration selects a Blue market, a Midnight market, start timestamp, end timestamp, caller incentive at start, caller incentive at end, and minimum rollable amount, and can later be disabled.
+The caller incentive is a percentage of the debt, is capped at 100% and increases linearly between start and end.
+The minimum rollable amount is the smallest debt a single roll can migrate, and is bypassed by a roll migrating the whole remaining Midnight debt, so a position can always be closed out.
 A roll requires the borrower to have exactly one activated Midnight collateral, matching the collateral token of the configured Blue market.
 
 ### `EcrecoverAuthorizer`
@@ -45,21 +45,6 @@ The authorizer must first authorize this contract on Midnight.
 An onchain mempool for Midnight.
 Its fallback publishes calldata in a `Data` event.
 Calldata is limited to 1,000,000 bytes.
-
-### `WhitelistEnterGate`
-
-An enter gate that restricts which accounts can increase their credit or debt in a Midnight market.
-
-Each side (credit, debt) has its own whitelist: only whitelisted accounts can enter on that side.
-Each side has its own role setter, who grants or revokes the whitelister role on that side.
-Whitelisters edit the lists directly with `setIsWhitelisted` or allow to edit the list by EIP-712 signatures used by `setIsWhitelistedWithSig`.
-`setIsWhitelistedWithSig` is a no-op instead of a revert when the signed nonce is stale and the account is already set to the signed value.
-A side can be made open at deployment, letting any account enter on that side (forever).
-
-### `WhitelistEnterGateFactory`
-
-Deploys a deterministic `WhitelistEnterGate` using `CREATE2` with a salt derived from the caller and a caller-provided pre-salt.
-The factory records gates in `isWhitelistEnterGate`.
 
 ## Libraries
 
