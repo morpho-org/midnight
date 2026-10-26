@@ -715,7 +715,6 @@ contract Midnight is IMidnight {
         return (seizedAssets, repaidUnits);
     }
 
-
     function setConsumed(bytes32 group, uint128 amount, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         require(amount >= consumed[onBehalf][group], AlreadyConsumed());
