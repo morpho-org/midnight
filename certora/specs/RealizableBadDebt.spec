@@ -121,8 +121,8 @@ rule liquidateRealizesTotalUnits(env e, Midnight.Market market, uint256 collater
 rule healthyHasNoRealizableBadDebt(Midnight.Market market, address borrower) {
     bytes32 id = summaryToId(market);
 
-    // Per collateral: down(down(c, p, S), lltv, WAD) <= down(up(c, p, S), lltv, WAD) <= up(up(c, p, S), lltv, WAD) <= up(up(c, p, S), WAD, maxLif).
-    // The axioms are instantiated on the nested terms, so that the prover grounds them on the intermediate values.
+    // For one collateral, write c: collateral, p:price, S:ORACLE_PRICE_SCALE, down:mulDivDown, up:mulDivUp.
+    // Hint to the prover: down(down(c, p, S), lltv, WAD) <= down(up(c, p, S), lltv, WAD) <= up(up(c, p, S), lltv, WAD) <= up(up(c, p, S), WAD, maxLif).
     require forall mathint c. forall mathint p. axiomMathMulDivUpGeqMulDivDown(c, p, ORACLE_PRICE_SCALE()), "axiom";
     require forall mathint c. forall mathint p. forall mathint lltv. axiomMathMulDivDownMonotoneA(mathMulDivDown(c, p, ORACLE_PRICE_SCALE()), mathMulDivUp(c, p, ORACLE_PRICE_SCALE()), lltv, WAD()), "axiom";
     require forall mathint c. forall mathint p. forall mathint lltv. axiomMathMulDivUpGeqMulDivDown(mathMulDivUp(c, p, ORACLE_PRICE_SCALE()), lltv, WAD()), "axiom";
