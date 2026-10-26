@@ -715,7 +715,7 @@ contract Midnight is IMidnight {
         return (seizedAssets, repaidUnits);
     }
 
-    /// @dev Passing type(uint128).max consumes all offers in the group (and never reverts).
+
     function setConsumed(bytes32 group, uint128 amount, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         require(amount >= consumed[onBehalf][group], AlreadyConsumed());
