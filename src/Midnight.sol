@@ -77,9 +77,10 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev Exactly one of maxAssets or maxUnits must be nonzero per offer (take reverts otherwise).
 /// @dev maxAssets caps max buyer assets if offer.buy is true, and caps max seller assets otherwise.
 /// @dev If maxAssets > 0, assets are capped to maxAssets, otherwise units are capped to maxUnits.
-/// @dev Midnight can call the callback of offers through a no-op take, even if those offers have consumed==max.
+/// @dev Midnight can call the callback of offers through a take, even if those offers have consumed==max.
 /// @dev Fully consumed assets-based offers can still be taken for nonzero units when the asset amount added to consumed is zero.
 /// @dev consumed can be increased manually by the maker or authorized accounts.
+/// @dev Offers that do not want to set a limit should set their max to type(uint128).max - 1 so that they can be fully canceled by setting consumed to type(uint128).max.
 ///
 /// TICK SPACING
 /// @dev Offers can only be placed at ticks that are multiples of the market's spacing.
@@ -714,7 +715,6 @@ contract Midnight is IMidnight {
         return (seizedAssets, repaidUnits);
     }
 
-    /// @dev Passing type(uint128).max cancels all offers in the group (and never reverts).
     function setConsumed(bytes32 group, uint128 amount, address onBehalf) external {
         require(onBehalf == msg.sender || isAuthorized[onBehalf][msg.sender], Unauthorized());
         require(amount >= consumed[onBehalf][group], AlreadyConsumed());
