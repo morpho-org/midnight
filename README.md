@@ -16,8 +16,8 @@ Compilation, testing and formatting are done with [forge](https://book.getfoundr
 If of interest, [BaseTest.sol](https://github.com/morpho-org/midnight/blob/main/test/BaseTest.sol) contains a re-usable testing setup and useful helpers.
 Optional helper contracts and libraries for interacting with Midnight are available in the [periphery folder](./src/periphery/).
 
-The repo contains some formal verification, done with [CVL](https://docs.certora.com/en/latest/docs/cvl/index.html).
-[This page](https://github.com/morpho-org/midnight/blob/main/certora/README.md) summarizes the proven properties.
+Formal verification of Midnight is done with the [Certora Prover](https://www.certora.com/prover).
+See the [Certora README](./certora/README.md) for the full list of verified properties and the modeling assumptions they rely on.
 
 ## Audits
 
@@ -25,5 +25,4 @@ Audits can be found in the [audits](./audits/) folder.
 
 ## Licences
 
-The primary license is the Business Source License 1.1 (BUSL-1.1), see [LICENSE](./LICENSE).
-However, all files in the following folders can also be licensed under GPL-2.0-or-later (as indicated in their SPDX headers), see [LICENSE-SECONDARY](./LICENSE-SECONDARY): `src/interfaces`, `src/libraries`, `src/ratifiers`, `src/periphery`, `test`, `certora`.
+The primary license, BUSL-1.1, covers `src/Midnight.sol` (see [LICENSE](./LICENSE)). All other files authored for this repository are under MIT (see [LICENSE-MIT](./LICENSE-MIT)).

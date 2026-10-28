@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Morpho Association
 
 persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
@@ -57,6 +57,14 @@ definition axiomMathMulDivAddUpUp(mathint a1, mathint a2, mathint b, mathint d) 
 definition axiomMathMulDivAddUpUpTight(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => mathMulDivUp(a1, b, d) + mathMulDivUp(a2, b, d) <= mathMulDivUp(a1 + a2, b, d) + 1;
 
 definition axiomMathMulDivAddDownUp(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 => mathMulDivDown(a1, b, d) + mathMulDivUp(a2, b, d) >= mathMulDivDown(a1 + a2, b, d);
+
+// Super-additivity lower bound for mathMulDivUp with one term rounded down: ceil(a1*b/d) + floor(a2*b/d) <= ceil((a1+a2)*b/d).
+definition axiomMathMulDivAddUpDown(mathint a1, mathint a2, mathint b, mathint d) returns bool = a1 >= 0 && a2 >= 0 && b >= 0 && d > 0 => mathMulDivUp(a1, b, d) + mathMulDivDown(a2, b, d) <= mathMulDivUp(a1 + a2, b, d);
+
+// The first two arguments can be swapped.
+definition axiomMathMulDivDownCommutative(mathint a, mathint b, mathint d) returns bool = mathMulDivDown(a, b, d) == mathMulDivDown(b, a, d);
+
+definition axiomMathMulDivUpCommutative(mathint a, mathint b, mathint d) returns bool = mathMulDivUp(a, b, d) == mathMulDivUp(b, a, d);
 
 definition axiomMathMulDivDownUpComposition(mathint a, mathint b, mathint c, mathint d) returns bool = a >= 0 && b >= 0 && c >= 0 && d > 0 => mathMulDivUp(mathMulDivDown(a, b, d), c, d) <= mathMulDivUp(a, b * c, d * d);
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Morpho Association
 
 import "TickToPrice.spec";
@@ -8,8 +8,8 @@ methods {
 }
 
 persistent ghost summaryWExp(int256) returns uint256 {
-    // See the rules in the wExp section of TickToPrice.spec, which together prove that wExp is non-decreasing.
-    axiom forall int256 x. forall int256 y. x <= y => summaryWExp(x) <= summaryWExp(y);
+    // See the rules in the wExp section of TickToPrice.spec, which together prove that wExp is non-decreasing on [-maxInput(), maxInput()].
+    axiom forall int256 x. forall int256 y. -cvlMaxInput() <= x && x <= y && y <= cvlMaxInput() => summaryWExp(x) <= summaryWExp(y);
 }
 
 rule tickToPriceIsMonotonic(uint256 tick1, uint256 tick2) {
