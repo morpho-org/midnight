@@ -42,6 +42,9 @@ methods {
     function _.onFlashLoan(address, address[], uint256[], bytes) external => NONDET;
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+
+    // Explicit HAVOC_ECF so -havocAllByDefault does not summarize these as HAVOC_ALL.
+    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => HAVOC_ECF;
 }
 
 ghost ghostMulDivDown(uint256, uint256, uint256) returns uint256 {
