@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 
 import "BitmapSummaries.spec";
+import "MulDivAxioms.spec";
 
 using Utils as Utils;
 
@@ -9,6 +10,7 @@ methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function realizableBadDebt(Midnight.Market, bytes32, address) external returns (uint256) envfree;
+    function isHealthy(Midnight.Market, bytes32, address) external returns (bool) envfree;
     function debt(bytes32, address) external returns (uint128) envfree;
     function totalUnits(bytes32) external returns (uint128) envfree;
     function liquidationLocked(bytes32, address) external returns (bool) envfree;
@@ -42,9 +44,7 @@ methods {
 
 definition WAD() returns uint256 = 10 ^ 18;
 
-persistent ghost ghostMulDivDown(mathint, mathint, mathint) returns mathint;
-
-persistent ghost ghostMulDivUp(mathint, mathint, mathint) returns mathint;
+definition ORACLE_PRICE_SCALE() returns uint256 = 10 ^ 36;
 
 persistent ghost maxLifGhost(uint256, uint256) returns uint256;
 
@@ -84,12 +84,13 @@ rule realizableBadDebtCannotIncrease(env e, method f, calldataarg args, Midnight
     // In that case the position must be healthy when the lock is removed later and no bad debt can be realized.
     require !liquidationLocked(id, borrower), "scope out the re-entrant case";
 
-    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. 0 <= a1 && a1 <= a2 && 0 <= b && 0 < d => ghostMulDivUp(a1, b, d) <= ghostMulDivUp(a2, b, d), "Monotone in the first argument (proven in MulDiv.spec as mulDivMonotoneA)";
+    require forall mathint a1. forall mathint a2. forall mathint b. forall mathint d. axiomMathMulDivUpMonotoneA(a1, a2, b, d), "axiom";
+    require forall mathint a. forall mathint b. forall mathint d. axiomMathMulDivUpGeqMulDivDown(a, b, d), "axiom";
+    require forall mathint a. forall mathint lltv. forall mathint lif. axiomMathMulDivUpMonotoneBD(a, lltv, WAD(), WAD(), lif), "axiom";
 
-    require forall mathint a. forall mathint b. forall mathint d. d > 0 => ghostMulDivUp(a, b, d) >= ghostMulDivDown(a, b, d), "Rounding up is at least rounding down (proven in MulDiv.spec as mulDivUpGeqMulDivDown)";
-
-    require forall mathint a. forall mathint lif. forall mathint lltv. a >= 0 && lltv * lif <= WAD() * WAD() => ghostMulDivUp(a, lltv, WAD()) <= ghostMulDivUp(a, WAD(), lif), "maxLif is at most 1/lltv";
-    require forall uint256 lltv. forall uint256 cursor. lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "maxLif is at most 1/lltv";
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "see createdMarketsHaveEnabledLltv in CreatedMarkets.spec and enabledLltvIsLessThanOrEqualToOne in Midnight.spec";
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].liquidationCursor < WAD(), "see createdMarketsHaveEnabledLiquidationCursor in CreatedMarkets.spec and enabledLiquidationCursorsIsLessThanOne in Midnight.spec";
+    require forall uint256 lltv. forall uint256 cursor. lltv <= WAD() && cursor < WAD() => lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
 
     uint256 badDebtBefore = realizableBadDebt(market, id, borrower);
 
@@ -113,4 +114,25 @@ rule liquidateRealizesTotalUnits(env e, Midnight.Market market, uint256 collater
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
     assert totalUnits(id) == totalUnitsBefore - badDebtBefore;
+}
+
+// A healthy position has no realizable bad debt, so liquidating it cannot write off any debt.
+// Together with notLiquidatableWhenLocked (Healthiness.spec) and the strong invariant isHealthy || liquidationLocked, this shows that liquidate() never writes off debt of a position that was healthy at the start of the transaction, even from inside a callback.
+rule healthyHasNoRealizableBadDebt(Midnight.Market market, address borrower) {
+    bytes32 id = summaryToId(market);
+
+    // For one collateral, write c: collateral, p:price, S:ORACLE_PRICE_SCALE, down:mulDivDown, up:mulDivUp.
+    // Hint to the prover: down(down(c, p, S), lltv, WAD) <= down(up(c, p, S), lltv, WAD) <= up(up(c, p, S), lltv, WAD) <= up(up(c, p, S), WAD, maxLif).
+    require forall mathint c. forall mathint p. axiomMathMulDivUpGeqMulDivDown(c, p, ORACLE_PRICE_SCALE()), "axiom";
+    require forall mathint c. forall mathint p. forall mathint lltv. axiomMathMulDivDownMonotoneA(mathMulDivDown(c, p, ORACLE_PRICE_SCALE()), mathMulDivUp(c, p, ORACLE_PRICE_SCALE()), lltv, WAD()), "axiom";
+    require forall mathint c. forall mathint p. forall mathint lltv. axiomMathMulDivUpGeqMulDivDown(mathMulDivUp(c, p, ORACLE_PRICE_SCALE()), lltv, WAD()), "axiom";
+    require forall mathint c. forall mathint p. forall mathint lltv. forall mathint lif. axiomMathMulDivUpMonotoneBD(mathMulDivUp(c, p, ORACLE_PRICE_SCALE()), lltv, WAD(), WAD(), lif), "axiom";
+
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].lltv <= WAD(), "see createdMarketsHaveEnabledLltv in CreatedMarkets.spec and enabledLltvIsLessThanOrEqualToOne in Midnight.spec";
+    require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].liquidationCursor < WAD(), "see createdMarketsHaveEnabledLiquidationCursor in CreatedMarkets.spec and enabledLiquidationCursorsIsLessThanOne in Midnight.spec";
+    require forall uint256 lltv. forall uint256 cursor. lltv <= WAD() && cursor < WAD() => lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
+
+    require isHealthy(market, id, borrower), "borrower is healthy";
+
+    assert realizableBadDebt(market, id, borrower) == 0;
 }
