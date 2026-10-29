@@ -96,7 +96,7 @@ Who may change state, sign authorizations and hold roles, and how failures propa
 
 Value cannot leak to unauthorized parties.
 
-- [`Solvency.spec`](specs/Solvency.spec) checks the central solvency invariant: for every token, the contract's balance always covers the sum of collateral, withdrawable and claimable settlement fees.
+- [`Solvency.spec`](specs/Solvency.spec) checks the central solvency invariant: for every well-behaved token, the contract's balance always covers the sum of collateral, withdrawable and claimable settlement fees, even in the presence of malicious tokens that can arbitrarily change the state when transferred.
 - [`OnlyExplicitPayerCanLoseTokens.spec`](specs/OnlyExplicitPayerCanLoseTokens.spec) checks that tokens are only ever pulled from an explicit payer.
   In `take`, the payer can only be the `buyerCallback` if it is passed, otherwise it is either the maker for a buy offer, or `msg.sender` for a sell offer.
   In every other entry point, the payer is `msg.sender` or the corresponding callback.
