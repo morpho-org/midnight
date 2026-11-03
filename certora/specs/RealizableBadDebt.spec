@@ -117,7 +117,7 @@ rule liquidateRealizesTotalUnits(env e, Midnight.Market market, uint256 collater
 }
 
 // A healthy position has no realizable bad debt, so liquidating it cannot write off any debt.
-// Together with notLiquidatableWhenLocked (Healthiness.spec) and the strong invariant isHealthy || liquidationLocked, this shows that liquidate() never writes off debt of a position that was healthy at the start of the transaction, even from inside a callback.
+// Together with notLiquidatableWhenLocked (Healthiness.spec) and the strong invariant isHealthy || liquidationLocked, this shows that liquidate() never writes off debt of a position that was healthy at the start of the transaction, even from inside a callback, assuming oracle prices remain unchanged throughout the transaction.
 rule healthyHasNoRealizableBadDebt(Midnight.Market market, address borrower) {
     bytes32 id = summaryToId(market);
 
