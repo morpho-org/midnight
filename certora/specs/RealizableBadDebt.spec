@@ -132,7 +132,5 @@ rule healthyHasNoRealizableBadDebt(Midnight.Market market, address borrower) {
     require forall uint256 i. i < market.collateralParams.length => market.collateralParams[i].liquidationCursor < WAD(), "see createdMarketsHaveEnabledLiquidationCursor in CreatedMarkets.spec and enabledLiquidationCursorsIsLessThanOne in Midnight.spec";
     require forall uint256 lltv. forall uint256 cursor. lltv <= WAD() && cursor < WAD() => lltv * maxLifGhost(lltv, cursor) <= WAD() * WAD(), "see lifTimesLltvIsLessThanOrEqualToOne in ExactMath.spec";
 
-    require isHealthy(market, id, borrower), "borrower is healthy";
-
-    assert realizableBadDebt(market, id, borrower) == 0;
+    assert isHealthy(market, id, borrower) => realizableBadDebt(market, id, borrower) == 0;
 }
