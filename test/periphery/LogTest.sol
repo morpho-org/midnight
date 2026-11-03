@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Morpho Association
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.0;
 
 import {Test, console} from "../../lib/forge-std/src/Test.sol";
 import {Log, MAX_DATA_LENGTH} from "../../src/periphery/log/Log.sol";
