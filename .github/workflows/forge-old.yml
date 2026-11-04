@@ -16,28 +16,31 @@ jobs:
         with:
           submodules: recursive
       - name: Install Foundry (old)
-        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
-        with:
-          version: v1.5.1
-      - name: Verify forge executable hash
         env:
-          EXPECTED_FORGE_SHA256: a39fc1913b53dde6a35b603756f65d799e13817ef694107ec0d3704c20435cce
+          FOUNDRY_VERSION: v1.5.1
+          FOUNDRY_SHA256: 73640b01bd9ed29fdb4965085099371f8cf0dbbec3e2086cf54564efc4dcfe88
         run: |
-          forge_path="$(which forge)"
-          echo "forge path: $forge_path"
-          actual="$(sha256sum "$forge_path" | awk '{print $1}')"
-          echo "actual:   $actual"
-          echo "expected: $EXPECTED_FORGE_SHA256"
-          [ "$actual" = "$EXPECTED_FORGE_SHA256" ] || { echo "forge hash mismatch"; exit 1; }
-      - name: Install solc 0.8.34 into svm cache
+          archive="$RUNNER_TEMP/foundry.tar.gz"
+          curl -fsSL -o "$archive" \
+            "https://github.com/foundry-rs/foundry/releases/download/$FOUNDRY_VERSION/foundry_${FOUNDRY_VERSION}_linux_amd64.tar.gz"
+          echo "$FOUNDRY_SHA256  $archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/foundry-old"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/foundry-old"
+          echo "$RUNNER_TEMP/foundry-old" >> "$GITHUB_PATH"
+      - name: Install solc into svm cache
         run: |
-          mkdir -p "$HOME/.svm/0.8.34"
-          curl -fsSL -o "$HOME/.svm/0.8.34/solc-0.8.34" \
-            https://github.com/ethereum/solidity/releases/download/v0.8.34/solc-static-linux
-          chmod +x "$HOME/.svm/0.8.34/solc-0.8.34"
-          "$HOME/.svm/0.8.34/solc-0.8.34" --version
+          while read -r version sha256; do
+            solc="$HOME/.svm/$version/solc-$version"
+            mkdir -p "${solc%/*}"
+            curl -fsSL -o "$solc" "https://github.com/ethereum/solidity/releases/download/v$version/solc-static-linux"
+            echo "$sha256  $solc" | sha256sum -c -
+            chmod +x "$solc"
+          done <<'EOF'
+          0.8.19 7a5c1d3dc9a8eba62bb2ec37192c9178ae5fe8a54a56e5573fd3c9c17cd9eb48
+          0.8.34 d40adc6f9fdbb22a97d32a02fa05688bf2ee7886affc48c9851b0afd4a726b39
+          EOF
       - name: Build with Foundry (old)
-        run: forge build --force
+        run: forge build --force --offline
       - name: Export bytecode manifest (old)
         run: |
           mkdir -p compare
@@ -54,11 +57,11 @@ jobs:
           fi
           echo "old manifest: $(wc -l < compare/old.tsv) src/ artifacts"
       - name: Run Forge tests
-        run: forge test
+        run: forge test --offline
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
       - name: Build with Foundry
-        run: forge build --force --out out-new --cache-path cache-new
+        run: forge build --force --offline --out out-new --cache-path cache-new
       - name: Export bytecode manifest (new)
         run: |
           find out-new -name '*.json' -print0 | while IFS= read -r -d '' file; do
