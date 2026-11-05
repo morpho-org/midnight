@@ -17,13 +17,10 @@ jobs:
           submodules: recursive
       - name: Install Foundry (old)
         run: |
-          mkdir -p "$RUNNER_TEMP/foundry-old"
-          cd "$RUNNER_TEMP/foundry-old"
           curl -fsSL -o foundry.tar.gz https://github.com/foundry-rs/foundry/releases/download/v1.5.1/foundry_v1.5.1_linux_amd64.tar.gz
           echo "73640b01bd9ed29fdb4965085099371f8cf0dbbec3e2086cf54564efc4dcfe88  foundry.tar.gz" | sha256sum -c -
-          tar -xzf foundry.tar.gz
-          rm foundry.tar.gz
-          echo "$PWD" >> "$GITHUB_PATH"
+          tar -xzf foundry.tar.gz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Install solc into svm cache
         run: |
           echo "0.8.19 7a5c1d3dc9a8eba62bb2ec37192c9178ae5fe8a54a56e5573fd3c9c17cd9eb48
