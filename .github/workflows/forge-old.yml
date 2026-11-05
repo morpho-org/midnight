@@ -26,13 +26,13 @@ jobs:
           echo "$PWD" >> "$GITHUB_PATH"
       - name: Install solc into svm cache
         run: |
-            echo "0.8.19 7a5c1d3dc9a8eba62bb2ec37192c9178ae5fe8a54a56e5573fd3c9c17cd9eb48
-            0.8.34 d40adc6f9fdbb22a97d32a02fa05688bf2ee7886affc48c9851b0afd4a726b39" | while read -r version sha256; do
-              solc="$HOME/.svm/$version/solc-$version"
-              mkdir -p "${solc%/*}"
-              curl -fsSL -o "$solc" "https://github.com/ethereum/solidity/releases/download/v$version/solc-static-linux"
-              echo "$sha256  $solc" | sha256sum -c -
-              chmod +x "$solc"
-            done
+          echo "0.8.19 7a5c1d3dc9a8eba62bb2ec37192c9178ae5fe8a54a56e5573fd3c9c17cd9eb48
+          0.8.34 d40adc6f9fdbb22a97d32a02fa05688bf2ee7886affc48c9851b0afd4a726b39" | while read -r version sha256; do
+            solc="$HOME/.svm/$version/solc-$version"
+            mkdir -p "${solc%/*}"
+            curl -fsSL -o "$solc" "https://github.com/ethereum/solidity/releases/download/v$version/solc-static-linux"
+            echo "$sha256  $solc" | sha256sum -c -
+            chmod +x "$solc"
+          done
       - name: Run Forge tests
         run: forge test --offline
