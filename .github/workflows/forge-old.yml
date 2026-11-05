@@ -19,12 +19,14 @@ jobs:
         run: |
           curl -fsSL -o foundry.tar.gz https://github.com/foundry-rs/foundry/releases/download/v1.5.1/foundry_v1.5.1_linux_amd64.tar.gz
           echo "73640b01bd9ed29fdb4965085099371f8cf0dbbec3e2086cf54564efc4dcfe88  foundry.tar.gz" | sha256sum -c -
-          tar -xzf foundry.tar.gz -C "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+          mkdir "$RUNNER_TEMP/foundry"
+          tar -xzf foundry.tar.gz -C "$RUNNER_TEMP/foundry"
+          echo "$RUNNER_TEMP/foundry" >> "$GITHUB_PATH"
       - name: Install solc into svm cache
         run: |
           echo "0.8.19 7a5c1d3dc9a8eba62bb2ec37192c9178ae5fe8a54a56e5573fd3c9c17cd9eb48
-          0.8.34 d40adc6f9fdbb22a97d32a02fa05688bf2ee7886affc48c9851b0afd4a726b39" | while read -r version sha256; do
+          0.8.34 d40adc6f9fdbb22a97d32a02fa05688bf2ee7886affc48c9851b0afd4a726b39" |
+          while read -r version sha256; do
             solc="$HOME/.svm/$version/solc-$version"
             mkdir -p "${solc%/*}"
             curl -fsSL -o "$solc" "https://github.com/ethereum/solidity/releases/download/v$version/solc-static-linux"
