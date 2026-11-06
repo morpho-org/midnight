@@ -9,7 +9,7 @@ methods {
     function _updatePosition(Midnight.Market memory, bytes32, address) internal returns (uint128, uint128, uint128) => NONDET;
 
     // Ignore the transient stores of LIQUIDATION_LOCK via the tExchange method.
-    // These are intentionally happen after the external calls.
+    // These intentionally happen after the external calls.
     function UtilsLib.tExchange(uint256, bytes32, address, bool) internal returns (bool) => NONDET;
 
     // These functions are over-approximated, except for the reverting behavior.
@@ -19,38 +19,41 @@ methods {
     function UtilsLib.mulDivUp(uint256 x, uint256 y, uint256 d) internal returns (uint256) => NONDET;
 }
 
-// True when at least one slot was written.
-persistent ghost bool storageChanged;
+// True when at least one slot was read or written.
+persistent ghost bool storageAccessed;
 
-// True when at least one CALL is executed after a storage change.
-persistent ghost bool hasCallAfterStore;
+// True when at least one CALL is executed after a storage access.
+persistent ghost bool hasCallAfterStorage;
 
-// True when at least one slot is changed after a CALL is executed after a storage change.
+// True when at least one slot is changed after a CALL is executed after a storage access.
 persistent ghost bool unsafeCall;
 
+hook ALL_SLOAD(uint _) uint _ {
+    storageAccessed = true;
+}
+
+hook ALL_TLOAD(uint _) uint _ {
+    storageAccessed = true;
+}
+
 hook ALL_SSTORE(uint _, uint _) {
-    storageChanged = true;
-    if (hasCallAfterStore) {
-        unsafeCall = true;
-    }
+    storageAccessed = true;
+    unsafeCall = unsafeCall || hasCallAfterStorage;
 }
 
 hook ALL_TSTORE(uint _, uint _) {
-    storageChanged = true;
-    if (hasCallAfterStore) {
-        unsafeCall = true;
-    }
+    storageAccessed = true;
+    unsafeCall = unsafeCall || hasCallAfterStorage;
 }
 
 hook CALL(uint256 g, address addr, uint256 value, uint256 argsOffset, uint256 argsLength, uint256 retOffset, uint256 retLength) uint256 rc {
-    if (storageChanged) {
-        hasCallAfterStore = true;
-    }
+    hasCallAfterStorage = hasCallAfterStorage || storageAccessed;
 }
 
-// Check that calls are either before the first store nor after the last store (excluding the effects of touchMarket, _updatePosition and tExchange).
+// Check that calls are either before the first storage access or after the last store (excluding the effects of touchMarket, _updatePosition and tExchange).
+// A read before a call followed by a write after it is unsafe too, as the write may rely on a value that the call changed.
 rule reentrancySafe(method f, env e, calldataarg data) {
-    require(!storageChanged && !hasCallAfterStore && !unsafeCall, "set up the initial ghost state");
+    require(!storageAccessed && !hasCallAfterStorage && !unsafeCall, "set up the initial ghost state");
     f(e, data);
     assert !unsafeCall;
 }
