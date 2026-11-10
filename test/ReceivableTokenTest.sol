@@ -6,6 +6,7 @@ import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK, TickLib} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
+import {SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {IERC20} from "../src/periphery/receivable-token/interfaces/IERC20.sol";
 import {MerkleProofLib} from "../src/periphery/receivable-token/libraries/MerkleProofLib.sol";
@@ -138,7 +139,7 @@ contract ReceivableTokenTest is BaseTest {
     /// @dev Receipts are plain transfers to the token.
     function _pay(IReceivableToken _token, uint256 amount) internal {
         vm.prank(payer);
-        loanToken.transfer(address(_token), amount);
+        SafeTransferLib.safeTransfer(address(loanToken), address(_token), amount);
     }
 
     /// FACTORY ///

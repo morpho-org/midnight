@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Morpho Association
-pragma solidity 0.8.38;
+pragma solidity 0.8.34;
 
 import {ReceivableToken} from "./ReceivableToken.sol";
 import {IReceivableTokenFactory} from "./interfaces/IReceivableTokenFactory.sol";
