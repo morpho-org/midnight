@@ -588,7 +588,7 @@ contract ReceivableTokenTest is BaseTest {
         bytes32 id = toId(market);
         uint256 units = 600e18;
 
-        // The minter tokenizes its receivables, pledges them and sells debt.
+        // The minter mints receivable tokens, pledges them and sells debt.
         _mint(units);
         vm.prank(minter);
         midnight.supplyCollateral(market, 0, units, minter);
