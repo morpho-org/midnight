@@ -47,11 +47,6 @@ function setUp() {
 
 definition isOracle(Midnight.Market market, address a) returns bool = exists uint256 i. i < market.collateralParams.length && market.collateralParams[i].oracle == a;
 
-definition is(address a, address b) returns mathint = a == b ? 1 : 0;
-
-// Callbacks are only called when they are set.
-definition isCallback(address a, address callback) returns mathint = a != 0 && a == callback ? 1 : 0;
-
 // Check that withdraw only calls the loan token, once (transfer to the receiver).
 rule withdrawCalls(env e, Midnight.Market market, uint256 units, address onBehalf, address receiver) {
     setUp();
@@ -72,9 +67,16 @@ rule takeCalls(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, a
     address buyerCallback = offer.buy ? offer.callback : takerCallback;
     address sellerCallback = offer.buy ? takerCallback : offer.callback;
 
+    address loanToken = offer.market.loanToken;
+    require(loanToken != 0 && buyerCallback != loanToken && sellerCallback != loanToken && (buyerCallback == 0 || buyerCallback != sellerCallback), "distinct targets, to count the calls to each of them");
+
     take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
-    assert forall address a. callsTo[a] == 2 * is(a, offer.market.loanToken) + isCallback(a, buyerCallback) + isCallback(a, sellerCallback);
+    assert callsTo[loanToken] == 2;
+    assert buyerCallback != 0 => callsTo[buyerCallback] == 1;
+    assert sellerCallback != 0 => callsTo[sellerCallback] == 1;
+    assert callsTo[0] == 0;
+    assert forall address a. a != loanToken && a != buyerCallback && a != sellerCallback => callsTo[a] == 0;
     assert staticCalled[offer.ratifier];
     assert forall address a. staticCalled[a] => a == offer.ratifier || (a != 0 && a == offer.market.enterGate) || isOracle(offer.market, a);
     assert forall address a. !delegateCalled[a];
@@ -85,9 +87,14 @@ rule takeCalls(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, a
 rule repayCalls(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data) {
     setUp();
 
+    require(market.loanToken != 0 && callback != market.loanToken, "distinct targets, to count the calls to each of them");
+
     repay(e, market, units, onBehalf, callback, data);
 
-    assert forall address a. callsTo[a] == is(a, market.loanToken) + isCallback(a, callback);
+    assert callsTo[market.loanToken] == 1;
+    assert callback != 0 => callsTo[callback] == 1;
+    assert callsTo[0] == 0;
+    assert forall address a. a != market.loanToken && a != callback => callsTo[a] == 0;
     assert forall address a. !staticCalled[a];
     assert forall address a. !delegateCalled[a];
     assert !otherCall;
@@ -123,23 +130,33 @@ rule withdrawCollateralCalls(env e, Midnight.Market market, uint256 collateralIn
 rule liquidateCalls(env e, Midnight.Market market, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data) {
     setUp();
 
+    address collateralToken = market.collateralParams[collateralIndex].token;
+    require(collateralToken != 0 && market.loanToken != 0 && collateralToken != market.loanToken && callback != collateralToken && callback != market.loanToken, "distinct targets, to count the calls to each of them");
+
     liquidate(e, market, collateralIndex, seizedAssets, repaidUnits, borrower, postMaturityMode, receiver, callback, data);
 
-    assert forall address a. callsTo[a] == is(a, market.collateralParams[collateralIndex].token) + is(a, market.loanToken) + isCallback(a, callback);
+    assert callsTo[collateralToken] == 1;
+    assert callsTo[market.loanToken] == 1;
+    assert callback != 0 => callsTo[callback] == 1;
+    assert callsTo[0] == 0;
+    assert forall address a. a != collateralToken && a != market.loanToken && a != callback => callsTo[a] == 0;
     assert forall address a. staticCalled[a] => (a != 0 && a == market.liquidatorGate) || isOracle(market, a);
     assert forall address a. !delegateCalled[a];
     assert !otherCall;
 }
 
-// Check that flashLoan calls each token twice (transfers to and from the callback) and the callback once, for up to two tokens.
+// Check that flashLoan calls each token twice (transfers to and from the callback) and the callback once.
 rule flashLoanCalls(env e, address[] tokens, uint256[] assets, address callback, bytes data) {
     setUp();
 
-    require(tokens.length <= 2, "the loop over the tokens is unrolled twice, see loop_iter");
+    require(forall uint256 i. forall uint256 j. i < j && j < tokens.length => tokens[i] != tokens[j], "distinct targets, to count the calls to each of them");
+    require(forall uint256 i. i < tokens.length => tokens[i] != callback, "distinct targets, to count the calls to each of them");
 
     flashLoan(e, tokens, assets, callback, data);
 
-    assert forall address a. callsTo[a] == is(a, callback) + 2 * (tokens.length > 0 ? is(a, tokens[0]) : 0) + 2 * (tokens.length > 1 ? is(a, tokens[1]) : 0);
+    assert callsTo[callback] == 1;
+    assert forall uint256 i. i < tokens.length => callsTo[tokens[i]] == 2;
+    assert forall address a. a != callback && (forall uint256 i. i < tokens.length => tokens[i] != a) => callsTo[a] == 0;
     assert forall address a. !staticCalled[a];
     assert forall address a. !delegateCalled[a];
     assert !otherCall;
@@ -216,4 +233,5 @@ rule multicallCalls(env e, bytes[] calls) {
 
     assert calls.length > 0 => delegateCalled[currentContract];
     assert forall address a. delegateCalled[a] => a == currentContract;
+    assert !otherCall;
 }
