@@ -58,7 +58,8 @@ rule withdrawCalls(env e, Midnight.Market market, uint256 units, address onBehal
 
     withdraw(e, market, units, onBehalf, receiver);
 
-    assert forall address a. callsTo[a] == is(a, market.loanToken);
+    assert callsTo[market.loanToken] == 1;
+    assert forall address a. a != market.loanToken => callsTo[a] == 0;
     assert forall address a. !staticCalled[a];
     assert forall address a. !delegateCalled[a];
     assert !otherCall;
@@ -98,7 +99,8 @@ rule supplyCollateralCalls(env e, Midnight.Market market, uint256 collateralInde
 
     supplyCollateral(e, market, collateralIndex, assets, onBehalf);
 
-    assert forall address a. callsTo[a] == is(a, market.collateralParams[collateralIndex].token);
+    assert callsTo[market.collateralParams[collateralIndex].token] == 1;
+    assert forall address a. a != market.collateralParams[collateralIndex].token => callsTo[a] == 0;
     assert forall address a. staticCalled[a] => a == market.collateralParams[collateralIndex].oracle;
     assert forall address a. !delegateCalled[a];
     assert !otherCall;
@@ -110,7 +112,8 @@ rule withdrawCollateralCalls(env e, Midnight.Market market, uint256 collateralIn
 
     withdrawCollateral(e, market, collateralIndex, assets, onBehalf, receiver);
 
-    assert forall address a. callsTo[a] == is(a, market.collateralParams[collateralIndex].token);
+    assert callsTo[market.collateralParams[collateralIndex].token] == 1;
+    assert forall address a. a != market.collateralParams[collateralIndex].token => callsTo[a] == 0;
     assert forall address a. staticCalled[a] => isOracle(market, a);
     assert forall address a. !delegateCalled[a];
     assert !otherCall;
@@ -148,7 +151,8 @@ rule claimSettlementFeeCalls(env e, address token, uint256 amount, address recei
 
     claimSettlementFee(e, token, amount, receiver);
 
-    assert forall address a. callsTo[a] == is(a, token);
+    assert callsTo[token] == 1;
+    assert forall address a. a != token => callsTo[a] == 0;
     assert forall address a. !staticCalled[a];
     assert forall address a. !delegateCalled[a];
     assert !otherCall;
@@ -160,7 +164,8 @@ rule claimContinuousFeeCalls(env e, Midnight.Market market, uint256 amount, addr
 
     claimContinuousFee(e, market, amount, receiver);
 
-    assert forall address a. callsTo[a] == is(a, market.loanToken);
+    assert callsTo[market.loanToken] == 1;
+    assert forall address a. a != market.loanToken => callsTo[a] == 0;
     assert forall address a. !staticCalled[a];
     assert forall address a. !delegateCalled[a];
     assert !otherCall;
