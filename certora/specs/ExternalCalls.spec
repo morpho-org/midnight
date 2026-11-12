@@ -56,8 +56,6 @@ rule withdrawCalls(env e, Midnight.Market market, uint256 units, address onBehal
     assert callsTo[market.loanToken] == 1;
     assert forall address a. a != market.loanToken => callsTo[a] == 0;
     assert forall address a. !staticCalled[a];
-    assert forall address a. !delegateCalled[a];
-    assert !otherCall;
 }
 
 // Check that take calls the loan token twice (transfers to Midnight and to the receiver), the buyer callback and the seller callback if they are set, and only view calls the ratifier, the enter gate and the market's oracles.
@@ -79,8 +77,6 @@ rule takeCalls(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, a
     assert forall address a. a != loanToken && a != buyerCallback && a != sellerCallback => callsTo[a] == 0;
     assert staticCalled[offer.ratifier];
     assert forall address a. staticCalled[a] => a == offer.ratifier || (a != 0 && a == offer.market.enterGate) || isOracle(offer.market, a);
-    assert forall address a. !delegateCalled[a];
-    assert !otherCall;
 }
 
 // Check that repay calls the loan token once (transfer from the payer), and the callback if it is set.
@@ -96,8 +92,6 @@ rule repayCalls(env e, Midnight.Market market, uint256 units, address onBehalf, 
     assert callsTo[0] == 0;
     assert forall address a. a != market.loanToken && a != callback => callsTo[a] == 0;
     assert forall address a. !staticCalled[a];
-    assert forall address a. !delegateCalled[a];
-    assert !otherCall;
 }
 
 // Check that supplyCollateral calls the collateral token once (transfer from the caller), and only view calls the oracle of that collateral.
@@ -109,8 +103,6 @@ rule supplyCollateralCalls(env e, Midnight.Market market, uint256 collateralInde
     assert callsTo[market.collateralParams[collateralIndex].token] == 1;
     assert forall address a. a != market.collateralParams[collateralIndex].token => callsTo[a] == 0;
     assert forall address a. staticCalled[a] => a == market.collateralParams[collateralIndex].oracle;
-    assert forall address a. !delegateCalled[a];
-    assert !otherCall;
 }
 
 // Check that withdrawCollateral calls the collateral token once (transfer to the receiver), and only view calls the market's oracles.
@@ -122,8 +114,6 @@ rule withdrawCollateralCalls(env e, Midnight.Market market, uint256 collateralIn
     assert callsTo[market.collateralParams[collateralIndex].token] == 1;
     assert forall address a. a != market.collateralParams[collateralIndex].token => callsTo[a] == 0;
     assert forall address a. staticCalled[a] => isOracle(market, a);
-    assert forall address a. !delegateCalled[a];
-    assert !otherCall;
 }
 
 // Check that liquidate calls the seized collateral token once (transfer to the receiver), the loan token once (transfer from the payer) and the callback if it is set, and only view calls the liquidator gate and the market's oracles.
@@ -141,8 +131,6 @@ rule liquidateCalls(env e, Midnight.Market market, uint256 collateralIndex, uint
     assert callsTo[0] == 0;
     assert forall address a. a != collateralToken && a != market.loanToken && a != callback => callsTo[a] == 0;
     assert forall address a. staticCalled[a] => (a != 0 && a == market.liquidatorGate) || isOracle(market, a);
-    assert forall address a. !delegateCalled[a];
-    assert !otherCall;
 }
 
 // Check that flashLoan calls each token twice (transfers to and from the callback) and the callback once.
@@ -158,8 +146,6 @@ rule flashLoanCalls(env e, address[] tokens, uint256[] assets, address callback,
     assert forall uint256 i. i < tokens.length => callsTo[tokens[i]] == 2;
     assert forall address a. a != callback && (forall uint256 i. i < tokens.length => tokens[i] != a) => callsTo[a] == 0;
     assert forall address a. !staticCalled[a];
-    assert forall address a. !delegateCalled[a];
-    assert !otherCall;
 }
 
 // Check that claimSettlementFee only calls the token, once (transfer to the receiver).
@@ -171,8 +157,6 @@ rule claimSettlementFeeCalls(env e, address token, uint256 amount, address recei
     assert callsTo[token] == 1;
     assert forall address a. a != token => callsTo[a] == 0;
     assert forall address a. !staticCalled[a];
-    assert forall address a. !delegateCalled[a];
-    assert !otherCall;
 }
 
 // Check that claimContinuousFee only calls the loan token, once (transfer to the receiver).
@@ -184,8 +168,6 @@ rule claimContinuousFeeCalls(env e, Midnight.Market market, uint256 amount, addr
     assert callsTo[market.loanToken] == 1;
     assert forall address a. a != market.loanToken => callsTo[a] == 0;
     assert forall address a. !staticCalled[a];
-    assert forall address a. !delegateCalled[a];
-    assert !otherCall;
 }
 
 // Check that isHealthy only view calls the market's oracles.
@@ -196,8 +178,6 @@ rule isHealthyCalls(env e, Midnight.Market market, bytes32 id, address borrower)
 
     assert forall address a. callsTo[a] == 0;
     assert forall address a. staticCalled[a] => isOracle(market, a);
-    assert forall address a. !delegateCalled[a];
-    assert !otherCall;
 }
 
 // Check that the other functions make no external call.
@@ -221,17 +201,23 @@ filtered {
 
     assert forall address a. callsTo[a] == 0;
     assert forall address a. !staticCalled[a];
-    assert forall address a. !delegateCalled[a];
-    assert !otherCall;
 }
 
-// Check that multicall only delegate calls Midnight itself, so it makes the external calls of the batched entry points.
+// Check that multicall delegate calls Midnight itself, so it makes the external calls of the batched entry points.
 rule multicallCalls(env e, bytes[] calls) {
     setUp();
 
     multicall(e, calls);
 
     assert calls.length > 0 => delegateCalled[currentContract];
-    assert forall address a. delegateCalled[a] => a == currentContract;
+}
+
+// Check that Midnight never sends ETH, never executes a CALLCODE, and only delegate calls itself, in multicall.
+rule noOtherCall(env e, method f, calldataarg args) {
+    setUp();
+
+    f(e, args);
+
+    assert forall address a. delegateCalled[a] => a == currentContract && f.selector == sig:multicall(bytes[]).selector;
     assert !otherCall;
 }
