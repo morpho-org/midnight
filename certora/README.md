@@ -34,9 +34,10 @@ Global invariants on positions, markets and accounting.
 - [`PostMaturityWithdrawable.spec`](specs/PostMaturityWithdrawable.spec) checks that it's not possible to manipulate a market's withdrawable liquidity post maturity: only `withdraw` and `claimContinuousFee` can decrease it, a withdrawal is bounded by the withdrawer's own credit, and `totalUnits` can only shrink once matured.
 - [`Reentrancy.spec`](specs/Reentrancy.spec) checks that within a single entry point, external (non-view) calls only happen before the first storage access (read or write) or after the last storage write, so that no external call observes an intermediate state and no write relies on a storage value that the call may have changed.
 - [`ReentrancyView.spec`](specs/ReentrancyView.spec) checks that within a single entry point, external view calls only happen before the first storage write or after the last one, so that no view call observes an intermediate state; reads around them are harmless since a view call cannot change the state.
-- [`ExternalCalls.spec`](specs/ExternalCalls.spec) lists the external calls of every entry point: their targets and how many `CALL`s are made.
+- [`ExternalCalls.spec`](specs/ExternalCalls.spec) lists the message calls of every entry point: how many `CALL`s are made to each address, and which addresses are `STATICCALL`ed.
   For example `withdraw` only calls the loan token, once, and `take` calls the loan token twice and the buyer and seller callbacks if they are set, and only view calls the ratifier, the enter gate and the market's oracles.
-  Every other entry point makes no external call, and Midnight never sends ETH nor uses `DELEGATECALL` or `CALLCODE`.
+  `multicall` only `DELEGATECALL`s Midnight itself, every other entry point makes no other message call, and Midnight never sends ETH nor uses `CALLCODE`.
+  Contract creations (the `CREATE2` storing a new market's parameters) are not message calls and are not tracked.
 - [`SumOfCreditsAxiomatic.spec`](specs/SumOfCreditsAxiomatic.spec) checks that the sum of all lender's credit values (rescaled according to the math in UpdatePosition to the current loss factor) plus the continuous fee are backed by totalUnits (which is the sum of all recorded debts plus the withdrawable amount).
 
 ## Positions health and liquidation
