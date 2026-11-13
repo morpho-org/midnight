@@ -22,11 +22,131 @@ contract ReceivableTokenTest is BaseTest {
 
     uint256 internal constant REPORTED = 1_000e18;
     uint256 internal constant OTHER_REPORTED = 500e18;
-    uint256 internal constant LENDER_REPORTED = 200e18;
+    uint256 internal constant SECP256K1_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
+    uint256 internal constant STEALTH_SPENDING_PRIVATE_KEY = 12345;
+    uint256 internal constant STEALTH_VIEWING_PRIVATE_KEY = 54321;
+    uint256 internal constant STEALTH_EPHEMERAL_PRIVATE_KEY = 67890;
+    // forgefmt: disable-start
+    /*
+// Pinned: @scopelift/stealth-address-sdk@1.0.0-beta.5 (viem@2.57.7), @noble/secp256k1@2.3.0, @noble/hashes@1.8.0, @openzeppelin/merkle-tree@1.0.8.
+// Run with: bun vectors.ts (bun 1.4.2; the SDK's dist uses extensionless ESM imports that Node cannot resolve).
+import { computeStealthKey, generateStealthAddress, VALID_SCHEME_ID } from "@scopelift/stealth-address-sdk";
+import * as secp from "@noble/secp256k1";
+import { keccak_256 } from "@noble/hashes/sha3";
+import { bytesToHex } from "@noble/hashes/utils";
+import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
+
+const hex32 = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
+const hex = (bytes: Uint8Array) => `0x${bytesToHex(bytes)}`;
+const assertEq = (a: string, b: string, what: string) => {
+  if (a.toLowerCase() !== b.toLowerCase()) throw new Error(`${what} mismatch: ${a} != ${b}`);
+};
+
+const n = secp.CURVE.n;
+const k = 12345n; // spending private key
+const v = 54321n; // viewing private key
+const r = 67890n; // ephemeral private key
+const K = secp.getPublicKey(secp.etc.hexToBytes(hex32(k).slice(2)), true);
+const V = secp.getPublicKey(secp.etc.hexToBytes(hex32(v).slice(2)), true);
+const stealthMetaAddressURI = `st:eth:${hex(K)}${bytesToHex(V)}`;
+
+// SDK: owner side, then user side.
+const sdk = generateStealthAddress({
+  stealthMetaAddressURI,
+  schemeId: VALID_SCHEME_ID.SCHEME_ID_1,
+  ephemeralPrivateKey: secp.etc.hexToBytes(hex32(r).slice(2)),
+});
+const sdkPrivateKey = computeStealthKey({
+  ephemeralPublicKey: sdk.ephemeralPublicKey as `0x${string}`,
+  schemeId: VALID_SCHEME_ID.SCHEME_ID_1,
+  spendingPrivateKey: hex32(k) as `0x${string}`,
+  viewingPrivateKey: hex32(v) as `0x${string}`,
+});
+
+// Plain @noble/secp256k1 cross-check.
+const R = secp.ProjectivePoint.BASE.multiply(r);
+const S = secp.ProjectivePoint.fromHex(V).multiply(r);
+const userS = R.multiply(v);
+if (!S.equals(userS)) throw new Error("shared secret mismatch");
+const SCompressed = S.toRawBytes(true);
+const sh = BigInt(hex(keccak_256(SCompressed)));
+const viewTag = `0x${hex32(sh).slice(2, 4)}`;
+const P = secp.ProjectivePoint.fromHex(K).add(secp.ProjectivePoint.BASE.multiply(sh)).toRawBytes(false);
+const key = `0x${bytesToHex(keccak_256(P.slice(1)).slice(-20))}`;
+const privateKey = (k + sh) % n;
+if (secp.ProjectivePoint.BASE.multiply(privateKey).equals(secp.ProjectivePoint.fromHex(P)) === false) {
+  throw new Error("stealth private key mismatch");
+}
+
+assertEq(sdk.ephemeralPublicKey, hex(R.toRawBytes(true)), "R");
+assertEq(sdk.viewTag, viewTag, "view tag");
+assertEq(sdk.stealthAddress, key, "stealth address");
+assertEq(sdkPrivateKey, hex32(privateKey), "stealth private key");
+
+const tree = StandardMerkleTree.of(
+  [
+    [sdk.stealthAddress, "25000000000000000000"],
+    ["0x000000000000000000000000000000000000dEaD", "1000000000000000000"],
+  ],
+  ["address", "uint256"],
+);
+
+const Su = S.toRawBytes(false);
+const Ru = R.toRawBytes(false);
+const Ku = secp.ProjectivePoint.fromHex(K).toRawBytes(false);
+const Vu = secp.ProjectivePoint.fromHex(V).toRawBytes(false);
+console.log(`k=${hex32(k)}`);
+console.log(`v=${hex32(v)}`);
+console.log(`r=${hex32(r)}`);
+console.log(`stealthMetaAddressURI=${stealthMetaAddressURI}`);
+console.log(`Kx=${hex(Ku.slice(1, 33))}`);
+console.log(`Ky=${hex(Ku.slice(33))}`);
+console.log(`Vx=${hex(Vu.slice(1, 33))}`);
+console.log(`Vy=${hex(Vu.slice(33))}`);
+console.log(`R=${sdk.ephemeralPublicKey}`);
+console.log(`Rx=${hex(Ru.slice(1, 33))}`);
+console.log(`Ry=${hex(Ru.slice(33))}`);
+console.log(`S=${hex(SCompressed)}`);
+console.log(`Sx=${hex(Su.slice(1, 33))}`);
+console.log(`Sy=${hex(Su.slice(33))}`);
+console.log(`sh=${hex32(sh)}`);
+console.log(`viewTag=${sdk.viewTag}`);
+console.log(`key=${sdk.stealthAddress}`);
+console.log(`privateKey=${sdkPrivateKey}`);
+console.log(`root=${tree.root}`);
+console.log(`leaf=${tree.leafHash([sdk.stealthAddress, "25000000000000000000"])}`);
+console.log(`proof=${JSON.stringify(tree.getProof(0))}`);
+*/
+    // forgefmt: disable-end
+    uint256 internal constant STEALTH_SPENDING_PUBLIC_X =
+        0xf01d6b9018ab421dd410404cb869072065522bf85734008f105cf385a023a80f;
+    uint256 internal constant STEALTH_SPENDING_PUBLIC_Y =
+        0x0eba29d0f0c5408ed681984dc525982abefccd9f7ff01dd26da4999cf3f6a295;
+    uint256 internal constant STEALTH_VIEWING_PUBLIC_X =
+        0x9d2d304374a5d5571d7d8c39db99c8eed149767dcaf70be1a356a08376caa34f;
+    uint256 internal constant STEALTH_VIEWING_PUBLIC_Y =
+        0x10d960983fcdeb4ca99b41c2e846add30c0dec73de02aae3aef5f609a70309a5;
+    uint256 internal constant STEALTH_EPHEMERAL_PUBLIC_X =
+        0x54006a630e70fca8d45a696d7dba3a1cb7d81cc830cfce3be0f634373aac3f0a;
+    uint256 internal constant STEALTH_EPHEMERAL_PUBLIC_Y =
+        0x32d92c4207b931604884cfdd494c2af6ee5995f490180cbd8fa39200fefe47f8;
+    bytes internal constant STEALTH_EPHEMERAL_PUBLIC_KEY =
+        hex"0254006a630e70fca8d45a696d7dba3a1cb7d81cc830cfce3be0f634373aac3f0a";
+    uint256 internal constant STEALTH_SHARED_X = 0xb4c7a6f5a20bf666e43af95e5fa04d19bb44dd0d1c9ff0e80817b3e323b4e108;
+    uint256 internal constant STEALTH_SHARED_Y = 0xfd8d371ad2e3b47d58219b030fb22649347a0ece9ed68655d8323e533fd6591b;
+    bytes internal constant STEALTH_SHARED_COMPRESSED =
+        hex"03b4c7a6f5a20bf666e43af95e5fa04d19bb44dd0d1c9ff0e80817b3e323b4e108";
+    uint256 internal constant STEALTH_HASHED_SHARED_SECRET =
+        0x218ead9be1508f0f1819fe12f4de8764f4db34785a8c1703d4d6f4653bc8c175;
+    uint8 internal constant STEALTH_VIEW_TAG = 0x21;
+    address internal constant STEALTH_KEY = 0xfd028863fCC80F7bb86b41D964cF3B41dc84B9B0;
+    uint256 internal constant STEALTH_PRIVATE_KEY = 0x218ead9be1508f0f1819fe12f4de8764f4db34785a8c1703d4d6f4653bc8f1ae;
+    bytes32 internal constant STEALTH_TREE_ROOT = 0xbcbde96952bf9a97b689f52d9ba06713555359c7ae63745b799086a6d002513b;
+    bytes32 internal constant STEALTH_TREE_PROOF = 0x2cd783aaad1a726bc1eb1972b42e56bbacddc40ccb34415a6f2b4ee19c89c8f3;
     uint256 internal constant TICK = MAX_TICK - 400; // price < 1, multiple of the default tick spacing.
     bytes32 internal constant ROOT_A = keccak256("A");
-    bytes32 internal constant ROOT_B = keccak256("B");
     bytes32 internal constant ROOT_C = keccak256("C");
+    bytes32 internal constant ROOT_D = keccak256("D");
 
     address internal payer = makeAddr("payer");
     address internal stranger = makeAddr("stranger");
@@ -41,6 +161,7 @@ contract ReceivableTokenTest is BaseTest {
     bytes32[] internal lenderProof; // lender on token.
     bytes32[] internal emptyProof; // proof of a leaf in a single-leaf root.
     uint256 internal maturity;
+    uint256 internal rootNonce;
 
     function setUp() public override {
         super.setUp();
@@ -60,14 +181,13 @@ contract ReceivableTokenTest is BaseTest {
         );
         // Roots are per token: the token's has two leaves, the other token's a single one.
         bytes32 leaf = MerkleProofLib.leaf(minter, REPORTED);
-        bytes32 lenderLeaf = MerkleProofLib.leaf(lender, LENDER_REPORTED);
+        bytes32 lenderLeaf = MerkleProofLib.leaf(lender, 0);
         bytes32 otherLeaf = MerkleProofLib.leaf(otherMinter, OTHER_REPORTED);
         bytes32 root = _hashPair(leaf, lenderLeaf);
         proof.push(lenderLeaf);
         lenderProof.push(leaf);
         vm.startPrank(minter);
         token.setRoot(ROOT_A, root);
-        token.setRoot(ROOT_B, root);
         token.setRoot(ROOT_C, MerkleProofLib.leaf(liquidator, 0));
         vm.stopPrank();
         vm.prank(otherMinter);
@@ -75,7 +195,7 @@ contract ReceivableTokenTest is BaseTest {
 
         // The lender is whitelisted by proving its leaf, without minting.
         vm.prank(lender);
-        token.mint(ROOT_A, 0, LENDER_REPORTED, lenderProof);
+        token.mint(ROOT_A, lender, 0, lenderProof, lender, 0, bytes32(0), bytes32(0));
 
         deal(address(loanToken), lender, 10 * REPORTED);
         deal(address(loanToken), payer, 10 * REPORTED);
@@ -87,6 +207,23 @@ contract ReceivableTokenTest is BaseTest {
 
     function _hashPair(bytes32 a, bytes32 b) internal pure returns (bytes32) {
         return a < b ? keccak256(bytes.concat(a, b)) : keccak256(bytes.concat(b, a));
+    }
+
+    function _setSingleLeafRoot(IReceivableToken _token, bytes32 rootId, address key, uint256 amount)
+        internal
+        returns (bytes32 leaf)
+    {
+        leaf = MerkleProofLib.leaf(key, amount);
+        vm.prank(_token.owner());
+        _token.setRoot(rootId, leaf);
+    }
+
+    function _mintDigest(IReceivableToken _token, bytes32 leaf, address to) internal view returns (bytes32) {
+        return keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32", keccak256(abi.encode(block.chainid, address(_token), leaf, to))
+            )
+        );
     }
 
     function _market() internal view returns (Market memory) {
@@ -125,15 +262,20 @@ contract ReceivableTokenTest is BaseTest {
         offer.tick = TICK;
     }
 
-    function _mint(uint256 amount) internal {
+    function _mint(uint256 amount) internal returns (bytes32 leaf) {
+        bytes32 rootId = keccak256(abi.encode(address(token), rootNonce++));
+        address key = address(uint160(uint256(keccak256(abi.encode(rootId)))));
+        leaf = MerkleProofLib.leaf(key, amount);
         vm.prank(minter);
-        token.mint(ROOT_A, amount, REPORTED, proof);
+        token.setRoot(rootId, leaf);
+        vm.prank(key);
+        token.mint(rootId, key, amount, emptyProof, minter, 0, bytes32(0), bytes32(0));
     }
 
     /// @dev The liquidator is whitelisted by proving its `reported` = 0 leaf under ROOT_C, without minting.
     function _whitelistLiquidator() internal {
         vm.prank(liquidator);
-        token.mint(ROOT_C, 0, 0, emptyProof);
+        token.mint(ROOT_C, liquidator, 0, emptyProof, liquidator, 0, bytes32(0), bytes32(0));
     }
 
     /// @dev Receipts are plain transfers to the token.
@@ -223,72 +365,239 @@ contract ReceivableTokenTest is BaseTest {
 
     function testMint(uint256 amount) public {
         amount = bound(amount, 1, REPORTED);
-        _mint(amount);
+        bytes32 leaf = _mint(amount);
         assertEq(token.balanceOf(minter), amount, "balance");
         assertEq(token.totalSupply(), amount, "supply");
-        assertEq(token.minted(ROOT_A, minter), amount, "minted");
-    }
-
-    function testMintUpToCapacity() public {
-        _mint(600e18);
-        _mint(400e18);
-        vm.expectRevert(IReceivableToken.ExceedsReceivables.selector);
-        _mint(1);
-    }
-
-    function testMintCapacityIsPerReport() public {
-        _mint(REPORTED);
-        vm.prank(minter);
-        token.mint(ROOT_B, REPORTED, REPORTED, proof);
-        assertEq(token.balanceOf(minter), 2 * REPORTED, "balance");
+        assertTrue(token.minted(leaf), "minted");
     }
 
     function testMintOtherMinter() public {
         vm.prank(otherMinter);
-        otherToken.mint(ROOT_A, OTHER_REPORTED, OTHER_REPORTED, otherProof);
+        otherToken.mint(ROOT_A, otherMinter, OTHER_REPORTED, otherProof, otherMinter, 0, bytes32(0), bytes32(0));
         assertEq(otherToken.balanceOf(otherMinter), OTHER_REPORTED, "balance");
 
         // Roots are per token: the minter's proof is not valid on the other token.
         vm.prank(minter);
         vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        otherToken.mint(ROOT_A, 1, REPORTED, proof);
-    }
-
-    function testMintByAnotherAccountWithAllowance() public {
-        vm.prank(lender);
-        token.mint(ROOT_A, LENDER_REPORTED, LENDER_REPORTED, lenderProof);
-        assertEq(token.balanceOf(lender), LENDER_REPORTED, "lender balance");
-        assertEq(token.minted(ROOT_A, lender), LENDER_REPORTED, "lender minted");
-
-        vm.prank(lender);
-        vm.expectRevert(IReceivableToken.ExceedsReceivables.selector);
-        token.mint(ROOT_A, 1, LENDER_REPORTED, lenderProof);
-
-        // Allowances are per account: the minter's is untouched.
-        _mint(REPORTED);
-        assertEq(token.totalSupply(), REPORTED + LENDER_REPORTED, "supply");
+        otherToken.mint(ROOT_A, minter, 1, proof, minter, 0, bytes32(0), bytes32(0));
     }
 
     function testMintInvalidProof() public {
         vm.startPrank(minter);
         vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        token.mint(ROOT_A, 1, REPORTED + 1, proof);
+        token.mint(ROOT_A, minter, REPORTED + 1, proof, minter, 0, bytes32(0), bytes32(0));
         vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        token.mint(ROOT_A, 1, REPORTED, lenderProof);
+        token.mint(ROOT_A, minter, REPORTED, lenderProof, minter, 0, bytes32(0), bytes32(0));
         vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        token.mint(keccak256("unknown"), 1, REPORTED, proof);
+        token.mint(keccak256("unknown"), minter, REPORTED, proof, minter, 0, bytes32(0), bytes32(0));
         vm.stopPrank();
 
-        // A leaf only works for its own account.
+        // A leaf only works for its own key.
         vm.prank(lender);
         vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        token.mint(ROOT_A, 1, REPORTED, proof);
+        token.mint(ROOT_A, lender, REPORTED, proof, lender, 0, bytes32(0), bytes32(0));
 
         // An invalid proof does not whitelist the caller.
         vm.prank(stranger);
         vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        token.mint(ROOT_A, 1, REPORTED, proof);
+        token.mint(ROOT_A, minter, REPORTED + 1, proof, stranger, 0, bytes32(0), bytes32(0));
         assertFalse(token.isWhitelisted(stranger), "stranger not whitelisted");
+    }
+
+    function testStealthDerivationMatches() public {
+        address key = STEALTH_KEY;
+        uint256 privateKey = STEALTH_PRIVATE_KEY;
+        uint256 hashedSharedSecret = STEALTH_HASHED_SHARED_SECRET;
+        Vm.Wallet memory spending = vm.createWallet(STEALTH_SPENDING_PRIVATE_KEY);
+        Vm.Wallet memory viewing = vm.createWallet(STEALTH_VIEWING_PRIVATE_KEY);
+        Vm.Wallet memory ephemeral = vm.createWallet(STEALTH_EPHEMERAL_PRIVATE_KEY);
+        // The owner computes S = r·V and the user S = v·R.
+        Vm.Wallet memory ownerShared =
+            vm.createWallet(mulmod(STEALTH_EPHEMERAL_PRIVATE_KEY, STEALTH_VIEWING_PRIVATE_KEY, SECP256K1_N));
+        Vm.Wallet memory userShared =
+            vm.createWallet(mulmod(STEALTH_VIEWING_PRIVATE_KEY, STEALTH_EPHEMERAL_PRIVATE_KEY, SECP256K1_N));
+        bytes memory compressedEphemeral =
+            bytes.concat(bytes1(ephemeral.publicKeyY % 2 == 0 ? 0x02 : 0x03), bytes32(ephemeral.publicKeyX));
+        bytes memory compressedShared =
+            bytes.concat(bytes1(ownerShared.publicKeyY % 2 == 0 ? 0x02 : 0x03), bytes32(ownerShared.publicKeyX));
+
+        assertEq(spending.publicKeyX, STEALTH_SPENDING_PUBLIC_X, "spending public key x");
+        assertEq(spending.publicKeyY, STEALTH_SPENDING_PUBLIC_Y, "spending public key y");
+        assertEq(viewing.publicKeyX, STEALTH_VIEWING_PUBLIC_X, "viewing public key x");
+        assertEq(viewing.publicKeyY, STEALTH_VIEWING_PUBLIC_Y, "viewing public key y");
+        assertEq(ephemeral.publicKeyX, STEALTH_EPHEMERAL_PUBLIC_X, "ephemeral public key x");
+        assertEq(ephemeral.publicKeyY, STEALTH_EPHEMERAL_PUBLIC_Y, "ephemeral public key y");
+        assertEq(compressedEphemeral, STEALTH_EPHEMERAL_PUBLIC_KEY, "compressed ephemeral public key");
+        assertEq(ownerShared.publicKeyX, STEALTH_SHARED_X, "shared point x");
+        assertEq(ownerShared.publicKeyY, STEALTH_SHARED_Y, "shared point y");
+        assertEq(userShared.publicKeyX, STEALTH_SHARED_X, "user shared point x");
+        assertEq(userShared.publicKeyY, STEALTH_SHARED_Y, "user shared point y");
+        assertEq(compressedShared, STEALTH_SHARED_COMPRESSED, "compressed shared point");
+        assertEq(uint256(keccak256(compressedShared)), hashedSharedSecret, "hashed shared secret");
+        assertEq(uint8(hashedSharedSecret >> 248), STEALTH_VIEW_TAG, "view tag");
+        assertEq(
+            addmod(STEALTH_SPENDING_PRIVATE_KEY, hashedSharedSecret, SECP256K1_N), privateKey, "stealth private key"
+        );
+        assertEq(vm.addr(privateKey), key, "owner and user derive same key");
+    }
+
+    function testStealthChunkFromStandardMerkleTree() public {
+        address key = STEALTH_KEY;
+        uint256 privateKey = STEALTH_PRIVATE_KEY;
+        uint256 amount = 25e18;
+        address to = makeAddr("standard merkle destination");
+        bytes32 leaf = MerkleProofLib.leaf(key, amount);
+        bytes32[] memory stealthProof = new bytes32[](1);
+        stealthProof[0] = STEALTH_TREE_PROOF;
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, _mintDigest(token, leaf, to));
+
+        vm.prank(minter);
+        token.setRoot(ROOT_D, STEALTH_TREE_ROOT);
+        vm.prank(stranger);
+        token.mint(ROOT_D, key, amount, stealthProof, to, v, r, s);
+
+        assertEq(token.balanceOf(to), amount, "destination balance");
+    }
+
+    function testRelayedMintToChosenDestination() public {
+        address key = STEALTH_KEY;
+        uint256 privateKey = STEALTH_PRIVATE_KEY;
+        uint256 amount = 25e18;
+        bytes32 rootId = ROOT_D;
+        bytes32 leaf = _setSingleLeafRoot(token, rootId, key, amount);
+        address to = makeAddr("mint destination");
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, _mintDigest(token, leaf, to));
+
+        vm.prank(stranger);
+        token.mint(rootId, key, amount, emptyProof, to, v, r, s);
+
+        assertEq(token.balanceOf(to), amount, "destination balance");
+        assertTrue(token.isWhitelisted(to), "destination whitelisted");
+        assertTrue(token.minted(leaf), "leaf minted");
+    }
+
+    function testDirectMint() public {
+        address key = stranger;
+        uint256 amount = 7e18;
+        bytes32 leaf = _setSingleLeafRoot(token, ROOT_D, key, amount);
+
+        vm.prank(key);
+        token.mint(ROOT_D, key, amount, emptyProof, key, 0, bytes32(0), bytes32(0));
+
+        assertEq(token.balanceOf(key), amount, "key balance");
+        assertTrue(token.minted(leaf), "leaf minted");
+    }
+
+    function testLeafMintsOnce() public {
+        uint256 amount = 1e18;
+        _setSingleLeafRoot(token, ROOT_D, minter, amount);
+
+        vm.prank(minter);
+        token.mint(ROOT_D, minter, amount, emptyProof, minter, 0, bytes32(0), bytes32(0));
+        vm.prank(minter);
+        vm.expectRevert(IReceivableToken.AlreadyMinted.selector);
+        token.mint(ROOT_D, minter, amount, emptyProof, minter, 0, bytes32(0), bytes32(0));
+    }
+
+    function testReplacedRootKeepsLeafMinted() public {
+        uint256 amount = 1e18;
+        bytes32 leaf = _setSingleLeafRoot(token, ROOT_D, minter, amount);
+
+        vm.prank(minter);
+        token.mint(ROOT_D, minter, amount, emptyProof, minter, 0, bytes32(0), bytes32(0));
+
+        bytes32 otherLeaf = MerkleProofLib.leaf(stranger, 2e18);
+        bytes32[] memory replacementProof = new bytes32[](1);
+        replacementProof[0] = otherLeaf;
+
+        vm.prank(minter);
+        token.setRoot(ROOT_D, _hashPair(leaf, otherLeaf));
+
+        vm.prank(minter);
+        vm.expectRevert(IReceivableToken.AlreadyMinted.selector);
+        token.mint(ROOT_D, minter, amount, replacementProof, minter, 0, bytes32(0), bytes32(0));
+    }
+
+    function testSignatureForDifferentDestinationIsInvalid() public {
+        address key = STEALTH_KEY;
+        uint256 privateKey = STEALTH_PRIVATE_KEY;
+        uint256 amount = 1e18;
+        bytes32 leaf = _setSingleLeafRoot(token, ROOT_D, key, amount);
+        address signedTo = makeAddr("signed destination");
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, _mintDigest(token, leaf, signedTo));
+
+        vm.prank(stranger);
+        vm.expectRevert(IReceivableToken.InvalidSignature.selector);
+        token.mint(ROOT_D, key, amount, emptyProof, makeAddr("other destination"), v, r, s);
+    }
+
+    function testSignatureForOtherChainIsInvalid() public {
+        address key = STEALTH_KEY;
+        uint256 privateKey = STEALTH_PRIVATE_KEY;
+        uint256 amount = 1e18;
+        bytes32 leaf = _setSingleLeafRoot(token, ROOT_D, key, amount);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, _mintDigest(token, leaf, stranger));
+        vm.chainId(block.chainid + 1);
+
+        vm.prank(stranger);
+        vm.expectRevert(IReceivableToken.InvalidSignature.selector);
+        token.mint(ROOT_D, key, amount, emptyProof, stranger, v, r, s);
+    }
+
+    function testRawHashSignatureIsInvalid() public {
+        address key = STEALTH_KEY;
+        uint256 privateKey = STEALTH_PRIVATE_KEY;
+        uint256 amount = 1e18;
+        bytes32 leaf = _setSingleLeafRoot(token, ROOT_D, key, amount);
+        address to = makeAddr("raw hash destination");
+        bytes32 rawHash = keccak256(abi.encode(block.chainid, address(token), leaf, to));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, rawHash);
+
+        vm.prank(stranger);
+        vm.expectRevert(IReceivableToken.InvalidSignature.selector);
+        token.mint(ROOT_D, key, amount, emptyProof, to, v, r, s);
+    }
+
+    function testZeroKeyCannotMintWithInvalidSignature() public {
+        uint256 amount = 1e18;
+        _setSingleLeafRoot(token, ROOT_D, address(0), amount);
+
+        vm.prank(stranger);
+        vm.expectRevert(IReceivableToken.InvalidSignature.selector);
+        token.mint(ROOT_D, address(0), amount, emptyProof, stranger, 0, bytes32(0), bytes32(0));
+    }
+
+    function testMalleatedSignatureMintsSameLeaf() public {
+        address key = STEALTH_KEY;
+        uint256 privateKey = STEALTH_PRIVATE_KEY;
+        uint256 amount = 1e18;
+        bytes32 leaf = _setSingleLeafRoot(token, ROOT_D, key, amount);
+        address to = makeAddr("malleated signature destination");
+        bytes32 digest = _mintDigest(token, leaf, to);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+        bytes32 highS = bytes32(SECP256K1_N - uint256(s));
+        uint8 highV = v == 27 ? uint8(28) : uint8(27);
+
+        vm.prank(stranger);
+        token.mint(ROOT_D, key, amount, emptyProof, to, highV, r, highS);
+        assertEq(token.balanceOf(to), amount, "malleated signature mints to signed destination");
+
+        vm.prank(stranger);
+        vm.expectRevert(IReceivableToken.AlreadyMinted.selector);
+        token.mint(ROOT_D, key, amount, emptyProof, to, v, r, s);
+    }
+
+    function testOwnerCannotSignWithStealthOffsetAlone() public {
+        // The owner and the viewing-key holder both know s_h, but neither can mint without the spending key k.
+        address key = STEALTH_KEY;
+        uint256 hashedSharedSecret = STEALTH_HASHED_SHARED_SECRET;
+        uint256 amount = 1e18;
+        bytes32 leaf = _setSingleLeafRoot(token, ROOT_D, key, amount);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(hashedSharedSecret, _mintDigest(token, leaf, stranger));
+
+        vm.prank(stranger);
+        vm.expectRevert(IReceivableToken.InvalidSignature.selector);
+        token.mint(ROOT_D, key, amount, emptyProof, stranger, v, r, s);
     }
 
     /// EXCESS RECEIPTS ///
@@ -297,7 +606,7 @@ contract ReceivableTokenTest is BaseTest {
         _mint(300e18);
         _pay(token, 500e18);
 
-        // The minter takes the 200 of excess by minting within its allowance and redeeming.
+        // The minter takes the 200 of excess by minting another chunk and redeeming.
         _mint(200e18);
         vm.prank(minter);
         token.redeem(200e18, minter);
@@ -399,9 +708,12 @@ contract ReceivableTokenTest is BaseTest {
 
     function testMintWhitelists() public {
         assertFalse(token.isWhitelisted(minter), "not whitelisted");
+        vm.prank(minter);
+        token.setRoot(ROOT_A, MerkleProofLib.leaf(minter, 0));
         vm.expectEmit(address(token));
         emit IReceivableToken.Whitelist(minter);
-        _mint(0);
+        vm.prank(minter);
+        token.mint(ROOT_A, minter, 0, emptyProof, minter, 0, bytes32(0), bytes32(0));
         assertTrue(token.isWhitelisted(minter), "whitelisted");
 
         // A second mint does not emit Whitelist again.

@@ -57,10 +57,33 @@ For example, with 100 reported, 60 minted and 50 received, a rate of 0.5 lets th
 The token is its own collateral oracle on Midnight markets whose loan token is the asset, so a markdown makes those positions liquidatable and realizes the uncovered debt as bad debt shared by the market's lenders.
 Redemptions before the owner updates the rate are first come, first served, like oracle lag before a liquidation.
 
-Any account with an allowance `mint`s tokens, up to `reported` under a report, where `reported` comes from Merkle roots set on the token by its owner (OpenZeppelin `StandardMerkleTree` layout with `(account, reported)` leaves, see `MerkleProofLib` in `receivable-token/libraries`).
-The owner allocates the receipts expected by the token between accounts this way, and receipts in excess of the outstanding tokens are extracted the same way, by minting within one's allowance and redeeming.
+The holder of a chunk's `key` `mint`s the chunk's `reported` once, to an account `to` of its choice, where chunks come from Merkle roots set on the token by its owner (OpenZeppelin `StandardMerkleTree` layout with `(key, reported)` leaves, see `MerkleProofLib` in `receivable-token/libraries`).
+The owner allocates the receipts expected by the token in chunks this way, and receipts in excess of the outstanding tokens are extracted the same way, by minting unminted chunks and redeeming.
+`mint` is called by `key` itself, or relayed by anyone with `key`'s EIP-191 (`personal_sign`) signature over `keccak256(abi.encode(block.chainid, address(this), leaf, to))`, which fixes `to`.
 
-Each token has an owner, who sets its reports. Whitelisted accounts are Midnight plus every account that has submitted a valid proof under any report, by calling `mint`, possibly with amount 0; the owner can whitelist a non-minter, such as a liquidator or a buyer that wants to keep tokens, by including a leaf with `reported` = 0.
+Each `key` is a one-time stealth address derived with [ERC-5564](https://eips.ethereum.org/EIPS/eip-5564) scheme 1, as implemented by ScopeLift's [`@scopelift/stealth-address-sdk`](https://github.com/ScopeLift/stealth-address-sdk).
+The user registers a spending public key `K = k·G` and a viewing public key `V = v·G` once with the owner.
+For each chunk, the owner picks a fresh `r`, sets `s_h = keccak256(r·V)`, with the shared point hashed in its 33-byte compressed encoding, and `key = address(K + s_h·G)`, and serves `R = r·G` with the leaf.
+The user computes the same `s_h` from `v·R`, and from it `key`'s private key `(k + s_h) mod n`.
+The owner, and anyone holding `v`, knows `s_h` but cannot mint the chunk without `k`.
+Outsiders cannot compute `key`, so they cannot brute-force a leaf's amount, as long as every leaf uses a fresh `key`.
+
+```mermaid
+sequenceDiagram
+    participant U as User (front end)
+    participant O as Owner (off-chain)
+    participant T as ReceivableToken
+    Note over U: once:<br/>spending key k, viewing key v<br/>K = k·G<br/>V = v·G
+    U->>O: meta-address st:eth:0x{K}{V}<br/>(K, V compressed)
+    Note over O: per chunk:<br/>random r<br/>R = r·G<br/>S = r·V<br/>s_h = keccak256(compressed S)<br/>K' = K + s_h·G<br/>key = address(K')<br/>leaf = H(H(key, reported))
+    O->>T: setRoot(rootId, root)
+    O-->>U: R, view tag s_h[0],<br/>key, reported, proof
+    Note over U: S = v·R<br/>s_h = keccak256(compressed S)<br/>k' = (k + s_h) mod n<br/>(k'·G = K', so k' signs for key)<br/>digest = keccak256(abi.encode(<br/>chainid, token, leaf, to))<br/>(sigV, sigR, sigS) =<br/>personal_sign(k', digest)
+    U->>T: mint(rootId, key, reported, proof,<br/>to, sigV, sigR, sigS)<br/>directly or via any relayer
+    Note over T: verify proof against roots[rootId]<br/>mark leaf minted<br/>signer = ecrecover(<br/>EIP-191 hash of digest,<br/>sigV, sigR, sigS)<br/>require signer == key<br/>whitelist and credit the to account
+```
+
+Each token has an owner, who sets its reports. Whitelisted accounts are Midnight plus every `to` of a `mint`, possibly with amount 0; the owner can whitelist a non-minter, such as a liquidator or a buyer that wants to keep tokens, by including a leaf with `reported` = 0 keyed by that account.
 Whitelisting is permanent: leaving an account out of a later report does not remove it. Only whitelisted accounts hold tokens across transactions.
 Any other account can still receive tokens, but only transiently: the token credits them in transient storage, calls `onReceivableTokenReceived` on the receiver, and reverts if the receiver still holds tokens when the call returns.
 The receiver must redeem them or transfer them to a whitelisted account in that call, so accounts without code cannot receive tokens unless whitelisted.

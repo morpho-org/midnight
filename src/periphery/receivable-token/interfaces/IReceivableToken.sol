@@ -7,11 +7,12 @@ import {IOracle} from "../../../interfaces/IOracle.sol";
 
 interface IReceivableToken is IERC20, IOracle {
     /// ERRORS ///
-    error ExceedsReceivables();
+    error AlreadyMinted();
     error InsufficientAllowance();
     error InsufficientBalance();
     error InsufficientCash();
     error InvalidProof();
+    error InvalidSignature();
     error NotOwner();
     error RateTooHigh();
     error TransientBalanceNotSettled();
@@ -25,7 +26,7 @@ interface IReceivableToken is IERC20, IOracle {
     event SetRoot(bytes32 indexed rootId, bytes32 root);
     event SetRate(uint256 rate);
     event Whitelist(address indexed account);
-    event Mint(bytes32 indexed rootId, address indexed account, uint256 amount, uint256 reported);
+    event Mint(bytes32 indexed rootId, bytes32 indexed leaf, address indexed to, uint256 amount);
     event Redeem(address indexed caller, address indexed receiver, uint256 amount, uint256 assets);
 
     /// STORAGE GETTERS ///
@@ -38,7 +39,7 @@ interface IReceivableToken is IERC20, IOracle {
     function owner() external view returns (address);
     function isWhitelisted(address account) external view returns (bool);
     function roots(bytes32 rootId) external view returns (bytes32);
-    function minted(bytes32 rootId, address account) external view returns (uint256);
+    function minted(bytes32 leaf) external view returns (bool);
     function rate() external view returns (uint256);
 
     /// VIEW FUNCTIONS ///
@@ -50,7 +51,16 @@ interface IReceivableToken is IERC20, IOracle {
     function setOwner(address newOwner) external;
     function setRoot(bytes32 rootId, bytes32 newRoot) external;
     function setRate(uint256 newRate) external;
-    function mint(bytes32 rootId, uint256 amount, uint256 reported, bytes32[] memory proof) external;
+    function mint(
+        bytes32 rootId,
+        address key,
+        uint256 reported,
+        bytes32[] memory proof,
+        address to,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
     function redeem(uint256 amount, address receiver) external returns (uint256 assets);
     // forgefmt: disable-end
 }
