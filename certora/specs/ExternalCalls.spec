@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Morpho Association
 
+using Utils as Utils;
+
 methods {
+    function Utils.toId(Midnight.Market) external returns (bytes32) envfree;
+    function collateral(bytes32, address, uint256) external returns (uint128) envfree;
+
     // These functions are over-approximated: it explores more paths, and the arithmetic does not decide which external calls are made.
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function UtilsLib.mulDivDown(uint256, uint256, uint256) internal returns (uint256) => NONDET;
@@ -95,15 +100,17 @@ rule repayCalls(env e, Midnight.Market market, uint256 units, address onBehalf, 
     assert forall address a. !staticCalled[a];
 }
 
-// Check that supplyCollateral calls the collateral token once (transfer from the caller), and only view calls the oracle of that collateral.
+// Check that supplyCollateral calls the collateral token once (transfer from the caller), and view calls the oracle of that collateral exactly when it activates it.
 rule supplyCollateralCalls(env e, Midnight.Market market, uint256 collateralIndex, uint256 assets, address onBehalf) {
     setUp();
+
+    bool activates = collateral(Utils.toId(market), onBehalf, collateralIndex) == 0 && assets > 0;
 
     supplyCollateral(e, market, collateralIndex, assets, onBehalf);
 
     assert callsTo[market.collateralParams[collateralIndex].token] == 1;
     assert forall address a. a != market.collateralParams[collateralIndex].token => callsTo[a] == 0;
-    assert forall address a. staticCalled[a] => a == market.collateralParams[collateralIndex].oracle;
+    assert forall address a. staticCalled[a] <=> activates && a == market.collateralParams[collateralIndex].oracle;
 }
 
 // Check that withdrawCollateral calls the collateral token once (transfer to the receiver), and only view calls the market's oracles.
