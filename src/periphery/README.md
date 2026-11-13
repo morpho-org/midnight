@@ -68,21 +68,6 @@ The user computes the same `s_h` from `v·R`, and from it `key`'s private key `(
 The owner, and anyone holding `v`, knows `s_h` but cannot mint the chunk without `k`.
 Outsiders cannot compute `key`, so they cannot brute-force a leaf's amount, as long as every leaf uses a fresh `key`.
 
-```mermaid
-sequenceDiagram
-    participant U as User (front end)
-    participant O as Owner (off-chain)
-    participant T as ReceivableToken
-    Note over U: once:<br/>spending key k, viewing key v<br/>K = k·G<br/>V = v·G
-    U->>O: meta-address st:eth:0x{K}{V}<br/>(K, V compressed)
-    Note over O: per chunk:<br/>random r<br/>R = r·G<br/>S = r·V<br/>s_h = keccak256(compressed S)<br/>K' = K + s_h·G<br/>key = address(K')<br/>leaf = H(H(key, reported))
-    O->>T: setRoot(rootId, root)
-    O-->>U: R, view tag s_h[0],<br/>key, reported, proof
-    Note over U: S = v·R<br/>s_h = keccak256(compressed S)<br/>k' = (k + s_h) mod n<br/>(k'·G = K', so k' signs for key)<br/>digest = keccak256(abi.encode(<br/>chainid, token, leaf, to))<br/>(sigV, sigR, sigS) =<br/>personal_sign(k', digest)
-    U->>T: mint(rootId, key, reported, proof,<br/>to, sigV, sigR, sigS)<br/>directly or via any relayer
-    Note over T: verify proof against roots[rootId]<br/>mark leaf minted<br/>signer = ecrecover(<br/>EIP-191 hash of digest,<br/>sigV, sigR, sigS)<br/>require signer == key<br/>whitelist and credit the to account
-```
-
 Each token has an owner, who sets its reports. Whitelisted accounts are Midnight plus every `to` of a `mint`, possibly with amount 0; the owner can whitelist a non-minter, such as a liquidator or a buyer that wants to keep tokens, by including a leaf with `reported` = 0 keyed by that account.
 Whitelisting is permanent: leaving an account out of a later report does not remove it. Only whitelisted accounts hold tokens across transactions.
 Any other account can still receive tokens, but only transiently: the token credits them in transient storage, calls `onReceivableTokenReceived` on the receiver, and reverts if the receiver still holds tokens when the call returns.
