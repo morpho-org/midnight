@@ -19,6 +19,7 @@ contract MintReceiver is IReceivableTokenReceiver {
     }
 
     function onReceivableTokenReceived(address, uint256) external {
-        IReceivableToken(msg.sender).mint(rootId, 0, reported, proof);
+        IReceivableToken(msg.sender)
+            .mint(rootId, address(this), reported, proof, address(this), 0, bytes32(0), bytes32(0));
     }
 }
