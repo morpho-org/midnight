@@ -20,7 +20,8 @@ persistent ghost mapping(address => mathint) delegateCallsTo;
 // True when Midnight sends ETH, or executes a CALLCODE.
 persistent ghost bool otherCall;
 
-// Unresolved external calls are not executed, so these hooks only see the calls executed by Midnight itself, not the ones of its callees.
+/// Unresolved external calls are not executed, so these hooks only see the calls executed by Midnight itself, not the ones of its callees.
+
 hook CALL(uint256 g, address addr, uint256 value, uint256 argsOffset, uint256 argsLength, uint256 retOffset, uint256 retLength) uint256 rc {
     callsTo[addr] = callsTo[addr] + 1;
     otherCall = otherCall || value != 0;
