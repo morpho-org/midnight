@@ -14,8 +14,8 @@ persistent ghost mapping(address => mathint) callsTo;
 // True for each address that Midnight STATICCALLs.
 persistent ghost mapping(address => bool) staticCalled;
 
-// True for each address that Midnight DELEGATECALLs.
-persistent ghost mapping(address => bool) delegateCalled;
+// Number of DELEGATECALLs executed by Midnight to each address.
+persistent ghost mapping(address => mathint) delegateCallsTo;
 
 // True when Midnight sends ETH, or executes a CALLCODE.
 persistent ghost bool otherCall;
@@ -31,7 +31,7 @@ hook STATICCALL(uint256 g, address addr, uint256 argsOffset, uint256 argsLength,
 }
 
 hook DELEGATECALL(uint256 g, address addr, uint256 argsOffset, uint256 argsLength, uint256 retOffset, uint256 retLength) uint256 rc {
-    delegateCalled[addr] = true;
+    delegateCallsTo[addr] = delegateCallsTo[addr] + 1;
 }
 
 hook CALLCODE(uint256 g, address addr, uint256 value, uint256 argsOffset, uint256 argsLength, uint256 retOffset, uint256 retLength) uint256 rc {
@@ -41,7 +41,7 @@ hook CALLCODE(uint256 g, address addr, uint256 value, uint256 argsOffset, uint25
 function setUp() {
     require(forall address a. callsTo[a] == 0, "set up the initial ghost state");
     require(forall address a. !staticCalled[a], "set up the initial ghost state");
-    require(forall address a. !delegateCalled[a], "set up the initial ghost state");
+    require(forall address a. delegateCallsTo[a] == 0, "set up the initial ghost state");
     require(!otherCall, "set up the initial ghost state");
 }
 
@@ -209,7 +209,9 @@ rule multicallCalls(env e, bytes[] calls) {
 
     multicall(e, calls);
 
-    assert calls.length > 0 => delegateCalled[currentContract];
+    assert delegateCallsTo[currentContract] == calls.length;
+    assert forall address a. callsTo[a] == 0;
+    assert forall address a. !staticCalled[a];
 }
 
 // Check that Midnight never sends ETH, never executes a CALLCODE, and only delegate calls itself, in multicall.
@@ -218,6 +220,6 @@ rule noOtherCall(env e, method f, calldataarg args) {
 
     f(e, args);
 
-    assert forall address a. delegateCalled[a] => a == currentContract && f.selector == sig:multicall(bytes[]).selector;
+    assert forall address a. delegateCallsTo[a] != 0 => a == currentContract && f.selector == sig:multicall(bytes[]).selector;
     assert !otherCall;
 }
