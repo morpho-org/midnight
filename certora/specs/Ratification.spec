@@ -15,6 +15,34 @@ methods {
     function TickLib.tickToPrice(uint256) internal returns (uint256) => NONDET;
     function isHealthy(Midnight.Market memory, bytes32, address) internal returns (bool) => NONDET;
     function settlementFee(bytes32, uint256) internal returns (uint256) => NONDET;
+
+    function _.isRatified(Midnight.Offer offer, bytes, address taker) external => recordRatification(calledContract, offer, taker) expect(bytes32);
+}
+
+definition CALLBACK_SUCCESS() returns bytes32 = to_bytes32(0x7f87788ea698181ea4d28d1576d0ba4fc92c0dbe5bf75b43692af2ce91dbaea2);
+
+// Persistent so that the unresolved calls after the ratification, such as callbacks and token transfers, do not erase it.
+persistent ghost bool ratified;
+
+persistent ghost address ratifiedBy;
+
+persistent ghost address ratifiedMaker;
+
+persistent ghost address ratifiedCallback;
+
+persistent ghost address ratifiedTaker;
+
+persistent ghost bytes32 ratificationResult;
+
+function recordRatification(address ratifier, Midnight.Offer offer, address taker) returns bytes32 {
+    bytes32 result;
+    ratified = true;
+    ratifiedBy = ratifier;
+    ratifiedMaker = offer.maker;
+    ratifiedCallback = offer.callback;
+    ratifiedTaker = taker;
+    ratificationResult = result;
+    return result;
 }
 
 // Every successful take requires the maker to have authorized the ratifier.
@@ -42,4 +70,22 @@ rule takeRequiresNonZeroMaker(env e, Midnight.Offer offer, bytes ratifierData, u
 
     take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
     assert offer.maker != 0;
+}
+
+// Every successful take asks the offer's ratifier to ratify the offer for the taker, and requires it to return CALLBACK_SUCCESS.
+rule takeRequiresRatifierSuccess(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
+    require !ratified, "no ratification before take";
+
+    take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
+
+    assert ratified && ratifiedBy == offer.ratifier;
+    assert ratifiedMaker == offer.maker && ratifiedCallback == offer.callback && ratifiedTaker == taker;
+    assert ratificationResult == CALLBACK_SUCCESS();
+}
+
+// No successful take has the maker as taker.
+rule takeRequiresDistinctMakerAndTaker(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
+    take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
+
+    assert offer.maker != taker;
 }

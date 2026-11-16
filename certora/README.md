@@ -60,7 +60,7 @@ How offers are consumed when taken.
   Only `setConsumed` and `take` modify it, and each touches only the targeted `(user, group)` pair.
   It never decreases, a take's delta matches the units taken and stays within the offer's max, and once at the max it stops moving: a fully-consumed offer then admits only no-op takes.
 - [`EmptyOffer.spec`](specs/EmptyOffer.spec) checks that taking an empty offer always reverts (so the offer tree can be padded with empty offers).
-- [`Ratification.spec`](specs/Ratification.spec) checks that every successful take requires the maker to have authorized the ratifier.
+- [`Ratification.spec`](specs/Ratification.spec) checks that every successful take requires the maker to have authorized the ratifier, asks that ratifier to ratify the offer for the taker and gets `CALLBACK_SUCCESS` back, and has a maker distinct from the taker.
 - [`SplitPreservesAccounting.spec`](specs/SplitPreservesAccounting.spec) checks that taking `A` units at once leaves the same credit, debt, total units, loss factors, accrual timestamps and continuous fee credit as taking `B` then `C`, with `A = B + C`.
 - [`SplitDoesNotPunishMakerOrFavorTaker.spec`](specs/SplitDoesNotPunishMakerOrFavorTaker.spec) checks the asset side of that split: splitting a take never makes the maker pay more or receive less, nor the taker pay less or receive more, up to one wei of rounding.
 
