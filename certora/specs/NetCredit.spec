@@ -4,6 +4,9 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
+    // Like the other nondeterministic callback summaries, this assumes no reentry into Midnight.
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address buyer, bytes) external => onBuySummary(calledContract, buyer) expect(bytes32);
+
     function lossFactor(bytes32 id) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
     function credit(bytes32 id, address user) external returns (uint128) envfree;
@@ -28,6 +31,20 @@ methods {
 }
 
 /// HELPERS
+
+persistent ghost bool onBuyCalled;
+
+persistent ghost address onBuyCallee;
+
+persistent ghost address onBuyBuyer;
+
+function onBuySummary(address callee, address buyer) returns (bytes32) {
+    onBuyCalled = true;
+    onBuyCallee = callee;
+    onBuyBuyer = buyer;
+    bytes32 result;
+    return result;
+}
 
 definition MAX_CONTINUOUS_FEE() returns uint256 = 317097919;
 
@@ -193,6 +210,44 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
     address seller = offer.buy ? taker : offer.maker;
     assert user == buyer => netCreditAfter >= netCreditBefore;
     assert user == seller => netCreditAfter <= netCreditBefore;
+}
+
+// An increase requires onBuy for the buyer, provided the buyer-side callback is configured.
+rule netCreditIncreaseCallsOnBuy(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user) {
+    address buyer = offer.buy ? offer.maker : taker;
+    address buyerCallback = offer.buy ? offer.callback : takerCallback;
+    require buyerCallback != 0, "the buyer-side callback is set, so take calls onBuy";
+    require !onBuyCalled, "onBuy has not been called yet in this transaction";
+
+    mathint netCreditBefore = netCredit(e, offer.market, user);
+
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
+
+    require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
+    requireInvariant maturityBoundedById(summaryToId(offer.market));
+
+    mathint netCreditAfter = netCredit(e, offer.market, user);
+
+    assert netCreditAfter > netCreditBefore => user == buyer && onBuyCalled && onBuyCallee == buyerCallback && onBuyBuyer == user;
+}
+
+// With no buyer-side callback, a buyer's net credit can grow without onBuy.
+rule netCreditIncreasesWithoutOnBuy(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
+    address buyer = offer.buy ? offer.maker : taker;
+    address buyerCallback = offer.buy ? offer.callback : takerCallback;
+    require buyerCallback == 0, "no buyer-side callback, so take skips onBuy";
+    require !onBuyCalled, "onBuy has not been called yet in this transaction";
+
+    mathint netCreditBefore = netCredit(e, offer.market, buyer);
+
+    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
+
+    require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
+    requireInvariant maturityBoundedById(summaryToId(offer.market));
+
+    mathint netCreditAfter = netCredit(e, offer.market, buyer);
+
+    satisfy netCreditAfter > netCreditBefore && !onBuyCalled;
 }
 
 // Liquidating does not change any user's net credit as long as no bad debt is realized on the same market, i.e. the market loss factor is unchanged by the liquidation.
