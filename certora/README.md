@@ -155,7 +155,7 @@ Verification is performed according to the following modeling conventions:
 
 # Getting started
 
-Install the `certora-cli` package with `pip install certora-cli==8.20.3`.
+Install the `certora-cli` package with `pip install certora-cli`.
 To verify a spec, pass its configuration file in the [`certora/confs`](confs) folder to `certoraRun`.
 It requires having set the `CERTORAKEY` environment variable to a valid Certora key, and to have `solc-0.8.34` in the PATH.
 You can also pass additional arguments, notably to verify a specific rule.
