@@ -76,7 +76,6 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
         include:
           - token-type: 0
