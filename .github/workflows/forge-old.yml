@@ -11,6 +11,7 @@ permissions: {}
 
 jobs:
   test:
+    name: Forge old tests
     permissions:
       contents: read
     strategy:
