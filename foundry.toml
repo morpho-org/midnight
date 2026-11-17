@@ -37,6 +37,10 @@ exclude_lints = [
 # Lint profile for test/: the base list in full, plus the rules that only fire in
 # test/. A profile replaces exclude_lints rather than extending it, hence the repeat.
 # Starting point to be trimmed, the bug-class rules first.
+# Lint test/ as ordinary Solidity instead of applying Forge's test-only rule filter.
+[profile.lint-test]
+test = ".forge-lint-unused"
+
 [profile.lint-test.lint]
 exclude_lints = [
     # Base [lint] list, repeated in full.
