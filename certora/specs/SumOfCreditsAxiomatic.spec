@@ -233,12 +233,12 @@ strong invariant sumOfCreditsLeTotalUnits(bytes32 id)
             require axiomDistributivity(continuousFeeCredit(id) - amount, amount, PRECISION), "axiom";
             require axiomDistributivity(totalUnits(id) - amount, amount, PRECISION), "axiom";
         }
-    
+
         preserved updatePosition(Midnight.Market market, address user) with (env e) {
             requireInvariant preciseCreditCorrect(id, user);
             require lastLossFactor(id, user) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";
         }
-    
+
         preserved withdraw(Midnight.Market market, uint256 units, address onBehalf, address receiver) with (env e) {
             requireInvariant preciseCreditCorrect(id, onBehalf);
             require lastLossFactor(id, onBehalf) <= currentContract.marketState[id].lossFactor, "lastLossFactorLeqMarketLossFactor in Midnight";

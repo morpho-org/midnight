@@ -7,6 +7,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
 jobs:
   format:
     runs-on: ubuntu-latest
@@ -18,6 +25,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
+        with:
+          version: stable # Deliberately exercise the current stable release.
 
       - name: Check formatting
         run: forge fmt src test script certora --check
@@ -31,6 +40,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
+        with:
+          version: stable # Deliberately exercise the current stable release.
 
       - name: Run forge lint
         run: forge lint src script certora --deny notes
@@ -47,6 +58,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
+        with:
+          version: stable # Deliberately exercise the current stable release.
 
       - name: Run forge build
         run: forge build --force --sizes
@@ -77,6 +90,8 @@ jobs:
           submodules: recursive
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
+        with:
+          version: stable # Deliberately exercise the current stable release.
       - name: Run Forge tests (${{ matrix.name }})
         run: forge test --deny warnings
         env:
