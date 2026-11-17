@@ -4,7 +4,7 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    // The callback may reenter Midnight only by withdrawing its own credit, as MidnightAdapter does on self-funded buys.
+    // When onBuyMayWithdraw holds, the callback may reenter Midnight by withdrawing its own credit, as MidnightAdapter does on self-funded buys. Otherwise, like the other callback summaries, it assumes no reentry.
     function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address buyer, bytes) external with(env e) => onBuySummary(e, calledContract, buyer) expect(bytes32);
 
     function lossFactor(bytes32 id) external returns (uint128) envfree;
@@ -38,12 +38,14 @@ persistent ghost address onBuyCallee;
 
 persistent ghost address onBuyBuyer;
 
+ghost bool onBuyMayWithdraw;
+
 function onBuySummary(env e, address callee, address buyer) returns (bytes32) {
     onBuyCalled = true;
     onBuyCallee = callee;
     onBuyBuyer = buyer;
     bool reenterWithdraw;
-    if (reenterWithdraw) {
+    if (onBuyMayWithdraw && reenterWithdraw) {
         env reentrantEnv;
         require reentrantEnv.msg.sender == callee;
         require reentrantEnv.block.timestamp == e.block.timestamp;
@@ -189,6 +191,7 @@ rule withdrawNetCreditNonIncreasing(env e, Midnight.Market withdrawMarket, uint2
 
 // Taking does not change the net credit of a user that is neither the taker nor the offer's maker.
 rule takeDoesNotChangeOtherNetCredit(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, Midnight.Market market, address user) {
+    require !onBuyMayWithdraw, "onBuy does not reenter Midnight";
     require (user != taker && user != offer.maker) || summaryToId(offer.market) != summaryToId(market), "user is not involved in the take or another market";
 
     mathint netCreditBefore = netCredit(e, market, user);
@@ -202,6 +205,7 @@ rule takeDoesNotChangeOtherNetCredit(env e, Midnight.Offer offer, bytes ratifier
 
 // Taking does not decrease the net credit of a buyer in a take, and does not increase the net credit of a seller in a take.
 rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user) {
+    require !onBuyMayWithdraw, "onBuy does not reenter Midnight";
     mathint netCreditBefore = netCredit(e, offer.market, user);
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
@@ -223,6 +227,7 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
 
 // An increase requires onBuy for the buyer, provided the buyer-side callback is configured.
 rule netCreditIncreaseCallsOnBuy(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user) {
+    require onBuyMayWithdraw, "onBuy may reenter Midnight by withdrawing its own credit";
     address buyer = offer.buy ? offer.maker : taker;
     address buyerCallback = offer.buy ? offer.callback : takerCallback;
     require buyerCallback != 0, "the buyer-side callback is set, so take calls onBuy";
