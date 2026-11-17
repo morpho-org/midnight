@@ -12,4 +12,4 @@ Flag notably these issues:
 
 Don't flag breaking changes, the code is not in production and will be immutable.
 Flag all issues, including those that were not introduced in this commit or pull request.
-Don't flag bugs in the older forge version pinned by `.github/workflows/forge-old.yml`: it's a backup of the main CI, which uses the latest stable forge.
+Don't flag bugs in the older, pinned forge version used by `.github/workflows/forge-old.yml`: it is only a backup CI (the main CI uses the latest stable forge).
