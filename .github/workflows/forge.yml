@@ -1,4 +1,4 @@
-name: forge
+name: Forge
 
 on:
   push:

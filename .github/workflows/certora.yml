@@ -1,4 +1,4 @@
-name: certora
+name: Certora
 
 on:
   push:
