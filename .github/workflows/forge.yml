@@ -101,5 +101,5 @@ jobs:
       - name: Run Forge tests (${{ matrix.name }})
         run: forge test --deny warnings -vvv
         env:
-          FOUNDRY_FUZZ_SEED: 0x${{ github.event.pull_request.base.sha || github.sha }}
+          FOUNDRY_FUZZ_SEED: 0x${{ github.sha }}
           TOKEN_TYPE: ${{ matrix.token-type }}
