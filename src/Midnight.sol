@@ -111,8 +111,9 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev When authorizing a smart-contract, one should consider:
 /// - The targets/functions that the account can call. At least Midnight's functions should be considered, but other
 /// contracts might re-use Midnight's authorization mapping too (e.g ratifiers and authorizers). In particular,
-/// authorized accounts can authorize other accounts on behalf of the user. - Under which conditions the account can
-/// return CALLBACK_SUCCESS when its isRatified function is called.
+/// authorized accounts can authorize other accounts on behalf of the user.
+///
+/// - Under which conditions the account can return CALLBACK_SUCCESS when its isRatified function is called.
 /// @dev updatePosition and liquidate (for liquidatable users) also impact the position and are permissionless.
 ///
 /// ROUNDINGS
@@ -138,8 +139,9 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// TOKEN SAFETY REQUIREMENTS
 /// @dev List of assumptions on tokens that guarantee that Midnight behaves as expected:
 /// - It should be ERC-20 compliant, except that it can omit return values on transfer and transferFrom. In particular,
-/// it should not revert because a transfer is no-op. - Midnight's balance of the token should only decrease on transfer
-/// and transferFrom.
+/// it should not revert because a transfer is no-op.
+///
+/// - Midnight's balance of the token should only decrease on transfer and transferFrom.
 /// - It should not re-enter Midnight on transfer nor transferFrom.
 /// - Midnight must send/receive exactly the requested amount on transfers.
 /// @dev See LIVENESS for liveness guarantees.
