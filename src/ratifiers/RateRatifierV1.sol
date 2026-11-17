@@ -10,17 +10,25 @@ import {TickLib} from "../libraries/TickLib.sol";
 import {UtilsLib} from "../libraries/UtilsLib.sol";
 import {HashLib} from "./libraries/HashLib.sol";
 
-/// @dev This ratifier checks that an authorized address has ratified the root of a Merkle tree of rate offers, and that the offer is a leaf in that tree.
-/// @dev The ratifier data must contain the root, the leaf index, the Merkle proof and the offer's rate and allowed taker (or address(0)).
+/// @dev This ratifier checks that an authorized address has ratified the root of a Merkle tree of rate offers, and that
+/// the offer is a leaf in that tree.
+/// @dev The ratifier data must contain the root, the leaf index, the Merkle proof and the offer's rate and allowed
+/// taker (or address(0)).
 /// @dev The leaf index determines each sibling's left/right position during Merkle proof verification.
-/// @dev The maker sets a rate instead of a fixed price. It is a WAD-scaled per-second rate. When isRatified is called, the rate is converted to a price limit using the remaining time to maturity.
-/// @dev The rate is quoted as simple interest using the money market quoting method. It does not account for compounding or continuous fees.
+/// @dev The maker sets a rate instead of a fixed price. It is a WAD-scaled per-second rate. When isRatified is called,
+/// the rate is converted to a price limit using the remaining time to maturity.
+/// @dev The rate is quoted as simple interest using the money market quoting method. It does not account for
+/// compounding or continuous fees.
 /// @dev A root can also be ratified with a signature.
-/// @dev The nonce is per (maker, root) and shared by all the maker's authorized signers, instead of being per signer, so that a ratification stays within a single storage slot.
-/// @dev Hashing offers as in EIP-712, which allows clear signing of the tree in setIsRootRatifiedWithSig, credits to Seaport for this mechanism.
-/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed ratifications are no longer valid.
+/// @dev The nonce is per (maker, root) and shared by all the maker's authorized signers, instead of being per signer,
+/// so that a ratification stays within a single storage slot.
+/// @dev Hashing offers as in EIP-712, which allows clear signing of the tree in setIsRootRatifiedWithSig, credits to
+/// Seaport for this mechanism.
+/// @dev If block.chainid changes (hard fork), the EIP-712 domain separator changes and previously signed ratifications
+/// are no longer valid.
 /// @dev This ratifier must only be used with the Midnight instance at MIDNIGHT.
-/// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a tree might not be ratified or unratified by a single call to either root setter.
+/// @dev All offers in a tree are expected to share the same maker and ratifier. Otherwise all offers in a tree might
+/// not be ratified or unratified by a single call to either root setter.
 contract RateRatifierV1 is IRateRatifierV1 {
     using UtilsLib for uint256;
 
@@ -47,7 +55,8 @@ contract RateRatifierV1 is IRateRatifierV1 {
         return SET_IS_ROOT_RATIFIED_SUCCESS;
     }
 
-    /// @dev Permissioned to not let people extract the signature of a batch and start taking before or take even though the batch reverted. Both the caller and the signer are subject to the same authorization as setIsRootRatified.
+    /// @dev Permissioned to not let people extract the signature of a batch and start taking before or take even though
+    /// the batch reverted. Both the caller and the signer are subject to the same authorization as setIsRootRatified.
     function setIsRootRatifiedWithSig(
         address maker,
         bytes32 root,

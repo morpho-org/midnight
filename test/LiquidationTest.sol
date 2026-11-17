@@ -742,7 +742,8 @@ contract LiquidationTest is BaseTest {
         assertTrue(debtAfter == 0 || collateralAfter == 0, "either debt repaid or collateral seized");
     }
 
-    /// @dev Recovery close factor with two collateralParams contributing to maxDebt. Drops price of the lower-lltv collateral to make position unhealthy, then liquidates it.
+    /// @dev Recovery close factor with two collateralParams contributing to maxDebt. Drops price of the lower-lltv
+    /// collateral to make position unhealthy, then liquidates it.
     function testRecoveryCloseFactorMultipleCollaterals(uint256 units) public {
         units = bound(units, 100, MAX_UNITS);
 
