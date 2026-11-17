@@ -291,8 +291,7 @@ contract PriceRatifierV1Test is BaseTest {
         priceRatifier.setIsRootRatifiedWithSig(lender, _root, 0, true, 1, vm.getBlockTimestamp(), v, r, s);
     }
 
-    /// @dev Replaying a consumed signature is a no-op while the status it carries still holds, so that a bundle
-    /// carrying it twice does not revert.
+    /// @dev Replaying a consumed signature is a no-op while the status it carries still holds, so that a bundle carrying it twice does not revert.
     function testSetIsRootRatifiedWithSigReplayNoOp() public {
         bytes32 _root = keccak256("root");
 

@@ -6,9 +6,7 @@ import {IMidnight} from "../../src/interfaces/IMidnight.sol";
 import {CBP} from "../../src/libraries/ConstantsLib.sol";
 
 contract SettlementFeeUtils {
-    /// @dev Mirrors Midnight.settlementFee but reads the loan token's default settlement fee cbps (in Solidity) instead
-    /// of the market state. This is the fee a freshly created market applies, since touchMarket copies these defaults
-    /// into the market state.
+    /// @dev Mirrors Midnight.settlementFee but reads the loan token's default settlement fee cbps (in Solidity) instead of the market state. This is the fee a freshly created market applies, since touchMarket copies these defaults into the market state.
     function defaultSettlementFee(IMidnight midnight, address loanToken, uint256 timeToMaturity)
         external
         view

@@ -38,8 +38,7 @@ struct Offer {
     uint256 continuousFeeCap;
 }
 
-/// @dev Settlement fee cbp values and the continuous fee are 0 until the market is created, then set to the default
-/// values.
+/// @dev Settlement fee cbp values and the continuous fee are 0 until the market is created, then set to the default values.
 struct MarketState {
     uint128 totalUnits;
     uint128 lossFactor;
