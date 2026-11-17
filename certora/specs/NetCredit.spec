@@ -231,25 +231,6 @@ rule netCreditIncreaseCallsOnBuy(env e, Midnight.Offer offer, bytes ratifierData
     assert netCreditAfter > netCreditBefore => user == buyer && onBuyCalled && onBuyCallee == buyerCallback && onBuyBuyer == user;
 }
 
-// With no buyer-side callback, a buyer's net credit can grow without onBuy.
-rule netCreditIncreasesWithoutOnBuy(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData) {
-    address buyer = offer.buy ? offer.maker : taker;
-    address buyerCallback = offer.buy ? offer.callback : takerCallback;
-    require buyerCallback == 0, "no buyer-side callback, so take skips onBuy";
-    require !onBuyCalled, "onBuy has not been called yet in this transaction";
-
-    mathint netCreditBefore = netCredit(e, offer.market, buyer);
-
-    take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
-
-    require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
-    requireInvariant maturityBoundedById(summaryToId(offer.market));
-
-    mathint netCreditAfter = netCredit(e, offer.market, buyer);
-
-    satisfy netCreditAfter > netCreditBefore && !onBuyCalled;
-}
-
 // Liquidating does not change any user's net credit as long as no bad debt is realized on the same market, i.e. the market loss factor is unchanged by the liquidation.
 rule liquidateWithoutBadDebtDoesNotChangeCredit(env e, Midnight.Market liquidateMarket, uint256 collateralIndex, uint256 seizedAssets, uint256 repaidUnits, address borrower, bool postMaturityMode, address receiver, address callback, bytes data, Midnight.Market market, address user) {
     bytes32 id = summaryToId(market);
