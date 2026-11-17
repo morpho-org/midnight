@@ -7,11 +7,12 @@ on:
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   test:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -57,6 +58,8 @@ jobs:
           TOKEN_TYPE: ${{ matrix.token-type }}
 
   forge-old:
+    permissions:
+      contents: read
     if: ${{ always() }}
     needs: test
     runs-on: ubuntu-latest
