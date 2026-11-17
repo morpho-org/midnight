@@ -4,8 +4,8 @@ using Utils as Utils;
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
-    // Like the other nondeterministic callback summaries, this assumes no reentry into Midnight.
-    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address buyer, bytes) external => onBuySummary(calledContract, buyer) expect(bytes32);
+    // The callback may reenter Midnight only by withdrawing its own credit, as MidnightAdapter does on self-funded buys.
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address buyer, bytes) external with(env e) => onBuySummary(e, calledContract, buyer) expect(bytes32);
 
     function lossFactor(bytes32 id) external returns (uint128) envfree;
     function pendingFee(bytes32 id, address user) external returns (uint128) envfree;
@@ -38,10 +38,19 @@ persistent ghost address onBuyCallee;
 
 persistent ghost address onBuyBuyer;
 
-function onBuySummary(address callee, address buyer) returns (bytes32) {
+function onBuySummary(env e, address callee, address buyer) returns (bytes32) {
     onBuyCalled = true;
     onBuyCallee = callee;
     onBuyBuyer = buyer;
+    bool reenterWithdraw;
+    if (reenterWithdraw) {
+        env reentrantEnv;
+        require reentrantEnv.msg.sender == callee;
+        require reentrantEnv.block.timestamp == e.block.timestamp;
+        Midnight.Market market;
+        uint256 units;
+        withdraw(reentrantEnv, market, units, callee, callee);
+    }
     bytes32 result;
     return result;
 }
