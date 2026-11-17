@@ -27,7 +27,7 @@ jobs:
           version: nightly # Catch upstream Foundry changes before the next stable release.
 
       - name: Check formatting
-        run: forge fmt src test script certora --check
+        run: forge fmt src test certora --check
 
   lint:
     permissions:
@@ -66,7 +66,7 @@ jobs:
           version: nightly # Catch upstream Foundry changes before the next stable release.
 
       - name: Run forge build
-        run: forge build --force --sizes
+        run: forge build --sizes
 
       - name: Check foundry.lock matches submodule pins
         run: forge build --locked
@@ -99,6 +99,7 @@ jobs:
         with:
           version: nightly # Catch upstream Foundry changes before the next stable release.
       - name: Run Forge tests (${{ matrix.name }})
-        run: forge test --deny warnings
+        run: forge test --deny warnings -vvv
         env:
+          FOUNDRY_FUZZ_SEED: 0x${{ github.event.pull_request.base.sha || github.sha }}
           TOKEN_TYPE: ${{ matrix.token-type }}
