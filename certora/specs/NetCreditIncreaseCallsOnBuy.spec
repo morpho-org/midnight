@@ -33,7 +33,8 @@ function onBuySummary(env e, address callee, address buyer) returns (bytes32) {
     return result;
 }
 
-// An increase requires onBuy for the buyer, provided the buyer-side callback is configured.
+// NetCredit.spec proves every entry point other than take leaves net credit unchanged or cannot increase it.
+// This rule covers the remaining increase path: take requires onBuy for the buyer when its callback is configured.
 rule netCreditIncreaseCallsOnBuy(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiver, address takerCallback, bytes takerCallbackData, address user) {
     address buyer = offer.buy ? offer.maker : taker;
     address buyerCallback = offer.buy ? offer.callback : takerCallback;
