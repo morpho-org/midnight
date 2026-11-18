@@ -29,10 +29,10 @@ Global invariants on positions, markets and accounting.
 - [`NetCredit.spec`](specs/NetCredit.spec) checks the net credit of a position, its up-to-date credit minus its pending continuous fee.
   Only `withdraw`, `take` and `liquidate` can change it, `withdraw` can only decrease it and leaves other positions untouched, and a `take` moves only the buyer's and the seller's.
   `liquidate` can only decrease it, and leaves every position untouched as long as it realizes no bad debt on that position's market.
-  When the buyer-side callback is nonzero, a net credit increase in `take` requires `onBuy` on that callback with the credited user as buyer; the callback need not be the buyer's address.
-  When the buyer-side callback is zero, `take` skips `onBuy`, so the provenance property does not apply.
-  This proof lets `onBuy` reenter Midnight once, by having the callback withdraw from its own position, as MidnightAdapter does on self-funded buys; it assumes no other reentry, and the other `take` rules assume none at all.
   It also checks that the pending fee is zero once a position has been accrued at or after maturity.
+- [`NetCreditIncreaseCallsOnBuy.spec`](specs/NetCreditIncreaseCallsOnBuy.spec) checks that when the buyer-side callback is nonzero, a net credit increase in `take` requires `onBuy` on that callback with the credited user as buyer; the callback need not be the buyer's address.
+  When the buyer-side callback is zero, `take` skips `onBuy`, so the provenance property does not apply.
+  The proof lets `onBuy` reenter Midnight once, by having the callback withdraw from its own position, as MidnightAdapter does on self-funded buys; it assumes no other reentry.
 - [`PostMaturityDebt.spec`](specs/PostMaturityDebt.spec) checks that a position's debt can never increase after its market's maturity.
 - [`PostMaturityWithdrawable.spec`](specs/PostMaturityWithdrawable.spec) checks that it's not possible to manipulate a market's withdrawable liquidity post maturity: only `withdraw` and `claimContinuousFee` can decrease it, a withdrawal is bounded by the withdrawer's own credit, and `totalUnits` can only shrink once matured.
 - [`Reentrancy.spec`](specs/Reentrancy.spec) checks that within a single entry point, external (non-view) calls only happen before the first storage access (read or write) or after the last storage write, so that no external call observes an intermediate state and no write relies on a storage value that the call may have changed.
