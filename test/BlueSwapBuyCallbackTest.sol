@@ -181,10 +181,10 @@ abstract contract BlueSwapBuyCallbackBase is BaseTest {
 contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
     using MarketParamsLib for MarketParams;
 
-    function testSameTokenWithEmptyTakerData() public {
+    function testSameTokenWithZeroSwapper() public {
         market.loanToken = address(tokenIn);
         supply(1e6);
-        bytes memory callbackData = abi.encode(abi.encode(params, uint256(0)), hex"");
+        bytes memory callbackData = abi.encode(abi.encode(params, ORACLE_PRICE_SCALE), abi.encode(address(0), hex""));
         assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, callbackData), 1e6);
         vm.expectEmit(address(callback));
         emit IBlueSwapBuyCallback.OnBuy(address(midnight), bytes32(0), 1e6, 1e6, address(0));
@@ -209,7 +209,7 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         SwapToken rlusd = new SwapToken(rlusdDecimals);
         SwapToken[3] memory tokens = [tokenIn, usdt, rlusd];
         uint128[3] memory units = [uint128(1e6), uint128(1e6), uint128(10 ** rlusdDecimals)];
-        uint256[3] memory prices = [uint256(0), uint256(1e36), 10 ** (uint256(rlusdDecimals) + 30)];
+        uint256[3] memory prices = [ORACLE_PRICE_SCALE, ORACLE_PRICE_SCALE, 10 ** (uint256(rlusdDecimals) + 30)];
         Offer[3] memory offers;
         bytes32[4] memory leaves;
         supply(3e6);
@@ -243,7 +243,7 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         MockExchange dex = new MockExchange();
         for (uint256 i; i < 3; i++) {
             bytes memory makerData = offers[i].callbackData;
-            bytes memory takerData;
+            bytes memory takerData = abi.encode(address(0), hex"");
             if (i > 0) {
                 dex.setRate(prices[i]);
                 deal(address(tokens[i]), address(dex), units[i]);
@@ -308,6 +308,18 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         assertEq(tokenIn.balanceOf(address(blue)), 1e6);
     }
 
+    function testCrossTokenZeroSwapperRevertsThroughMidnight() public {
+        supply(1e6);
+        collateralize(market, borrower, 1e18);
+        (Offer memory offer, bytes memory proof) = signedOffer(1e18);
+        offer.callbackData = abi.encode(abi.encode(params, price), abi.encode(address(0), hex""));
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.prank(borrower);
+        midnight.take(offer, proof, 1e18, borrower, borrower, address(0), hex"");
+        assertEq(tokenIn.balanceOf(address(blue)), 1e6);
+        assertEq(tokenIn.balanceOf(address(callback)), 0);
+    }
+
     function testPreexistingBalanceCanFundDelivery() public {
         supply(1e6);
         configure(1e18 - 1);
@@ -335,7 +347,11 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         price = 0;
         vm.expectEmit(address(callback));
         emit IBlueSwapBuyCallback.OnBuy(address(midnight), bytes32(0), 0, 0, address(0));
-        buy(0);
+        vm.prank(address(midnight));
+        assertEq(
+            callback.onBuy(bytes32(0), market, 0, 0, 0, lender, abi.encode(abi.encode(params, price), hex"")),
+            CALLBACK_SUCCESS
+        );
         assertEq(swapper.calls(), 0);
         assertEq(tokenOut.allowance(address(callback), address(midnight)), 0);
     }
@@ -355,6 +371,7 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         market.loanToken = address(tokenOut);
         price = 1e24;
         supply(1e18);
+        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 1e6);
         configureRoute(1e18, 1e6);
         buy(1e6);
         assertEq(tokenIn.balanceOf(address(exchange)), 1e18);
@@ -420,11 +437,11 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
     function testBound() public {
         assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 0);
         supply(1e6);
-        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 1e6);
-        price = 0;
-        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 1e6);
+        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 1e18);
         deal(address(tokenIn), address(blue), 5e5);
-        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 5e5);
+        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 5e17);
+        price = 0;
+        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 0);
     }
 
     function testBoundLiquidity() public {
@@ -435,14 +452,14 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         blue.supplyCollateral(params, 1e18, borrower, hex"");
         blue.borrow(params, 4e5, 0, borrower, borrower);
         vm.stopPrank();
-        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 6e5);
+        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 6e17);
     }
 
     function testConvertedBoundIsTakeable() public {
         supply(1e6);
-        uint256 bound = callback.buyerAssetsBound(bytes32(0), market, lender, data());
-        uint128 units = uint128(bound * price / ORACLE_PRICE_SCALE);
-        configureRoute(bound, units);
+        uint128 units = uint128(callback.buyerAssetsBound(bytes32(0), market, lender, data()));
+        assertEq(units, 1e18);
+        configureRoute(1e6, units);
         collateralize(market, borrower, units);
         (Offer memory offer, bytes memory proof) = signedOffer(units);
         vm.prank(borrower);

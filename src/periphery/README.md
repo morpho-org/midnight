@@ -14,16 +14,14 @@ Anyone can `skim` rewards or donations to the owner.
 Callback data is `abi.encode(bytes makerData, bytes takerData)`, where maker data is `abi.encode(MarketParams blueMarketParams, uint256 limitPrice)` and taker data is `abi.encode(address swapper, bytes swapData)`.
 The price is the Morpho Blue `ORACLE_PRICE_SCALE` (1e36)-scaled minimum raw A units per raw B unit: USDC (6 decimals) to DAI (18 decimals) at parity uses `1e48`, and the reverse uses `1e24`.
 Withdrawals round down in the maker's favor.
-Positive cross-token buys reject a zero price.
-Zero buys neither withdraw nor call the swapper.
-`buyerAssetsBound` always returns Blue loan-token units: the minimum of the supply position, market liquidity and Blue's token balance.
-For same-token offers max `buyerAssets` equals this bound.
-For cross-token offers callers compute `bound * limitPrice / ORACLE_PRICE_SCALE`, rounded down, using that offer's `limitPrice` from maker data.
-Conversion is left to the caller because each offer carries its own price.
+Positive buys reject a zero price.
+Zero buys neither withdraw nor call the swapper, and their taker data may be empty bytes.
+`buyerAssetsBound` returns Midnight loan-token units: the minimum of the Blue supply position, market liquidity and Blue's token balance, multiplied by `limitPrice / ORACLE_PRICE_SCALE` and rounded down.
 
-When the Blue and Midnight loan tokens match, the callback withdraws `buyerAssets` directly to itself without a swap.
-It ignores `limitPrice` and `takerData` (which may be empty bytes), and `buyerAssetsBound` returns the unconverted Blue availability.
-For different tokens, it withdraws `sourceAssets = buyerAssets * ORACLE_PRICE_SCALE / limitPrice` to the swapper.
+Every positive buy withdraws `sourceAssets = buyerAssets * ORACLE_PRICE_SCALE / limitPrice`, rounded down, to the swapper, or to the callback itself if the swapper is zero.
+A zero swapper skips the swap without checking token equality; Midnight's pull still enforces payment.
+Same-token offers sign `limitPrice = 1e36` (or higher for a premium), and takers pass `abi.encode(address(0), bytes(""))` as taker data to skip the swap.
+At `limitPrice = 1e36`, the bound equals the available Blue assets.
 Every successful callback emits `OnBuy(caller, id, buyerAssets, sourceAssets, swapper)`, including zero buys and direct withdrawals; `swapper` is zero when no swap happens.
 
 The owner manages Blue permissions with `setAuthorization`; signature-based authorization is not supported.

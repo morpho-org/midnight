@@ -58,7 +58,7 @@ contract BlueSwapBuyCallback is IBlueSwapBuyCallback {
     }
 
     /// @dev Reverts if the owner position on the requested market is too small or if the liquidity on that market is too small.
-    /// @dev For identical loan tokens, withdraws buyerAssets directly to this callback, ignoring limitPrice and takerData.
+    /// @dev A zero swapper withdraws sourceAssets to this callback without a swap; same-token offers use limitPrice = ORACLE_PRICE_SCALE (or higher for a premium).
     function onBuy(
         bytes32 id,
         Market memory market,
@@ -74,35 +74,38 @@ contract BlueSwapBuyCallback is IBlueSwapBuyCallback {
         (MarketParams memory marketParams, uint256 limitPrice) = abi.decode(makerData, (MarketParams, uint256));
         uint256 sourceAssets;
         address swapper;
-        if (buyerAssets > 0 && marketParams.loanToken == market.loanToken) {
-            sourceAssets = buyerAssets;
-            IMorpho(BLUE).withdraw(marketParams, buyerAssets, 0, address(this), address(this));
-        } else if (buyerAssets > 0) {
+        if (buyerAssets > 0) {
             sourceAssets = buyerAssets.mulDivDown(ORACLE_PRICE_SCALE, limitPrice);
             bytes memory swapData;
             (swapper, swapData) = abi.decode(takerData, (address, bytes));
-            if (sourceAssets > 0) IMorpho(BLUE).withdraw(marketParams, sourceAssets, 0, address(this), swapper);
-            require(
-                ISwapper(swapper).onSwap(marketParams.loanToken, market.loanToken, sourceAssets, buyerAssets, swapData)
-                    == CALLBACK_SUCCESS,
-                InvalidSwapCallback()
-            );
+            if (sourceAssets > 0) {
+                IMorpho(BLUE)
+                    .withdraw(
+                        marketParams, sourceAssets, 0, address(this), swapper == address(0) ? address(this) : swapper
+                    );
+            }
+            if (swapper != address(0)) {
+                require(
+                    ISwapper(swapper)
+                            .onSwap(marketParams.loanToken, market.loanToken, sourceAssets, buyerAssets, swapData)
+                        == CALLBACK_SUCCESS,
+                    InvalidSwapCallback()
+                );
+            }
         }
         ERC20Lib.safeApprove(market.loanToken, MIDNIGHT, buyerAssets);
         emit OnBuy(msg.sender, id, buyerAssets, sourceAssets, swapper);
         return CALLBACK_SUCCESS;
     }
 
-    /// @dev Available source assets in Blue loan-token units, without price conversion.
-    /// @dev For same-token offers, max buyerAssets equals this bound. For cross-token offers, callers compute bound * limitPrice / ORACLE_PRICE_SCALE rounded down, using that offer's limitPrice from makerData.
-    /// @dev Conversion is left to the caller because the price lives in each offer.
+    /// @dev Max buyerAssets in Midnight loan-token units: available Blue assets * limitPrice / ORACLE_PRICE_SCALE, rounded down.
     /// @dev Takers receive the amount to take per offer from the routing layer. But the routing layer is asynchronous/offchain, and might not be up to date on the chain's latest state. To counter this, takers can query atomically this function to cap their take.
     /// @dev Ignores some static reasons why the bound might be smaller, such as wrong loan token, wrong owner... But it is easy for the routing layer to take that into account.
     /// @dev Reverts if data is not well formed.
     /// @dev Under-estimates the real bound if the callback is the fee recipient of the blue market.
     function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {
         (bytes memory makerData,) = abi.decode(data, (bytes, bytes));
-        (MarketParams memory marketParams,) = abi.decode(makerData, (MarketParams, uint256));
+        (MarketParams memory marketParams, uint256 limitPrice) = abi.decode(makerData, (MarketParams, uint256));
 
         (uint256 totalSupplyAssets, uint256 totalSupplyShares, uint256 totalBorrowAssets,) =
             IMorpho(BLUE).expectedMarketBalances(marketParams);
@@ -113,6 +116,7 @@ contract BlueSwapBuyCallback is IBlueSwapBuyCallback {
         uint256 liquidity = totalSupplyAssets - totalBorrowAssets;
         uint256 blueBalance = IERC20Extended(marketParams.loanToken).balanceOf(BLUE);
 
-        return UtilsLib.min(UtilsLib.min(supplyAssets, liquidity), blueBalance);
+        return
+            UtilsLib.min(UtilsLib.min(supplyAssets, liquidity), blueBalance).mulDivDown(limitPrice, ORACLE_PRICE_SCALE);
     }
 }
