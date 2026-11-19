@@ -2,6 +2,30 @@ This folder contains optional helpers for interacting with Midnight.
 
 ## Contracts
 
+### `BlueSwapBuyCallback` and `BlueSwapBuyCallbackFactory`
+
+Funds a Midnight buy in token A by withdrawing the callback's Blue supply in token B directly to a taker-selected
+`ISwapper`. The swapper must deliver the required A to the callback and return `CALLBACK_SUCCESS`. Only the increase
+in A balance counts; surplus stays in the callback and anyone can `skim` it to the owner. A transient lock prevents
+nested buys on the same callback. Swappers receive tokens, never Blue authorization.
+
+Callback data is `abi.encode(bytes makerData, bytes takerData)`, where maker data is
+`abi.encode(MarketParams blueMarketParams, uint256 limitPrice)` and taker data is `abi.encode(address swapper, bytes swapData)`.
+The price is the Morpho Blue `ORACLE_PRICE_SCALE` (1e36)-scaled minimum raw A units per raw B unit: USDC (6 decimals) to DAI (18 decimals) at parity uses
+`1e48`, and the reverse uses `1e24`. Withdrawals round down in the maker's favor. Positive buys reject a zero price.
+Zero buys neither withdraw nor call the swapper. `buyerAssetsBound` converts available Blue liquidity at that price.
+
+Owner authorization, signatures and skimming follow `BlueBuyCallback`. The factory uses owner and salt to deploy
+deterministically and records `callbackOf` and `isBlueSwapBuyCallback`.
+
+### `MakerCallbackDataRatifier`
+
+Wraps an existing ratifier so makers commit to maker data while takers choose execution data. Authorize the wrapper
+on Midnight, and sign the inner ratifier's normal offer leaf with `callbackData = makerData` and `ratifier = wrapper`.
+The actual offer passed to Midnight has the two-part callback data above. The callback address and maker data remain
+bound; taker data does not. Since the leaf includes `offer.ratifier`, direct-inner and wrapper offers are not interchangeable.
+Signatures and cancellation use the inner ratifier's domain and state. The inner ratifier must support forwarded calls.
+
 ### `BlueBuyCallback`
 
 A buy callback that uses liquidity supplied on Morpho Blue.
