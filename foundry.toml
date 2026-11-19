@@ -1,4 +1,5 @@
 [profile.default]
+ignored_error_codes_from = [["test", ["code-size", "init-code-size"]]]
 ignored_warnings_from = ["lib"]
 via_ir = true
 optimizer = true
@@ -14,28 +15,30 @@ fs_permissions = [
 runs = 1024
 
 [lint]
+severity = ["high", "medium", "low", "info"]
 exclude_lints = [
-    "asm-keccak256",
-    "unsafe-cheatcode",
-    "incorrect-shift",
-    "block-timestamp",
-    "internal-function-used-once",
-    "pragma-inconsistent",
-    "missing-zero-check",
-    "low-level-calls",
-    "inline-assembly",
-    "literal-instead-of-constant",
-    "require-revert-in-loop",
-    "multi-contract-file",
-    "calls-loop",
     "arbitrary-send-erc20",
-    "unused-return",
-    "cyclomatic-complexity",
+    "block-timestamp",
     "boolean-cst",
+    "calls-loop",
+    "cyclomatic-complexity",
+    "incorrect-shift",
+    "inline-assembly",
+    "internal-function-used-once",
+    "literal-instead-of-constant",
+    "low-level-calls",
     "missing-events-access-control",
-    "costly-loop",
-    "uninitialized-local",
+    "missing-zero-check",
+    "mixed-case-variable",
+    "multi-contract-file",
+    "pragma-inconsistent",
     "reentrancy-events",
+    "require-revert-in-loop",
+    "screaming-snake-case-immutable",
+    "too-many-digits",
+    "uninitialized-local",
+    "unsafe-cheatcode",
+    "unused-return",
 ]
 
 [[profile.default.compilation_restrictions]]
