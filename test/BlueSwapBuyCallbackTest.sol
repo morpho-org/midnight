@@ -180,6 +180,98 @@ abstract contract BlueSwapBuyCallbackBase is BaseTest {
 contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
     using MarketParamsLib for MarketParams;
 
+    function testSameTokenWithEmptyTakerData() public {
+        market.loanToken = address(tokenIn);
+        supply(1e6);
+        bytes memory callbackData = abi.encode(abi.encode(params, uint256(0)), hex"");
+        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, callbackData), 1e6);
+        vm.expectEmit(address(callback));
+        emit IBlueSwapBuyCallback.OnBuy(address(midnight), bytes32(0), 1e6, 1e6, address(0));
+        vm.prank(address(midnight));
+        assertEq(callback.onBuy(bytes32(0), market, 1e6, 0, 0, lender, callbackData), CALLBACK_SUCCESS);
+        assertEq(tokenIn.balanceOf(address(callback)), 1e6);
+        assertEq(tokenIn.allowance(address(callback), address(midnight)), 1e6);
+        assertEq(blue.position(params.id(), address(callback)).supplyShares, 0);
+        assertEq(swapper.calls(), 0);
+    }
+
+    function testSingleRootThreeMarketsRlusd6Decimals() public {
+        singleRootThreeMarkets(6);
+    }
+
+    function testSingleRootThreeMarketsRlusd18Decimals() public {
+        singleRootThreeMarkets(18);
+    }
+
+    function singleRootThreeMarkets(uint8 rlusdDecimals) internal {
+        SwapToken usdt = new SwapToken(6);
+        SwapToken rlusd = new SwapToken(rlusdDecimals);
+        SwapToken[3] memory tokens = [tokenIn, usdt, rlusd];
+        uint128[3] memory units = [uint128(1e6), uint128(1e6), uint128(10 ** rlusdDecimals)];
+        uint256[3] memory prices = [uint256(0), uint256(1e36), 10 ** (uint256(rlusdDecimals) + 30)];
+        Offer[3] memory offers;
+        bytes32[4] memory leaves;
+        supply(3e6);
+        uint256 initialShares = blue.position(params.id(), address(callback)).supplyShares;
+
+        for (uint256 i; i < 3; i++) {
+            Offer memory offer;
+            offer.market = abi.decode(abi.encode(market), (Market));
+            offer.market.loanToken = address(tokens[i]);
+            midnight.setMarketTickSpacing(midnight.touchMarket(offer.market), 1);
+            collateralize(offer.market, borrower, units[i]);
+            offer.buy = true;
+            offer.maker = lender;
+            offer.expiry = block.timestamp + 200;
+            offer.tick = MAX_TICK;
+            offer.callback = address(callback);
+            offer.callbackData = abi.encode(params, prices[i]);
+            offer.ratifier = address(wrapper);
+            offer.group = bytes32(i);
+            offer.maxUnits = units[i];
+            offer.continuousFeeCap = type(uint256).max;
+            leaves[i] = HashLib.hashOffer(offer);
+            offers[i] = offer;
+        }
+
+        bytes32 left = keccak256(abi.encode(leaves[0], leaves[1]));
+        bytes32 right = keccak256(abi.encode(leaves[2], leaves[3]));
+        bytes32 root = keccak256(abi.encode(left, right));
+        Signature memory sig = signature(root, privateKey[lender], address(ecrecoverRatifier), 2);
+        GenericSwapper routeSwapper = new GenericSwapper();
+        MockExchange dex = new MockExchange();
+        for (uint256 i; i < 3; i++) {
+            bytes memory makerData = offers[i].callbackData;
+            bytes memory takerData;
+            if (i > 0) {
+                dex.setRate(prices[i]);
+                deal(address(tokens[i]), address(dex), units[i]);
+                bytes memory route = abi.encode(
+                    address(dex), abi.encodeCall(dex.swap, (address(tokenIn), address(tokens[i]), 1e6)), otherLender
+                );
+                takerData = abi.encode(address(routeSwapper), route);
+            }
+            offers[i].callbackData = abi.encode(makerData, takerData);
+            bytes32[] memory proof = new bytes32[](2);
+            proof[0] = leaves[i ^ 1];
+            proof[1] = i < 2 ? right : left;
+            vm.prank(borrower);
+            (uint256 buyerAssets, uint256 sellerAssets) = midnight.take(
+                offers[i], abi.encode(sig, root, i, proof), units[i], borrower, borrower, address(0), hex""
+            );
+            assertEq(buyerAssets, units[i]);
+            assertEq(tokens[i].balanceOf(borrower), sellerAssets);
+            assertEq(tokens[i].balanceOf(address(callback)), 0);
+            assertEq(tokens[i].balanceOf(address(routeSwapper)), 0);
+            assertEq(midnight.credit(toId(offers[i].market), lender), units[i]);
+            assertEq(midnight.debt(toId(offers[i].market), borrower), units[i]);
+            assertEq(blue.position(params.id(), address(callback)).supplyShares, initialShares * (2 - i) / 3);
+            assertEq(tokenIn.balanceOf(address(blue)), (2 - i) * 1e6);
+            assertEq(tokenIn.balanceOf(address(dex)), i * 1e6);
+            assertEq(tokenIn.allowance(address(routeSwapper), address(dex)), 0);
+        }
+    }
+
     function testFullTake() public {
         supply(1e6);
         configureRoute(1e6, 1e18);
@@ -240,6 +332,8 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
 
     function testZeroBuy() public {
         price = 0;
+        vm.expectEmit(address(callback));
+        emit IBlueSwapBuyCallback.OnBuy(address(midnight), bytes32(0), 0, 0, address(0));
         buy(0);
         assertEq(swapper.calls(), 0);
         assertEq(tokenOut.allowance(address(callback), address(midnight)), 0);
@@ -341,16 +435,16 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 6e17);
     }
 
-    function testRoundingAndSwapEvent() public {
+    function testRoundingAndOnBuyEvent() public {
         supply(1e6);
         configure(1e18 + 1);
         vm.expectEmit(address(callback));
-        emit IBlueSwapBuyCallback.Swap(address(midnight), bytes32(0), address(swapper), 1e6);
+        emit IBlueSwapBuyCallback.OnBuy(address(midnight), bytes32(0), 1e18 + 1, 1e6, address(swapper));
         buy(1e18 + 1);
         assertEq(tokenIn.balanceOf(address(swapper)), 1e6);
     }
 
-    function testPositiveBuyWithZeroBlueAssets() public {
+    function testPositiveBuyWithZeroSourceAssets() public {
         configure(1);
         buy(1);
         assertEq(swapper.calls(), 1);

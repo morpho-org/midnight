@@ -12,10 +12,17 @@ Swappers receive tokens, never Blue authorization. Anyone can `skim` rewards or 
 Callback data is `abi.encode(bytes makerData, bytes takerData)`, where maker data is
 `abi.encode(MarketParams blueMarketParams, uint256 limitPrice)` and taker data is `abi.encode(address swapper, bytes swapData)`.
 The price is the Morpho Blue `ORACLE_PRICE_SCALE` (1e36)-scaled minimum raw A units per raw B unit: USDC (6 decimals) to DAI (18 decimals) at parity uses
-`1e48`, and the reverse uses `1e24`. Withdrawals round down in the maker's favor. Positive buys reject a zero price.
+`1e48`, and the reverse uses `1e24`. Withdrawals round down in the maker's favor. Positive cross-token buys reject a zero price.
 Zero buys neither withdraw nor call the swapper. `buyerAssetsBound` converts available Blue liquidity at that price.
 
-Owner authorization, signatures and skimming follow `BlueBuyCallback`. The factory uses owner and salt to deploy
+When the Blue and Midnight loan tokens match, the callback withdraws `buyerAssets` directly to itself without a swap.
+It ignores `limitPrice` and `takerData` (which may be empty bytes), and `buyerAssetsBound` returns the unconverted Blue
+availability. For different tokens, it withdraws `sourceAssets = buyerAssets * ORACLE_PRICE_SCALE / limitPrice` to the swapper.
+Every successful callback emits `OnBuy(caller, id, buyerAssets, sourceAssets, swapper)`, including zero buys and direct
+withdrawals; `swapper` is zero when no swap happens.
+
+The owner manages Blue permissions with `setAuthorization`; signature-based authorization is not supported.
+Skimming follows `BlueBuyCallback`. The factory uses owner and salt to deploy
 deterministically and records `callbackOf` and `isBlueSwapBuyCallback`.
 
 ### `MakerCallbackDataRatifier`

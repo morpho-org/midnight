@@ -3,8 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {IMorpho, MarketParams, Authorization, Signature} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
-import {AUTHORIZATION_TYPEHASH, DOMAIN_TYPEHASH} from "../lib/morpho-blue/src/libraries/ConstantsLib.sol";
+import {IMorpho, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {Market} from "../src/interfaces/IMidnight.sol";
 import {BlueSwapBuyCallback} from "../src/periphery/blue-swap-buy-callback/BlueSwapBuyCallback.sol";
 import {IBlueSwapBuyCallback} from "../src/periphery/blue-swap-buy-callback/interfaces/IBlueSwapBuyCallback.sol";
@@ -88,81 +87,6 @@ contract BlueSwapBuyCallbackAuthorizationTest is Test {
 
         assertEq(otherToken.balanceOf(address(callback)), 0);
         assertEq(otherToken.balanceOf(owner), assets);
-    }
-
-    function testSetAuthorizationWithSig() public {
-        uint256 ownerPrivateKey = 1;
-        address signer = vm.addr(ownerPrivateKey);
-        address authorized = makeAddr("authorized");
-        BlueSwapBuyCallback signedCallback = new BlueSwapBuyCallback(signer, address(midnight), address(blue));
-        Authorization memory authorization = Authorization(signer, authorized, true, 0, block.timestamp);
-        Signature memory signature = _signAuthorization(ownerPrivateKey, address(signedCallback), authorization);
-
-        vm.expectEmit(address(signedCallback));
-        emit IBlueSwapBuyCallback.SetAuthorizationWithSig(address(this), 0);
-        signedCallback.setAuthorizationWithSig(authorization, signature);
-
-        assertTrue(blue.isAuthorized(address(signedCallback), authorized));
-        assertEq(signedCallback.nonce(), 1);
-    }
-
-    function testSetAuthorizationWithSigRevertsIfExpired() public {
-        uint256 ownerPrivateKey = 1;
-        address signer = vm.addr(ownerPrivateKey);
-        BlueSwapBuyCallback signedCallback = new BlueSwapBuyCallback(signer, address(midnight), address(blue));
-        Authorization memory authorization = Authorization(signer, makeAddr("authorized"), true, 0, block.timestamp - 1);
-        Signature memory signature = _signAuthorization(ownerPrivateKey, address(signedCallback), authorization);
-
-        vm.expectRevert(IBlueSwapBuyCallback.AuthorizationExpired.selector);
-        signedCallback.setAuthorizationWithSig(authorization, signature);
-    }
-
-    function testSetAuthorizationWithSigAllowsNoOp() public {
-        uint256 ownerPrivateKey = 1;
-        address signer = vm.addr(ownerPrivateKey);
-        address authorized = makeAddr("authorized");
-        BlueSwapBuyCallback signedCallback = new BlueSwapBuyCallback(signer, address(midnight), address(blue));
-        Authorization memory authorization = Authorization(signer, authorized, false, 0, block.timestamp);
-        Signature memory signature = _signAuthorization(ownerPrivateKey, address(signedCallback), authorization);
-
-        signedCallback.setAuthorizationWithSig(authorization, signature);
-
-        assertFalse(blue.isAuthorized(address(signedCallback), authorized));
-        assertEq(signedCallback.nonce(), 1);
-    }
-
-    function testSetAuthorizationWithSigRevertsIfNonceIsReused() public {
-        uint256 ownerPrivateKey = 1;
-        address signer = vm.addr(ownerPrivateKey);
-        BlueSwapBuyCallback signedCallback = new BlueSwapBuyCallback(signer, address(midnight), address(blue));
-        Authorization memory authorization = Authorization(signer, makeAddr("authorized"), true, 0, block.timestamp);
-        Signature memory signature = _signAuthorization(ownerPrivateKey, address(signedCallback), authorization);
-        signedCallback.setAuthorizationWithSig(authorization, signature);
-
-        vm.expectRevert(IBlueSwapBuyCallback.InvalidNonce.selector);
-        signedCallback.setAuthorizationWithSig(authorization, signature);
-    }
-
-    function testSetAuthorizationWithSigRevertsIfSignerIsNotOwner() public {
-        uint256 ownerPrivateKey = 1;
-        address signer = vm.addr(ownerPrivateKey);
-        BlueSwapBuyCallback signedCallback = new BlueSwapBuyCallback(signer, address(midnight), address(blue));
-        Authorization memory authorization = Authorization(signer, makeAddr("authorized"), true, 0, block.timestamp);
-        Signature memory signature = _signAuthorization(2, address(signedCallback), authorization);
-
-        vm.expectRevert(IBlueSwapBuyCallback.InvalidSignature.selector);
-        signedCallback.setAuthorizationWithSig(authorization, signature);
-    }
-
-    function _signAuthorization(uint256 privateKey, address verifyingContract, Authorization memory authorization)
-        internal
-        view
-        returns (Signature memory signature)
-    {
-        bytes32 hashStruct = keccak256(abi.encode(AUTHORIZATION_TYPEHASH, authorization));
-        bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, block.chainid, verifyingContract));
-        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, hashStruct));
-        (signature.v, signature.r, signature.s) = vm.sign(privateKey, digest);
     }
 }
 
