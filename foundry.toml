@@ -10,6 +10,9 @@ fs_permissions = [
     { access = "read", path = "out/Morpho.sol/Morpho.json" },
 ]
 
+[profile.default.fuzz]
+runs = 2048
+
 [lint]
 exclude_lints = [
     "asm-keccak256",

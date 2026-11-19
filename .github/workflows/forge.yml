@@ -10,7 +10,7 @@ on:
 permissions: {}
 
 jobs:
-  format:
+  fmt:
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -49,7 +49,7 @@ jobs:
       - name: Run forge lint on tests
         run: forge lint test --deny notes
 
-  sizes:
+  build:
     permissions:
       contents: read
     runs-on: ubuntu-latest

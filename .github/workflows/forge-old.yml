@@ -58,6 +58,7 @@ jobs:
           FOUNDRY_FUZZ_SEED: 0x${{ github.sha }}
           TOKEN_TYPE: ${{ matrix.token-type }}
 
+  # Same check name as in the other repos.
   forge-old:
     permissions:
       contents: read
