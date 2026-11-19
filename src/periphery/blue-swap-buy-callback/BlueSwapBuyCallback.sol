@@ -93,19 +93,17 @@ contract BlueSwapBuyCallback is IBlueSwapBuyCallback {
         return CALLBACK_SUCCESS;
     }
 
-    /// @dev Max buyerAssets amount that the callback can handle.
+    /// @dev Available source assets in Blue loan-token units, without price conversion.
+    /// @dev For same-token offers, max buyerAssets equals this bound. For cross-token offers, callers compute
+    /// bound * limitPrice / ORACLE_PRICE_SCALE rounded down, using that offer's limitPrice from makerData.
+    /// @dev Conversion is left to the caller because the price lives in each offer.
     /// @dev Takers receive the amount to take per offer from the routing layer. But the routing layer is asynchronous/offchain, and might not be up to date on the chain's latest state. To counter this, takers can query atomically this function to cap their take.
     /// @dev Ignores some static reasons why the bound might be smaller, such as wrong loan token, wrong owner... But it is easy for the routing layer to take that into account.
     /// @dev Reverts if data is not well formed.
     /// @dev Under-estimates the real bound if the callback is the fee recipient of the blue market.
-    /// @dev For identical loan tokens, returns Blue availability without price conversion.
-    function buyerAssetsBound(bytes32, Market memory market, address, bytes memory data)
-        external
-        view
-        returns (uint256)
-    {
+    function buyerAssetsBound(bytes32, Market memory, address, bytes memory data) external view returns (uint256) {
         (bytes memory makerData,) = abi.decode(data, (bytes, bytes));
-        (MarketParams memory marketParams, uint256 limitPrice) = abi.decode(makerData, (MarketParams, uint256));
+        (MarketParams memory marketParams,) = abi.decode(makerData, (MarketParams, uint256));
 
         (uint256 totalSupplyAssets, uint256 totalSupplyShares, uint256 totalBorrowAssets,) =
             IMorpho(BLUE).expectedMarketBalances(marketParams);
@@ -116,10 +114,6 @@ contract BlueSwapBuyCallback is IBlueSwapBuyCallback {
         uint256 liquidity = totalSupplyAssets - totalBorrowAssets;
         uint256 blueBalance = IERC20Extended(marketParams.loanToken).balanceOf(BLUE);
 
-        uint256 available = UtilsLib.min(UtilsLib.min(supplyAssets, liquidity), blueBalance);
-        return
-            marketParams.loanToken == market.loanToken
-                ? available
-                : available.mulDivDown(limitPrice, ORACLE_PRICE_SCALE);
+        return UtilsLib.min(UtilsLib.min(supplyAssets, liquidity), blueBalance);
     }
 }

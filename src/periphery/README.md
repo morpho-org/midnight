@@ -13,7 +13,10 @@ Callback data is `abi.encode(bytes makerData, bytes takerData)`, where maker dat
 `abi.encode(MarketParams blueMarketParams, uint256 limitPrice)` and taker data is `abi.encode(address swapper, bytes swapData)`.
 The price is the Morpho Blue `ORACLE_PRICE_SCALE` (1e36)-scaled minimum raw A units per raw B unit: USDC (6 decimals) to DAI (18 decimals) at parity uses
 `1e48`, and the reverse uses `1e24`. Withdrawals round down in the maker's favor. Positive cross-token buys reject a zero price.
-Zero buys neither withdraw nor call the swapper. `buyerAssetsBound` converts available Blue liquidity at that price.
+Zero buys neither withdraw nor call the swapper. `buyerAssetsBound` always returns Blue loan-token units: the minimum
+of the supply position, market liquidity and Blue's token balance. For same-token offers max `buyerAssets` equals this
+bound. For cross-token offers callers compute `bound * limitPrice / ORACLE_PRICE_SCALE`, rounded down, using that
+offer's `limitPrice` from maker data. Conversion is left to the caller because each offer carries its own price.
 
 When the Blue and Midnight loan tokens match, the callback withdraws `buyerAssets` directly to itself without a swap.
 It ignores `limitPrice` and `takerData` (which may be empty bytes), and `buyerAssetsBound` returns the unconverted Blue

@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import {IMorpho, MarketParams} from "../lib/morpho-blue/src/interfaces/IMorpho.sol";
 import {MarketParamsLib} from "../lib/morpho-blue/src/libraries/MarketParamsLib.sol";
+import {ORACLE_PRICE_SCALE} from "../lib/morpho-blue/src/libraries/ConstantsLib.sol";
 import {Market, Offer, CollateralParams} from "../src/interfaces/IMidnight.sol";
 import {MAX_TICK} from "../src/libraries/TickLib.sol";
 import {CALLBACK_SUCCESS} from "../src/libraries/ConstantsLib.sol";
@@ -419,9 +420,11 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
     function testBound() public {
         assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 0);
         supply(1e6);
-        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 1e18);
+        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 1e6);
+        price = 0;
+        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 1e6);
         deal(address(tokenIn), address(blue), 5e5);
-        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 5e17);
+        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 5e5);
     }
 
     function testBoundLiquidity() public {
@@ -432,7 +435,21 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         blue.supplyCollateral(params, 1e18, borrower, hex"");
         blue.borrow(params, 4e5, 0, borrower, borrower);
         vm.stopPrank();
-        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 6e17);
+        assertEq(callback.buyerAssetsBound(bytes32(0), market, lender, data()), 6e5);
+    }
+
+    function testConvertedBoundIsTakeable() public {
+        supply(1e6);
+        uint256 bound = callback.buyerAssetsBound(bytes32(0), market, lender, data());
+        uint128 units = uint128(bound * price / ORACLE_PRICE_SCALE);
+        configureRoute(bound, units);
+        collateralize(market, borrower, units);
+        (Offer memory offer, bytes memory proof) = signedOffer(units);
+        vm.prank(borrower);
+        (uint256 buyerAssets,) = midnight.take(offer, proof, units, borrower, borrower, address(0), hex"");
+        assertEq(buyerAssets, units);
+        assertEq(blue.position(params.id(), address(callback)).supplyShares, 0);
+        assertRouteCleared();
     }
 
     function testRoundingAndOnBuyEvent() public {
