@@ -4,37 +4,41 @@ This folder contains optional helpers for interacting with Midnight.
 
 ### `BlueSwapBuyCallback` and `BlueSwapBuyCallbackFactory`
 
-Funds a Midnight buy in token A by withdrawing the callback's Blue supply in token B directly to a taker-selected
-`ISwapper`. The swapper delivers the required A to the callback and returns `CALLBACK_SUCCESS`. Midnight's subsequent
-transferFrom enforces payment; pre-existing callback balances may contribute to it. Nested buys are supported.
-Swappers receive tokens, never Blue authorization. Anyone can `skim` rewards or donations to the owner.
+Funds a Midnight buy in token A by withdrawing the callback's Blue supply in token B directly to a taker-selected `ISwapper`.
+The swapper delivers the required A to the callback and returns `CALLBACK_SUCCESS`.
+Midnight's subsequent transferFrom enforces payment; pre-existing callback balances may contribute to it.
+Nested buys are supported.
+Swappers receive tokens, never Blue authorization.
+Anyone can `skim` rewards or donations to the owner.
 
-Callback data is `abi.encode(bytes makerData, bytes takerData)`, where maker data is
-`abi.encode(MarketParams blueMarketParams, uint256 limitPrice)` and taker data is `abi.encode(address swapper, bytes swapData)`.
-The price is the Morpho Blue `ORACLE_PRICE_SCALE` (1e36)-scaled minimum raw A units per raw B unit: USDC (6 decimals) to DAI (18 decimals) at parity uses
-`1e48`, and the reverse uses `1e24`. Withdrawals round down in the maker's favor. Positive cross-token buys reject a zero price.
-Zero buys neither withdraw nor call the swapper. `buyerAssetsBound` always returns Blue loan-token units: the minimum
-of the supply position, market liquidity and Blue's token balance. For same-token offers max `buyerAssets` equals this
-bound. For cross-token offers callers compute `bound * limitPrice / ORACLE_PRICE_SCALE`, rounded down, using that
-offer's `limitPrice` from maker data. Conversion is left to the caller because each offer carries its own price.
+Callback data is `abi.encode(bytes makerData, bytes takerData)`, where maker data is `abi.encode(MarketParams blueMarketParams, uint256 limitPrice)` and taker data is `abi.encode(address swapper, bytes swapData)`.
+The price is the Morpho Blue `ORACLE_PRICE_SCALE` (1e36)-scaled minimum raw A units per raw B unit: USDC (6 decimals) to DAI (18 decimals) at parity uses `1e48`, and the reverse uses `1e24`.
+Withdrawals round down in the maker's favor.
+Positive cross-token buys reject a zero price.
+Zero buys neither withdraw nor call the swapper.
+`buyerAssetsBound` always returns Blue loan-token units: the minimum of the supply position, market liquidity and Blue's token balance.
+For same-token offers max `buyerAssets` equals this bound.
+For cross-token offers callers compute `bound * limitPrice / ORACLE_PRICE_SCALE`, rounded down, using that offer's `limitPrice` from maker data.
+Conversion is left to the caller because each offer carries its own price.
 
 When the Blue and Midnight loan tokens match, the callback withdraws `buyerAssets` directly to itself without a swap.
-It ignores `limitPrice` and `takerData` (which may be empty bytes), and `buyerAssetsBound` returns the unconverted Blue
-availability. For different tokens, it withdraws `sourceAssets = buyerAssets * ORACLE_PRICE_SCALE / limitPrice` to the swapper.
-Every successful callback emits `OnBuy(caller, id, buyerAssets, sourceAssets, swapper)`, including zero buys and direct
-withdrawals; `swapper` is zero when no swap happens.
+It ignores `limitPrice` and `takerData` (which may be empty bytes), and `buyerAssetsBound` returns the unconverted Blue availability.
+For different tokens, it withdraws `sourceAssets = buyerAssets * ORACLE_PRICE_SCALE / limitPrice` to the swapper.
+Every successful callback emits `OnBuy(caller, id, buyerAssets, sourceAssets, swapper)`, including zero buys and direct withdrawals; `swapper` is zero when no swap happens.
 
 The owner manages Blue permissions with `setAuthorization`; signature-based authorization is not supported.
-Skimming follows `BlueBuyCallback`. The factory uses owner and salt to deploy
-deterministically and records `callbackOf` and `isBlueSwapBuyCallback`.
+Skimming follows `BlueBuyCallback`.
+The factory uses owner and salt to deploy deterministically and records `callbackOf` and `isBlueSwapBuyCallback`.
 
 ### `MakerCallbackDataRatifier`
 
-Wraps an existing ratifier so makers commit to maker data while takers choose execution data. Authorize the wrapper
-on Midnight, and sign the inner ratifier's normal offer leaf with `callbackData = makerData` and `ratifier = wrapper`.
-The actual offer passed to Midnight has the two-part callback data above. The callback address and maker data remain
-bound; taker data does not. Since the leaf includes `offer.ratifier`, direct-inner and wrapper offers are not interchangeable.
-Signatures and cancellation use the inner ratifier's domain and state. The inner ratifier must support forwarded calls.
+Wraps an existing ratifier so makers commit to maker data while takers choose execution data.
+Authorize the wrapper on Midnight, and sign the inner ratifier's normal offer leaf with `callbackData = makerData` and `ratifier = wrapper`.
+The actual offer passed to Midnight has the two-part callback data above.
+The callback address and maker data remain bound; taker data does not.
+Since the leaf includes `offer.ratifier`, direct-inner and wrapper offers are not interchangeable.
+Signatures and cancellation use the inner ratifier's domain and state.
+The inner ratifier must support forwarded calls.
 
 ### `BlueBuyCallback`
 
