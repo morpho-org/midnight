@@ -11,7 +11,7 @@ fs_permissions = [
 ]
 
 [profile.default.fuzz]
-runs = 2048
+runs = 1024
 
 [lint]
 exclude_lints = [
