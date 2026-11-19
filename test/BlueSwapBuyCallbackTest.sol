@@ -16,6 +16,8 @@ import {HashLib} from "../src/ratifiers/libraries/HashLib.sol";
 import {Signature, IEcrecoverRatifier} from "../src/ratifiers/interfaces/IEcrecoverRatifier.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {ERC20} from "./erc20s/ERC20.sol";
+import {GenericSwapper} from "./helpers/GenericSwapper.sol";
+import {MockExchange} from "./helpers/MockExchange.sol";
 
 contract SwapToken is ERC20 {
     uint8 public decimals;
@@ -52,6 +54,31 @@ contract TestSwapper is ISwapper {
     }
 }
 
+contract NestedTakeSwapper is ISwapper {
+    address public midnight;
+    bytes public nestedTake;
+
+    function configure(address _midnight, bytes memory _nestedTake) external {
+        midnight = _midnight;
+        nestedTake = _nestedTake;
+    }
+
+    function onSwap(address, address tokenOut, uint256, uint256 minAmountOut, bytes memory) external returns (bytes32) {
+        if (nestedTake.length > 0) {
+            bytes memory callData = nestedTake;
+            delete nestedTake;
+            (bool success, bytes memory reason) = midnight.call(callData);
+            if (!success) {
+                assembly ("memory-safe") {
+                    revert(add(reason, 0x20), mload(reason))
+                }
+            }
+        }
+        require(ERC20(tokenOut).transfer(msg.sender, minAmountOut));
+        return CALLBACK_SUCCESS;
+    }
+}
+
 abstract contract BlueSwapBuyCallbackBase is BaseTest {
     using MarketParamsLib for MarketParams;
 
@@ -59,6 +86,9 @@ abstract contract BlueSwapBuyCallbackBase is BaseTest {
     BlueSwapBuyCallback internal callback;
     MakerCallbackDataRatifier internal wrapper;
     TestSwapper internal swapper;
+    GenericSwapper internal genericSwapper;
+    MockExchange internal exchange;
+    bytes internal swapData;
     SwapToken internal tokenIn;
     SwapToken internal tokenOut;
     Market internal market;
@@ -89,7 +119,28 @@ abstract contract BlueSwapBuyCallbackBase is BaseTest {
     }
 
     function data() internal view returns (bytes memory) {
+        if (address(genericSwapper) != address(0)) {
+            return abi.encode(abi.encode(params, price), abi.encode(address(genericSwapper), swapData));
+        }
         return abi.encode(abi.encode(params, price), abi.encode(address(swapper), hex""));
+    }
+
+    function configureRoute(uint256 amountIn, uint256 output) internal {
+        genericSwapper = new GenericSwapper();
+        exchange = new MockExchange();
+        exchange.setRate(price);
+        deal(address(tokenOut), address(exchange), output);
+        swapData = abi.encode(
+            address(exchange),
+            abi.encodeCall(exchange.swap, (address(tokenIn), address(tokenOut), amountIn)),
+            otherLender
+        );
+    }
+
+    function assertRouteCleared() internal view {
+        assertEq(tokenIn.balanceOf(address(genericSwapper)), 0);
+        assertEq(tokenOut.balanceOf(address(genericSwapper)), 0);
+        assertEq(tokenIn.allowance(address(genericSwapper), address(exchange)), 0);
     }
 
     function supply(uint256 assets) internal {
@@ -131,7 +182,7 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
 
     function testFullTake() public {
         supply(1e6);
-        configure(1e18);
+        configureRoute(1e6, 1e18);
         collateralize(market, borrower, 1e18);
         (Offer memory offer, bytes memory proof) = signedOffer(1e18);
         vm.prank(borrower);
@@ -140,30 +191,42 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         assertEq(buyerAssets, 1e18);
         assertEq(tokenOut.balanceOf(borrower), sellerAssets);
         assertEq(blue.position(params.id(), address(callback)).supplyShares, 0);
-        assertEq(tokenIn.balanceOf(address(swapper)), 1e6);
+        assertEq(tokenIn.balanceOf(address(exchange)), 1e6);
+        assertRouteCleared();
         assertEq(midnight.credit(toId(market), lender), 1e18);
     }
 
-    function testSurplusAndSkim() public {
-        supply(1e6);
-        configure(2e18);
-        buy(1e18);
-        vm.prank(address(midnight));
-        require(tokenOut.transferFrom(address(callback), borrower, 1e18));
+    function testSkimDonations() public {
+        deal(address(tokenOut), address(callback), 1e18);
         assertEq(tokenOut.balanceOf(address(callback)), 1e18);
         callback.skim(address(tokenOut));
         assertEq(tokenOut.balanceOf(lender), 1e18);
         assertEq(tokenOut.balanceOf(address(callback)), 0);
     }
 
-    function testShortDeliveryAndPreexistingBalance() public {
+    function testShortDeliveryRevertsThroughMidnight() public {
         supply(1e6);
         configure(1e18 - 1);
-        deal(address(tokenOut), address(callback), 10e18);
-        vm.expectRevert(IBlueSwapBuyCallback.InsufficientDelivery.selector);
-        vm.prank(address(midnight));
-        callback.onBuy(bytes32(0), market, 1e18, 0, 0, lender, data());
-        assertEq(tokenOut.balanceOf(address(callback)), 10e18);
+        collateralize(market, borrower, 1e18);
+        (Offer memory offer, bytes memory proof) = signedOffer(1e18);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.prank(borrower);
+        midnight.take(offer, proof, 1e18, borrower, borrower, address(0), hex"");
+        assertEq(tokenIn.balanceOf(address(blue)), 1e6);
+    }
+
+    function testPreexistingBalanceCanFundDelivery() public {
+        supply(1e6);
+        configure(1e18 - 1);
+        deal(address(tokenOut), address(callback), 1);
+        collateralize(market, borrower, 1e18);
+        (Offer memory offer, bytes memory proof) = signedOffer(1e18);
+        vm.prank(borrower);
+        (uint256 buyerAssets, uint256 sellerAssets) =
+            midnight.take(offer, proof, 1e18, borrower, borrower, address(0), hex"");
+        assertEq(buyerAssets, 1e18);
+        assertEq(tokenOut.balanceOf(borrower), sellerAssets);
+        assertEq(tokenOut.balanceOf(address(callback)), 0);
     }
 
     function testInvalidReturn() public {
@@ -197,10 +260,66 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         market.loanToken = address(tokenOut);
         price = 1e24;
         supply(1e18);
-        configure(1e6);
+        configureRoute(1e18, 1e6);
         buy(1e6);
-        assertEq(tokenIn.balanceOf(address(swapper)), 1e18);
+        assertEq(tokenIn.balanceOf(address(exchange)), 1e18);
         assertEq(tokenOut.balanceOf(address(callback)), 1e6);
+        assertRouteCleared();
+    }
+
+    function testRouteSurplus() public {
+        supply(1e6);
+        configureRoute(1e6, 2e18);
+        exchange.setRate(2 * price);
+        buy(1e18);
+        assertEq(tokenOut.balanceOf(address(callback)), 1e18);
+        assertEq(tokenOut.balanceOf(otherLender), 1e18);
+        assertRouteCleared();
+    }
+
+    function testRouteShortDelivery() public {
+        supply(1e6);
+        configureRoute(1e6, 1e18);
+        exchange.setRate(price / 2);
+        collateralize(market, borrower, 1e18);
+        (Offer memory offer, bytes memory proof) = signedOffer(1e18);
+        vm.expectRevert(GenericSwapper.InsufficientOutput.selector);
+        vm.prank(borrower);
+        midnight.take(offer, proof, 1e18, borrower, borrower, address(0), hex"");
+        assertEq(tokenIn.balanceOf(address(blue)), 1e6);
+        assertRouteCleared();
+    }
+
+    function testRouteBubblesRevert() public {
+        supply(1e6);
+        configureRoute(1e6, 0);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Insufficient balance"));
+        vm.prank(address(midnight));
+        callback.onBuy(bytes32(0), market, 1e18, 0, 0, lender, data());
+        assertEq(tokenIn.balanceOf(address(blue)), 1e6);
+        assertRouteCleared();
+    }
+
+    function testRouteZeroAmounts() public {
+        configureRoute(0, 0);
+        assertEq(genericSwapper.onSwap(address(tokenIn), address(tokenOut), 0, 0, swapData), CALLBACK_SUCCESS);
+        assertRouteCleared();
+    }
+
+    function testRouteRefundsUnusedInput() public {
+        configureRoute(5e5, 5e17);
+        deal(address(tokenIn), address(genericSwapper), 1e6);
+        assertEq(genericSwapper.onSwap(address(tokenIn), address(tokenOut), 1e6, 5e17, swapData), CALLBACK_SUCCESS);
+        assertEq(tokenIn.balanceOf(otherLender), 5e5);
+        assertEq(tokenOut.balanceOf(address(this)), 5e17);
+        assertRouteCleared();
+    }
+
+    function testRouteMalformedData() public {
+        configureRoute(0, 0);
+        vm.expectRevert();
+        genericSwapper.onSwap(address(tokenIn), address(tokenOut), 0, 0, hex"");
+        assertRouteCleared();
     }
 
     function testBound() public {
@@ -226,7 +345,7 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         supply(1e6);
         configure(1e18 + 1);
         vm.expectEmit(address(callback));
-        emit IBlueSwapBuyCallback.Swap(address(midnight), bytes32(0), address(swapper), 1e6, 1e18 + 1);
+        emit IBlueSwapBuyCallback.Swap(address(midnight), bytes32(0), address(swapper), 1e6);
         buy(1e18 + 1);
         assertEq(tokenIn.balanceOf(address(swapper)), 1e6);
     }
@@ -283,21 +402,33 @@ contract BlueSwapBuyCallbackTest is BlueSwapBuyCallbackBase {
         assertEq(swapper.attackError(), abi.encodeWithSelector(IBlueSwapBuyCallback.NotMidnight.selector));
     }
 
-    function testReentrantTake() public {
+    function testNestedTakeSettlesBothFills() public {
         supply(2e6);
-        configure(1e18);
-        collateralize(market, address(swapper), 1e18);
+        NestedTakeSwapper nestedSwapper = new NestedTakeSwapper();
+        deal(address(tokenOut), address(nestedSwapper), 2e18);
+        collateralize(market, address(nestedSwapper), 1e18);
         collateralize(market, borrower, 1e18);
         (Offer memory offer, bytes memory proof) = signedOffer(2e18);
-        swapper.configure(
-            1e18,
-            CALLBACK_SUCCESS,
+        offer.callbackData = abi.encode(abi.encode(params, price), abi.encode(address(nestedSwapper), hex""));
+        nestedSwapper.configure(
             address(midnight),
-            abi.encodeCall(midnight.take, (offer, proof, 1e18, address(swapper), address(swapper), address(0), hex""))
+            abi.encodeCall(
+                midnight.take, (offer, proof, 1e18, address(nestedSwapper), address(nestedSwapper), address(0), hex"")
+            )
         );
         vm.prank(borrower);
-        midnight.take(offer, proof, 1e18, borrower, borrower, address(0), hex"");
-        assertEq(swapper.attackError(), abi.encodeWithSelector(IBlueSwapBuyCallback.Reentrancy.selector));
+        (uint256 buyerAssets, uint256 sellerAssets) =
+            midnight.take(offer, proof, 1e18, borrower, borrower, address(0), hex"");
+        assertEq(buyerAssets, 1e18);
+        assertEq(tokenOut.balanceOf(borrower), sellerAssets);
+        assertEq(tokenOut.balanceOf(address(nestedSwapper)), sellerAssets);
+        assertEq(midnight.credit(toId(market), lender), 2e18);
+        assertEq(midnight.debt(toId(market), borrower), 1e18);
+        assertEq(midnight.debt(toId(market), address(nestedSwapper)), 1e18);
+        assertEq(tokenIn.balanceOf(address(nestedSwapper)), 2e6);
+        assertEq(blue.position(params.id(), address(callback)).supplyShares, 0);
+        assertEq(tokenOut.balanceOf(address(callback)), 0);
+        assertEq(tokenOut.allowance(address(callback), address(midnight)), 0);
     }
 }
 

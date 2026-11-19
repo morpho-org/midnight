@@ -5,9 +5,9 @@ This folder contains optional helpers for interacting with Midnight.
 ### `BlueSwapBuyCallback` and `BlueSwapBuyCallbackFactory`
 
 Funds a Midnight buy in token A by withdrawing the callback's Blue supply in token B directly to a taker-selected
-`ISwapper`. The swapper must deliver the required A to the callback and return `CALLBACK_SUCCESS`. Only the increase
-in A balance counts; surplus stays in the callback and anyone can `skim` it to the owner. A transient lock prevents
-nested buys on the same callback. Swappers receive tokens, never Blue authorization.
+`ISwapper`. The swapper delivers the required A to the callback and returns `CALLBACK_SUCCESS`. Midnight's subsequent
+transferFrom enforces payment; pre-existing callback balances may contribute to it. Nested buys are supported.
+Swappers receive tokens, never Blue authorization. Anyone can `skim` rewards or donations to the owner.
 
 Callback data is `abi.encode(bytes makerData, bytes takerData)`, where maker data is
 `abi.encode(MarketParams blueMarketParams, uint256 limitPrice)` and taker data is `abi.encode(address swapper, bytes swapData)`.

@@ -8,9 +8,7 @@ import {Authorization, Signature} from "../../../../lib/morpho-blue/src/interfac
 interface IBlueSwapBuyCallback is IBuyCallback, IBuyerAssetsBound {
     /// ERRORS ///
     error AuthorizationExpired();
-    error Reentrancy();
     error InvalidSwapCallback();
-    error InsufficientDelivery();
     error InvalidNonce();
     error InvalidSignature();
     error NotMidnight();
@@ -21,9 +19,7 @@ interface IBlueSwapBuyCallback is IBuyCallback, IBuyerAssetsBound {
     /// @dev To track authorization changes, listen to the SetAuthorization event emitted by Blue.
     event SetAuthorizationWithSig(address indexed caller, uint256 nonce);
     event Skim(address indexed caller, address indexed token, uint256 assets);
-    event Swap(
-        address indexed caller, bytes32 indexed id, address indexed swapper, uint256 blueAssets, uint256 received
-    );
+    event Swap(address indexed caller, bytes32 indexed id, address indexed swapper, uint256 blueAssets);
 
     /// STORAGE GETTERS ///
     function OWNER() external view returns (address);

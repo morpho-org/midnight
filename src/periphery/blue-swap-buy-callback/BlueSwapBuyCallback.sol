@@ -39,7 +39,6 @@ contract BlueSwapBuyCallback is IBlueSwapBuyCallback {
     address public immutable MIDNIGHT;
     address public immutable BLUE;
     uint256 public nonce;
-    bool internal transient locked;
 
     constructor(address _owner, address _midnight, address _blue) {
         OWNER = _owner;
@@ -92,30 +91,20 @@ contract BlueSwapBuyCallback is IBlueSwapBuyCallback {
     ) external returns (bytes32) {
         require(msg.sender == MIDNIGHT, NotMidnight());
         require(buyer == OWNER, NotOwnerBuyer());
-        require(!locked, Reentrancy());
-        locked = true;
         (bytes memory makerData, bytes memory takerData) = abi.decode(data, (bytes, bytes));
         (MarketParams memory marketParams, uint256 limitPrice) = abi.decode(makerData, (MarketParams, uint256));
         if (buyerAssets > 0) {
             uint256 blueAssets = buyerAssets.mulDivDown(ORACLE_PRICE_SCALE, limitPrice);
             (address swapper, bytes memory swapData) = abi.decode(takerData, (address, bytes));
-            // forge-lint: disable-next-item(reentrancy-no-eth) locked remains true throughout all external calls.
             if (blueAssets > 0) IMorpho(BLUE).withdraw(marketParams, blueAssets, 0, address(this), swapper);
-            uint256 balanceBefore = IERC20Extended(market.loanToken).balanceOf(address(this));
-            // forge-lint: disable-next-item(reentrancy-no-eth) locked remains true throughout all external calls.
             require(
                 ISwapper(swapper).onSwap(marketParams.loanToken, market.loanToken, blueAssets, buyerAssets, swapData)
                     == CALLBACK_SUCCESS,
                 InvalidSwapCallback()
             );
-            uint256 balanceAfter = IERC20Extended(market.loanToken).balanceOf(address(this));
-            require(
-                balanceAfter >= balanceBefore && balanceAfter - balanceBefore >= buyerAssets, InsufficientDelivery()
-            );
-            emit Swap(msg.sender, id, swapper, blueAssets, balanceAfter - balanceBefore);
+            emit Swap(msg.sender, id, swapper, blueAssets);
         }
         ERC20Lib.safeApprove(market.loanToken, MIDNIGHT, buyerAssets);
-        locked = false;
         return CALLBACK_SUCCESS;
     }
 
