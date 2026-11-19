@@ -70,15 +70,12 @@ jobs:
       - name: Install certora
         run: pip install certora-cli
 
-      - name: Install solc
+      - name: Install solc (0.8.34)
         run: |
-          echo "0.8.34 d40adc6f9fdbb22a97d32a02fa05688bf2ee7886affc48c9851b0afd4a726b39" |
-          while read -r version sha256; do
-            curl -fsSL -o solc "https://github.com/ethereum/solidity/releases/download/v$version/solc-static-linux"
-            echo "$sha256  solc" | sha256sum --check --strict
-            chmod +x solc
-            sudo mv solc "/usr/local/bin/solc-$version"
-          done
+          wget https://github.com/ethereum/solidity/releases/download/v0.8.34/solc-static-linux
+          echo "d40adc6f9fdbb22a97d32a02fa05688bf2ee7886affc48c9851b0afd4a726b39  solc-static-linux" | sha256sum --check --strict
+          chmod +x solc-static-linux
+          sudo mv solc-static-linux /usr/local/bin/solc-0.8.34
 
       - name: Verify ${{ matrix.conf }} specification
         run: certoraRun "certora/confs/$CONF.conf"
