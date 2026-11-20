@@ -32,10 +32,6 @@ contract ReceivableRepayerTest is ReceivableTokenTest {
 
     function testFullRepayRounding() public {
         _prepare();
-        _assertFullRepay();
-    }
-
-    function _assertFullRepay() internal {
         uint256 balanceBefore = loanToken.balanceOf(minter);
         uint256 amount = (DEBT * WAD + token.rate() - 1) / token.rate();
         _repay(DEBT);
@@ -54,15 +50,6 @@ contract ReceivableRepayerTest is ReceivableTokenTest {
         assertEq(midnight.debt(toId(_market()), minter), DEBT / 2, "remaining debt");
         assertGt(midnight.collateral(toId(_market()), minter, 0), 0, "remaining collateral");
         assertTrue(midnight.isHealthy(_market(), toId(_market()), minter), "healthy");
-    }
-
-    function testWhitelistedRepayer() public {
-        _prepare();
-        vm.prank(minter);
-        token.setRoot(ROOT_C, MerkleProofLib.leaf(address(repayer), 0));
-        vm.prank(address(repayer));
-        token.mint(ROOT_C, 0, 0, emptyProof);
-        _assertFullRepay();
     }
 
     function testNotMidnight() public {

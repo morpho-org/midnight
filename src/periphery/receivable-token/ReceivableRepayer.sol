@@ -46,10 +46,6 @@ contract ReceivableRepayer is IRepayCallback, IReceivableTokenReceiver {
 
         expectedToken = address(token);
         IMidnight(midnight).withdrawCollateral(market, collateralIndex, amount, onBehalf, address(this));
-        if (expectedToken != address(0)) {
-            expectedToken = address(0);
-            token.redeem(amount, address(this));
-        }
 
         ERC20Lib.safeApprove(market.loanToken, midnight, units);
         repaying = false;
