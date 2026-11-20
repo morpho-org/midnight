@@ -198,7 +198,7 @@ rule takeNetCreditChangeForBuyerAndSeller(env e, Midnight.Offer offer, bytes rat
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
     // We require it after `take`, because `take` may initialize the market first.
-    require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
+    require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.spec";
 
     requireInvariant maturityBoundedById(summaryToId(offer.market));
 
@@ -224,7 +224,7 @@ rule netCreditIncreaseCallsOnBuy(env e, Midnight.Offer offer, bytes ratifierData
 
     take(e, offer, ratifierData, units, taker, receiver, takerCallback, takerCallbackData);
 
-    require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.sol";
+    require continuousFee(summaryToId(offer.market)) <= MAX_CONTINUOUS_FEE(), "See continuousFeeBounded in Midnight.spec";
     requireInvariant maturityBoundedById(summaryToId(offer.market));
 
     mathint netCreditAfter = netCredit(e, offer.market, user);
