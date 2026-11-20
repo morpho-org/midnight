@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Morpho Association
 pragma solidity ^0.8.0;
 
 import {ReceivableTokenTest} from "./ReceivableTokenTest.sol";
