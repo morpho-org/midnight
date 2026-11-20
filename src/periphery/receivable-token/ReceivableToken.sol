@@ -17,12 +17,14 @@ import {IReceivableTokenReceiver} from "./interfaces/IReceivableTokenReceiver.so
 /// `rate` units of the asset as long as the contract holds them.
 ///
 /// REPORTS
-/// @dev The owner publishes reports identified by a `rootId`: Merkle roots of `(account, reported)` leaves, where
-/// `reported` is the cumulative amount of tokens that `account` may mint under the report. The owner allocates the
-/// receipts expected by the token between accounts this way. Reports should be monotone: a new receivable increases
-/// `reported`, a receipt does not decrease it.
-/// @dev Under a report, an account can have minted at most `reported`. Receipts in excess of the outstanding tokens
-/// are extracted the same way: by minting within one's allowance and redeeming.
+/// @dev The owner publishes reports identified by a `rootId`: Merkle roots of `(key, reported)` leaves, each a chunk of
+/// `reported` tokens that the holder of `key` may mint once, to any account. The owner allocates the receipts expected
+/// by the token in chunks this way.
+/// @dev Receipts in excess of the outstanding tokens are extracted the same way: by minting unminted chunks and
+/// redeeming.
+/// @dev Each `key` is a one-time ERC-5564 scheme 1 stealth address that the owner derives from the user's spending and
+/// viewing public keys (see the README), so outsiders cannot link chunks or brute-force their amounts as long as every
+/// leaf uses a fresh key.
 ///
 /// RATE
 /// @dev The owner sets `rate`, the assets each token redeems for, to the expected recovery over the total reported
@@ -35,10 +37,10 @@ import {IReceivableTokenReceiver} from "./interfaces/IReceivableTokenReceiver.so
 /// come, first served, like oracle lag before a liquidation.
 ///
 /// HOLDERS
-/// @dev Whitelisted accounts are Midnight plus every account that has submitted a valid proof under any report, by
-/// calling `mint`, possibly with amount 0. The owner can whitelist a non-minter, such as a liquidator or a buyer
-/// that wants to keep tokens, by including a leaf with `reported` = 0 in a report. Whitelisting is permanent:
-/// leaving an account out of a later report does not remove it.
+/// @dev Whitelisted accounts are Midnight plus every account that has been minted to under any report, possibly with
+/// amount 0. The owner can whitelist a non-minter, such as a liquidator or a buyer that wants to keep tokens, by
+/// including a leaf keyed by that account with `reported` = 0 in a report. Whitelisting is permanent: leaving an
+/// account out of a later report does not remove it.
 /// @dev Only whitelisted accounts hold tokens across transactions. Any other account can still receive tokens, but
 /// only transiently: the token credits them in transient storage, calls onReceivableTokenReceived on the receiver,
 /// and reverts if the receiver still holds tokens when the call returns. The receiver must redeem them or transfer
@@ -51,7 +53,7 @@ import {IReceivableTokenReceiver} from "./interfaces/IReceivableTokenReceiver.so
 /// collateral on Midnight.
 ///
 /// USAGE
-/// @dev This contract does not interact with Midnight. Accounts with an allowance mint tokens and can sell them, or
+/// @dev This contract does not interact with Midnight. Chunk key holders mint tokens and can sell them, or
 /// supply them as collateral on any Midnight market that lists them and sell debt against them. The debt is repaid
 /// either by the borrower, typically with a repay callback that withdraws and redeems the collateral once the receipts
 /// are in, or by a liquidator after maturity who then redeems the seized tokens.
@@ -87,8 +89,8 @@ contract ReceivableToken is IReceivableToken {
     /// @dev Balances of whitelisted accounts.
     mapping(address account => uint256) internal _balanceOf;
     mapping(address owner => mapping(address spender => uint256)) public allowance;
-    /// @dev Tokens minted by the account under the report.
-    mapping(bytes32 rootId => mapping(address account => uint256)) public minted;
+    /// @dev Whether the leaf has been minted.
+    mapping(bytes32 leaf => bool) public minted;
     /// @dev Tokens transiently held by non-whitelisted accounts in this transaction.
     uint256 public transient transientSupply;
 
@@ -113,7 +115,7 @@ contract ReceivableToken is IReceivableToken {
         emit SetOwner(newOwner);
     }
 
-    /// @dev Leaves are MerkleProofLib.leaf(account, reported).
+    /// @dev Leaves are MerkleProofLib.leaf(key, reported).
     function setRoot(bytes32 rootId, bytes32 newRoot) external {
         require(msg.sender == owner, NotOwner());
         roots[rootId] = newRoot;
@@ -130,26 +132,52 @@ contract ReceivableToken is IReceivableToken {
 
     /// MINTER FUNCTIONS ///
 
-    /// @dev Mints `amount` tokens to the caller, within its allowance under the report.
-    /// @dev `reported` and `proof` must match the report's current root, for the leaf (caller, reported).
-    /// @dev Whitelists the caller permanently. Calling `mint` with `amount` = 0 is the way to get whitelisted
-    /// without minting.
-    function mint(bytes32 rootId, uint256 amount, uint256 reported, bytes32[] memory proof) external {
-        bytes32 leaf = MerkleProofLib.leaf(msg.sender, reported);
+    /// @dev Mints the leaf's `reported` tokens to `to`, once per leaf.
+    /// @dev `key`, `reported` and `proof` must match the report's current root. The caller must be `key`, or relay
+    /// `key`'s signature over `keccak256(abi.encode(block.chainid, address(this), leaf, to))`, signed with the EIP-191
+    /// `personal_sign` prefix.
+    /// @dev Whitelists `to` permanently. Minting a leaf with `reported` = 0 is the way to get whitelisted without
+    /// minting.
+    function mint(
+        bytes32 rootId,
+        address key,
+        uint256 reported,
+        bytes32[] memory proof,
+        address to,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        bytes32 leaf = MerkleProofLib.leaf(key, reported);
         require(MerkleProofLib.verify(proof, roots[rootId], leaf), InvalidProof());
-        uint256 newMinted = minted[rootId][msg.sender] + amount;
-        require(newMinted <= reported, ExceedsReceivables());
-        minted[rootId][msg.sender] = newMinted;
+        require(!minted[leaf], AlreadyMinted());
+        minted[leaf] = true;
+        // forge-lint: disable-next-item(ecrecover) malleability is ok because each leaf can only be minted once.
+        require(
+            msg.sender == key
+                || (key != address(0)
+                    && ecrecover(
+                        keccak256(
+                            abi.encodePacked(
+                                "\x19Ethereum Signed Message:\n32",
+                                keccak256(abi.encode(block.chainid, address(this), leaf, to))
+                            )
+                        ),
+                        v,
+                        r,
+                        s
+                    ) == key),
+            InvalidSignature()
+        );
 
-        if (!_isWhitelisted[msg.sender]) {
-            _isWhitelisted[msg.sender] = true;
-            emit Whitelist(msg.sender);
+        if (!_isWhitelisted[to]) {
+            _isWhitelisted[to] = true;
+            emit Whitelist(to);
         }
 
-        emit Mint(rootId, msg.sender, amount, reported);
-
-        _credit(msg.sender, amount);
-        emit Transfer(address(0), msg.sender, amount);
+        emit Mint(rootId, leaf, to, reported);
+        _credit(to, reported);
+        emit Transfer(address(0), to, reported);
     }
 
     /// HOLDER FUNCTIONS ///
@@ -172,7 +200,7 @@ contract ReceivableToken is IReceivableToken {
         return _totalSupply + transientSupply;
     }
 
-    /// @dev Midnight is always whitelisted; other accounts once they have proven a leaf in a report.
+    /// @dev Midnight is always whitelisted; other accounts once they have been minted to under a report.
     function isWhitelisted(address account) public view returns (bool) {
         return account == midnight || _isWhitelisted[account];
     }
