@@ -212,6 +212,7 @@ contract ReceivableToken is IReceivableToken {
         if (allowed != type(uint256).max) {
             require(allowed >= amount, InsufficientAllowance());
             allowance[from][msg.sender] = allowed - amount;
+            emit Approval(from, msg.sender, allowed - amount);
         }
         _transfer(from, to, amount);
         return true;
@@ -223,7 +224,7 @@ contract ReceivableToken is IReceivableToken {
         _debit(from, amount);
         _credit(to, amount);
         emit Transfer(from, to, amount);
-        if (!isWhitelisted(to)) {
+        if (amount > 0 && !isWhitelisted(to)) {
             IReceivableTokenReceiver(to).onReceivableTokenReceived(from, amount);
             require(_tload(_transientBalanceSlot(to)) == 0, TransientBalanceNotSettled());
         }

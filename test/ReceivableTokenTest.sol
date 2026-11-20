@@ -144,6 +144,45 @@ contract ReceivableTokenTest is BaseTest {
 
     /// FACTORY ///
 
+    function testFactoryConstructorEvent() public {
+        vm.expectEmit();
+        emit IReceivableTokenFactory.Constructor(address(midnight));
+        address created = deployCode("ReceivableTokenFactory.sol", abi.encode(address(midnight)));
+        assertEq(IReceivableTokenFactory(created).midnight(), address(midnight), "midnight");
+    }
+
+    function testCreateReceivableTokenEvent() public {
+        vm.recordLogs();
+        vm.prank(stranger);
+        address created = factory.createReceivableToken(minter, address(loanToken), "Fresh", "FRS", bytes32(uint256(1)));
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        Vm.Log memory creation = logs[logs.length - 1];
+        assertEq(creation.emitter, address(factory), "emitter");
+        assertEq(creation.topics.length, 4, "topics");
+        assertEq(creation.topics[0], IReceivableTokenFactory.CreateReceivableToken.selector, "event");
+        assertEq(creation.topics[1], bytes32(uint256(uint160(minter))), "owner");
+        assertEq(creation.topics[2], bytes32(uint256(uint160(address(loanToken)))), "asset");
+        assertEq(creation.topics[3], bytes32(uint256(uint160(created))), "token");
+        assertEq(creation.data, abi.encode(bytes32(uint256(1)), "Fresh", "FRS", stranger), "data");
+    }
+
+    function testTransferFromAllowance(uint256 amount) public {
+        amount = bound(amount, 0, REPORTED);
+        _mint(REPORTED);
+        vm.prank(minter);
+        token.approve(stranger, REPORTED);
+        vm.expectEmit(address(token));
+        emit IReceivableToken.Approval(minter, stranger, REPORTED - amount);
+        vm.prank(stranger);
+        token.transferFrom(minter, lender, amount);
+        assertEq(token.allowance(minter, stranger), REPORTED - amount, "allowance");
+        assertEq(token.balanceOf(lender), amount, "transferred");
+
+        vm.prank(stranger);
+        vm.expectRevert(IReceivableToken.InsufficientAllowance.selector);
+        token.transferFrom(minter, lender, REPORTED - amount + 1);
+    }
+
     function testCreateReceivableToken() public {
         assertTrue(factory.isReceivableToken(address(token)), "isReceivableToken");
         assertEq(token.name(), "Receivable A", "name");
@@ -575,8 +614,12 @@ contract ReceivableTokenTest is BaseTest {
 
         // A (0, 0) liquidation realizes the bad debt without seizing collateral.
         uint256 lossFactorBefore = midnight.lossFactor(id);
+        assertFalse(token.isWhitelisted(stranger), "receiver not whitelisted");
+        assertEq(stranger.code.length, 0, "receiver is EOA");
+        vm.expectEmit(address(token));
+        emit IReceivableToken.Transfer(address(midnight), stranger, 0);
         vm.prank(liquidator);
-        midnight.liquidate(market, 0, 0, 0, minter, false, address(midnight), address(0), "");
+        midnight.liquidate(market, 0, 0, 0, minter, false, stranger, address(0), "");
         assertLt(midnight.debt(id, minter), units, "bad debt realized");
         assertGt(midnight.lossFactor(id), lossFactorBefore, "loss factor increased");
     }
