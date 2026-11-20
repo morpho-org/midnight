@@ -71,6 +71,19 @@ The contract does not interact with Midnight. Minters can sell the tokens, or su
 The debt is repaid either by the borrower, typically with a repay callback that withdraws and redeems the collateral once the receipts are in, or by a liquidator after maturity who then redeems the seized tokens.
 A market can list up to 128 tokens, each with its own LLTV, so lenders diversify across tokens through markets rather than through pooled claims.
 
+### `ReceivableRepayer`
+
+Repays a borrower's debt by withdrawing and redeeming their receivable collateral inside Midnight's repay callback.
+The collateral token's asset must match the market's loan token, its rate must be nonzero, and it must hold enough cash.
+Only the collateral index is read from callback data; collateral is always withdrawn from the borrower being repaid.
+
+The borrower first calls `midnight.setIsAuthorized(repayer, true, borrower)`, then calls
+`midnight.repay(market, units, borrower, repayer, abi.encode(collateralIndex))`.
+The repayer withdraws the collateral amount rounded up at the current rate and redeems it for exactly `units` loan
+tokens, since the rate is at most WAD, then approves Midnight for exactly `units`.
+The repayer redeems inside the token's receiver hook.
+The receiver hook only accepts the expected token during a repayment.
+
 ### `ReceivableTokenFactory`
 
 Deploys `ReceivableToken`s with `CREATE2` from a caller-provided salt, and records them in `isReceivableToken`.
