@@ -79,7 +79,7 @@ rule takeRequiresNonZeroMaker(env e, Midnight.Offer offer, bytes ratifierData, u
 }
 
 // Every successful take asks the offer's ratifier to ratify the offer for the taker, and requires it to return CALLBACK_SUCCESS.
-// Of the offer seen by the ratifier, only the maker and the callback are checked: they are the fields the take summary in morpho-org/vault-v2#1361 relies on.
+// Of the offer seen by the ratifier, only the maker and the callback are checked.
 rule takeRequiresRatifierSuccess(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
     require ratificationCalls == 0, "no ratification before take";
 
