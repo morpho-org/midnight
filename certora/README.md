@@ -120,6 +120,7 @@ The collateral bitmap is an optimization: no functional changes compared to the 
 Round-trip properties ensuring that helper computations can reach any target amount.
 
 - [`TakeAmountsLibInvertibility.spec`](specs/TakeAmountsLibInvertibility.spec) checks that `TakeAmountsLib.buyerAssetsToUnits` and `sellerAssetsToUnits` are exact inverses of `take`: feeding the returned units back into `take` produces exactly the target buyer (resp. seller) assets.
+  Both rules run in [`TakeAmountsLibInvertibility.conf`](confs/TakeAmountsLibInvertibility.conf): the main proofs use 100 Z3 seeds with a 90-second per-seed timeout and no splitting, while their built-in vacuity sanity checks use separate solver settings with a broader portfolio and splitting to depth 10.
 
 ## Tick math
 
