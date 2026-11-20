@@ -132,29 +132,4 @@ contract ReceivableRepayerTest is ReceivableTokenTest {
         assertEq(midnight.debt(toId(_market()), minter), DEBT, "debt unchanged");
         assertEq(midnight.collateral(toId(_market()), minter, 0), COLLATERAL, "collateral unchanged");
     }
-
-    function testExcessAssetsReturned() public {
-        _prepare();
-        vm.mockCall(address(token), abi.encodeCall(token.rate, ()), abi.encode(3 * WAD));
-        vm.mockCall(address(token), abi.encodeCall(token.redeem, (1, address(repayer))), abi.encode(uint256(3)));
-        deal(address(loanToken), address(repayer), 3);
-        vm.prank(minter);
-        token.setRoot(ROOT_C, MerkleProofLib.leaf(address(repayer), 0));
-        vm.prank(address(repayer));
-        token.mint(ROOT_C, 0, 0, emptyProof);
-        uint256 beforeBalance = loanToken.balanceOf(minter);
-        vm.mockCalls(
-            address(loanToken),
-            abi.encodeWithSelector(bytes4(keccak256("balanceOf(address)")), address(repayer)),
-            _balances()
-        );
-        _repay(1);
-        assertEq(loanToken.balanceOf(minter), beforeBalance + 2, "excess returned");
-    }
-
-    function _balances() internal pure returns (bytes[] memory balances) {
-        balances = new bytes[](2);
-        balances[0] = abi.encode(uint256(0));
-        balances[1] = abi.encode(uint256(3));
-    }
 }

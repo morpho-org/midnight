@@ -5,13 +5,13 @@ import {IMidnight, Market} from "../../interfaces/IMidnight.sol";
 import {IRepayCallback} from "../../interfaces/ICallbacks.sol";
 import {WAD, CALLBACK_SUCCESS} from "../../libraries/ConstantsLib.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";
-import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {ERC20Lib} from "../libraries/ERC20Lib.sol";
 import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 import {IReceivableTokenReceiver} from "./interfaces/IReceivableTokenReceiver.sol";
 
 /// @dev Repays debt by withdrawing and redeeming the borrower's receivable collateral.
 /// @dev Borrowers must authorize this contract on Midnight. Callback data is an ABI-encoded collateral index.
+/// @dev Because the token's rate is at most WAD, redeeming the rounded-up collateral yields exactly `units`.
 contract ReceivableRepayer is IRepayCallback, IReceivableTokenReceiver {
     using UtilsLib for uint256;
 
@@ -21,12 +21,12 @@ contract ReceivableRepayer is IRepayCallback, IReceivableTokenReceiver {
     error RepayInProgress();
     error ZeroRate();
 
-    address public immutable MIDNIGHT;
+    address public immutable midnight;
     address internal transient expectedToken;
     bool internal transient repaying;
 
-    constructor(address midnight) {
-        MIDNIGHT = midnight;
+    constructor(address _midnight) {
+        midnight = _midnight;
     }
 
     // forge-lint: disable-next-item(reentrancy-no-eth) repaying guards the entire callback against reentrancy.
@@ -34,7 +34,7 @@ contract ReceivableRepayer is IRepayCallback, IReceivableTokenReceiver {
         external
         returns (bytes32)
     {
-        require(msg.sender == MIDNIGHT, NotMidnight());
+        require(msg.sender == midnight, NotMidnight());
         require(!repaying, RepayInProgress());
         repaying = true;
         uint256 collateralIndex = abi.decode(data, (uint256));
@@ -43,18 +43,15 @@ contract ReceivableRepayer is IRepayCallback, IReceivableTokenReceiver {
         uint256 rate = token.rate();
         require(rate != 0, ZeroRate());
         uint256 amount = units.mulDivUp(WAD, rate);
-        uint256 balanceBefore = IReceivableToken(market.loanToken).balanceOf(address(this));
 
         expectedToken = address(token);
-        IMidnight(MIDNIGHT).withdrawCollateral(market, collateralIndex, amount, onBehalf, address(this));
+        IMidnight(midnight).withdrawCollateral(market, collateralIndex, amount, onBehalf, address(this));
         if (expectedToken != address(0)) {
             expectedToken = address(0);
             token.redeem(amount, address(this));
         }
 
-        uint256 assets = IReceivableToken(market.loanToken).balanceOf(address(this)) - balanceBefore;
-        ERC20Lib.safeApprove(market.loanToken, MIDNIGHT, units);
-        if (assets > units) SafeTransferLib.safeTransfer(market.loanToken, onBehalf, assets - units);
+        ERC20Lib.safeApprove(market.loanToken, midnight, units);
         repaying = false;
         return CALLBACK_SUCCESS;
     }
