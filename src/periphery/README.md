@@ -79,21 +79,6 @@ Anyone creates a token with `createReceivableToken`, picking its owner, asset, n
 
 Holders trust a token's owner, who determines who may mint how much and who can hold tokens at all through its reports, and the payers of the receivables.
 
-### `WhitelistEnterGate`
-
-An enter gate that restricts which accounts can increase their credit or debt in a Midnight market.
-
-Each side (credit, debt) has its own whitelist: only whitelisted accounts can enter on that side.
-Each side has its own role setter, who grants or revokes the whitelister role on that side.
-Whitelisters edit the lists directly with `setIsWhitelisted` or allow to edit the list by EIP-712 signatures used by `setIsWhitelistedWithSig`.
-`setIsWhitelistedWithSig` is a no-op instead of a revert when the signed nonce is stale and the account is already set to the signed value.
-A side can be made open at deployment, letting any account enter on that side (forever).
-
-### `WhitelistEnterGateFactory`
-
-Deploys a deterministic `WhitelistEnterGate` using `CREATE2` with a salt derived from the caller and a caller-provided pre-salt.
-The factory records gates in `isWhitelistEnterGate`.
-
 ## Libraries
 
 ### `TakeAmountsLib`
