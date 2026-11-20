@@ -20,7 +20,7 @@ interface IReceivableToken is IERC20, IOracle {
     /// EVENTS ///
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
-    event Constructor(address indexed midnight, address indexed asset, address owner, string name, string symbol);
+    event Constructor(address indexed midnight, address indexed asset, address owner, string name, string symbol, uint8 decimals);
     event SetOwner(address indexed owner);
     event SetRoot(bytes32 indexed rootId, bytes32 root);
     event SetRate(uint256 rate);

@@ -210,6 +210,8 @@ contract ReceivableTokenTest is BaseTest {
 
     function testDecimalsMirrorAsset() public {
         vm.mockCall(address(loanToken), abi.encodeWithSelector(IERC20.decimals.selector), abi.encode(uint8(6)));
+        vm.expectEmit();
+        emit IReceivableToken.Constructor(address(midnight), address(loanToken), minter, "Six", "SIX", 6);
         IReceivableToken created = IReceivableToken(
             factory.createReceivableToken(minter, address(loanToken), "Six", "SIX", bytes32(uint256(6)))
         );

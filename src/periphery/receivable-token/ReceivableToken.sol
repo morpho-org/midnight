@@ -102,7 +102,7 @@ contract ReceivableToken is IReceivableToken {
         rate = WAD;
         name = _name;
         symbol = _symbol;
-        emit Constructor(_midnight, _asset, _owner, _name, _symbol);
+        emit Constructor(_midnight, _asset, _owner, _name, _symbol, decimals);
     }
 
     /// OWNER FUNCTIONS ///
