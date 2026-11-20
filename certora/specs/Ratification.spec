@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Morpho Association
 
+using Utils as Utils;
+
 methods {
     function multicall(bytes[]) external => HAVOC_ALL DELETE;
 
     function isAuthorized(address authorizer, address authorized) external returns (bool) envfree;
+    function Utils.callbackSuccess() external returns (bytes32) envfree;
 
     // Over-approximate view functions.
     function IdLib.toId(Midnight.Market memory) internal returns (bytes32) => NONDET;
@@ -19,10 +22,9 @@ methods {
     function _.isRatified(Midnight.Offer offer, bytes, address taker) external => recordRatification(calledContract, offer, taker) expect(bytes32);
 }
 
-definition CALLBACK_SUCCESS() returns bytes32 = to_bytes32(0x7f87788ea698181ea4d28d1576d0ba4fc92c0dbe5bf75b43692af2ce91dbaea2);
-
 // Persistent so that the unresolved calls after the ratification, such as callbacks and token transfers, do not erase it.
-persistent ghost bool ratified;
+
+persistent ghost mathint ratificationCalls;
 
 persistent ghost address ratifiedBy;
 
@@ -35,8 +37,12 @@ persistent ghost address ratifiedTaker;
 persistent ghost bytes32 ratificationResult;
 
 function recordRatification(address ratifier, Midnight.Offer offer, address taker) returns bytes32 {
+    bool reverts;
+    if (reverts) {
+        revert();
+    }
     bytes32 result;
-    ratified = true;
+    ratificationCalls = ratificationCalls + 1;
     ratifiedBy = ratifier;
     ratifiedMaker = offer.maker;
     ratifiedCallback = offer.callback;
@@ -74,13 +80,14 @@ rule takeRequiresNonZeroMaker(env e, Midnight.Offer offer, bytes ratifierData, u
 
 // Every successful take asks the offer's ratifier to ratify the offer for the taker, and requires it to return CALLBACK_SUCCESS.
 rule takeRequiresRatifierSuccess(env e, Midnight.Offer offer, bytes ratifierData, uint256 units, address taker, address receiverIfTakerIsSeller, address takerCallback, bytes takerCallbackData) {
-    require !ratified, "no ratification before take";
+    require ratificationCalls == 0, "no ratification before take";
 
     take(e, offer, ratifierData, units, taker, receiverIfTakerIsSeller, takerCallback, takerCallbackData);
 
-    assert ratified && ratifiedBy == offer.ratifier;
+    assert ratificationCalls == 1;
+    assert ratifiedBy == offer.ratifier;
     assert ratifiedMaker == offer.maker && ratifiedCallback == offer.callback && ratifiedTaker == taker;
-    assert ratificationResult == CALLBACK_SUCCESS();
+    assert ratificationResult == Utils.callbackSuccess();
 }
 
 // No successful take has the maker as taker.
