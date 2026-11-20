@@ -18,25 +18,20 @@ contract ReceivableRepayer is IRepayCallback, IReceivableTokenReceiver {
     error NotMidnight();
     error InconsistentLoanToken();
     error UnexpectedToken();
-    error RepayInProgress();
     error ZeroRate();
 
     address public immutable midnight;
     address internal transient expectedToken;
-    bool internal transient repaying;
 
     constructor(address _midnight) {
         midnight = _midnight;
     }
 
-    // forge-lint: disable-next-item(reentrancy-no-eth) repaying guards the entire callback against reentrancy.
     function onRepay(bytes32, Market memory market, uint256 units, address onBehalf, bytes memory data)
         external
         returns (bytes32)
     {
         require(msg.sender == midnight, NotMidnight());
-        require(!repaying, RepayInProgress());
-        repaying = true;
         uint256 collateralIndex = abi.decode(data, (uint256));
         IReceivableToken token = IReceivableToken(market.collateralParams[collateralIndex].token);
         require(token.asset() == market.loanToken, InconsistentLoanToken());
@@ -48,7 +43,6 @@ contract ReceivableRepayer is IRepayCallback, IReceivableTokenReceiver {
         IMidnight(midnight).withdrawCollateral(market, collateralIndex, amount, onBehalf, address(this));
 
         ERC20Lib.safeApprove(market.loanToken, midnight, units);
-        repaying = false;
         return CALLBACK_SUCCESS;
     }
 
