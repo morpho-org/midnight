@@ -9,6 +9,15 @@ methods {
 
     function withdrawable(bytes32 id) external returns (uint128) envfree;
     function claimableSettlementFee(address token) external returns (uint256) envfree;
+
+    // Explicit HAVOC_ECF so -havocAllByDefault does not summarize these as HAVOC_ALL.
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => HAVOC_ECF;
+    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => HAVOC_ECF;
+    function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => HAVOC_ECF;
+    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => HAVOC_ECF;
+    function _.onFlashLoan(address, address[], uint256[], bytes) external => HAVOC_ECF;
+    function _.transfer(address, uint256) external => HAVOC_ECF;
+    function _.transferFrom(address, address, uint256) external => HAVOC_ECF;
 }
 
 rule repayIncreasesWithdrawable(env e, Midnight.Market market, uint256 units, address onBehalf, address callback, bytes data) {
