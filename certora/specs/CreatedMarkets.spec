@@ -32,6 +32,13 @@ methods {
     // Tokens are assumed to not reenter, for performance reasons.
     function SafeTransferLib.safeTransferFrom(address, address, address, uint256) internal => NONDET;
     function SafeTransferLib.safeTransfer(address, address, uint256) internal => NONDET;
+
+    // Explicit HAVOC_ECF so -havocAllByDefault does not summarize these as HAVOC_ALL.
+    function _.onBuy(bytes32, Midnight.Market, uint256, uint256, uint256, address, bytes) external => HAVOC_ECF;
+    function _.onSell(bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes) external => HAVOC_ECF;
+    function _.onRepay(bytes32, Midnight.Market, uint256, address, bytes) external => HAVOC_ECF;
+    function _.onLiquidate(address, bytes32, Midnight.Market, uint256, uint256, uint256, address, address, bytes, uint256) external => HAVOC_ECF;
+    function _.onFlashLoan(address, address[], uint256[], bytes) external => HAVOC_ECF;
 }
 
 /// HELPERS
