@@ -1,4 +1,4 @@
-name: forge
+name: Forge
 
 on:
   push:
@@ -7,54 +7,66 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   format:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          submodules: recursive
+          persist-credentials: false
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
+        with:
+          version: nightly
 
-      - name: Check formatting
-        run: forge fmt src test script certora --check
+      - name: Run forge fmt
+        run: forge fmt src test certora --check
 
   lint:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
+        with:
+          version: nightly
 
       - name: Run forge lint
-        run: forge lint src script certora --deny notes
+        run: forge lint src certora test --deny notes
 
-      - name: Run forge lint on tests
-        run: FOUNDRY_PROFILE=lint-test forge lint test --deny notes
-
-  sizes:
+  build:
+    name: sizes # Required by the main ruleset; update it before renaming.
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
+        with:
+          version: nightly
 
       - name: Run forge build
-        run: forge build --force --sizes
-
-      - name: Check foundry.lock matches submodule pins
-        run: forge build --locked
+        run: forge build --sizes --locked
 
   test:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -71,13 +83,18 @@ jobs:
           - token-type: 4
             name: no-return
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
-      - name: Run Forge tests (${{ matrix.name }})
-        run: forge test --deny warnings
+        with:
+          version: nightly
+      - name: Run forge test
+        run: forge test --deny warnings -vvv
         env:
+          FOUNDRY_FUZZ_SEED: 0x${{ github.sha }}
+          FOUNDRY_FUZZ_MAX_TEST_REJECTS: 500000
+          FOUNDRY_FUZZ_RUNS: 10000
           TOKEN_TYPE: ${{ matrix.token-type }}
