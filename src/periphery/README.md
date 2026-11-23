@@ -82,7 +82,6 @@ The borrower first calls `midnight.setIsAuthorized(repayer, true, borrower)`, th
 The repayer withdraws the collateral amount rounded up at the current rate and redeems it for exactly `units` loan
 tokens, since the rate is at most WAD, then approves Midnight for exactly `units`.
 The repayer redeems inside the token's receiver hook.
-The receiver hook only accepts the expected token during a repayment.
 
 ### `ReceivableTokenFactory`
 

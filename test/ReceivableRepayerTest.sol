@@ -59,13 +59,6 @@ contract ReceivableRepayerTest is ReceivableTokenTest {
         repayer.onRepay(toId(_market()), _market(), DEBT, minter, abi.encode(uint256(0)));
     }
 
-    function testHookOutsideRepay() public {
-        _prepare();
-        vm.prank(address(token));
-        vm.expectRevert(ReceivableRepayer.UnexpectedToken.selector);
-        repayer.onReceivableTokenReceived(address(midnight), 1);
-    }
-
     function testAttackerCannotSelectVictim() public {
         _prepare();
         vm.prank(minter);

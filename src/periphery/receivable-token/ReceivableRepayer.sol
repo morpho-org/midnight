@@ -18,11 +18,9 @@ contract ReceivableRepayer is IRepayCallback, IReceivableTokenReceiver {
 
     error NotMidnight();
     error InconsistentLoanToken();
-    error UnexpectedToken();
     error ZeroRate();
 
     address public immutable midnight;
-    address internal transient expectedToken;
 
     constructor(address _midnight) {
         midnight = _midnight;
@@ -40,7 +38,6 @@ contract ReceivableRepayer is IRepayCallback, IReceivableTokenReceiver {
         require(rate != 0, ZeroRate());
         uint256 amount = units.mulDivUp(WAD, rate);
 
-        expectedToken = address(token);
         IMidnight(midnight).withdrawCollateral(market, collateralIndex, amount, onBehalf, address(this));
 
         ERC20Lib.safeApprove(market.loanToken, midnight, units);
@@ -48,8 +45,6 @@ contract ReceivableRepayer is IRepayCallback, IReceivableTokenReceiver {
     }
 
     function onReceivableTokenReceived(address, uint256 amount) external {
-        require(expectedToken != address(0) && msg.sender == expectedToken, UnexpectedToken());
-        expectedToken = address(0);
         IReceivableToken(msg.sender).redeem(amount, address(this));
     }
 }
