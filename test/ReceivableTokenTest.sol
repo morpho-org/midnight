@@ -212,16 +212,6 @@ contract ReceivableTokenTest is BaseTest {
         factory.createReceivableToken(minter, address(loanToken), "None", "NONE", root, bytes32(uint256(7)));
     }
 
-    function testSetOwner() public {
-        bytes32 root = token.root();
-        vm.expectRevert(IReceivableToken.NotOwner.selector);
-        token.setOwner(address(this));
-        vm.prank(minter);
-        token.setOwner(address(this));
-        assertEq(token.owner(), address(this), "owner");
-        assertEq(token.root(), root, "root unchanged");
-    }
-
     /// MINT ///
 
     function testMint(uint256 amount) public {
@@ -395,10 +385,12 @@ contract ReceivableTokenTest is BaseTest {
         }
     }
 
-    function testWhitelistingIsPermanent() public {
+    function testWhitelistIsIdempotent() public {
         _mint(1);
+        vm.recordLogs();
         vm.prank(minter);
-        token.setOwner(stranger);
+        token.whitelist(lender);
+        assertEq(vm.getRecordedLogs().length, 0, "no second Whitelist");
 
         assertTrue(token.isWhitelisted(lender), "still whitelisted");
         vm.prank(minter);

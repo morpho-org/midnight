@@ -73,7 +73,7 @@ A market can list up to 128 tokens, each with its own LLTV, so lenders diversify
 
 Deploys `ReceivableToken`s with `CREATE2` from a caller-provided salt, and records them in `isReceivableToken`.
 The factory is deployed with Midnight's address and passes it to every token it deploys, so Midnight is always whitelisted on them.
-Anyone creates a token with `createReceivableToken`, picking its owner, asset, name, symbol and report root.
+Anyone creates a token with `createReceivableToken`, picking its asset, name, symbol, and immutable owner and report root.
 
 Holders trust the payers of the receivables and the token's owner, who can add holders directly with `whitelist(account)`.
 

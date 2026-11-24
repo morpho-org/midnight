@@ -22,7 +22,6 @@ interface IReceivableToken is IERC20, ILiquidateCallback {
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
     event Constructor(address indexed midnight, address indexed asset, address owner, string name, string symbol, uint8 decimals, bytes32 root);
-    event SetOwner(address indexed owner);
     event Whitelist(address indexed account);
     event Mint(address indexed account, uint256 amount, uint256 reported);
     event Redeem(address indexed caller, address indexed receiver, uint256 amount);
@@ -45,7 +44,6 @@ interface IReceivableToken is IERC20, ILiquidateCallback {
     function cash() external view returns (uint256);
 
     /// FUNCTIONS ///
-    function setOwner(address newOwner) external;
     function whitelist(address account) external;
     function mint(uint256 amount, uint256 reported, bytes32[] memory proof) external;
     function redeem(uint256 amount, address receiver) external;

@@ -57,12 +57,12 @@ contract ReceivableToken is IReceivableToken {
     /// STORAGE ///
     address public immutable midnight;
     address public immutable asset;
+    address public immutable owner;
     uint8 public immutable decimals;
     bytes32 public immutable root;
 
     string public name;
     string public symbol;
-    address public owner;
     mapping(address account => bool) internal _isWhitelisted;
     uint256 public totalSupply;
     mapping(address account => uint256) public balanceOf;
@@ -82,21 +82,15 @@ contract ReceivableToken is IReceivableToken {
     ) {
         midnight = _midnight;
         asset = _asset;
+        owner = _owner;
         decimals = IERC20(_asset).decimals();
         root = _root;
-        owner = _owner;
         name = _name;
         symbol = _symbol;
         emit Constructor(_midnight, _asset, _owner, _name, _symbol, decimals, _root);
     }
 
-    /// OWNER FUNCTIONS ///
-
-    function setOwner(address newOwner) external {
-        require(msg.sender == owner, NotOwner());
-        owner = newOwner;
-        emit SetOwner(newOwner);
-    }
+    /// OWNER FUNCTION ///
 
     /// @dev Whitelists `account` permanently.
     function whitelist(address account) external {
