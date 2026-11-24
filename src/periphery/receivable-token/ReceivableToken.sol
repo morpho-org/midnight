@@ -101,7 +101,7 @@ contract ReceivableToken is IReceivableToken {
         emit SetRoot(rootId, newRoot);
     }
 
-    /// @dev Whitelists `account` permanently without minting tokens.
+    /// @dev Whitelists `account` permanently.
     function whitelist(address account) external {
         require(msg.sender == owner, NotOwner());
         _whitelist(account);
