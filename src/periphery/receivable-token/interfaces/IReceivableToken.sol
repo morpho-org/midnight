@@ -4,17 +4,21 @@ pragma solidity >=0.5.0;
 
 import {IERC20} from "./IERC20.sol";
 import {IOracle} from "../../../interfaces/IOracle.sol";
+import {ILiquidateCallback} from "../../../interfaces/ICallbacks.sol";
 
-interface IReceivableToken is IERC20, IOracle {
+interface IReceivableToken is IERC20, IOracle, ILiquidateCallback {
     /// ERRORS ///
     error ExceedsReceivables();
     error InsufficientAllowance();
     error InsufficientBalance();
     error InsufficientCash();
+    error InsufficientProceeds();
+    error InvalidLiquidation();
     error InvalidProof();
+    error NotMidnight();
     error NotOwner();
+    error NotWhitelisted();
     error RateTooHigh();
-    error TransientBalanceNotSettled();
 
     // forgefmt: disable-start
     /// EVENTS ///
@@ -27,6 +31,7 @@ interface IReceivableToken is IERC20, IOracle {
     event Whitelist(address indexed account);
     event Mint(bytes32 indexed rootId, address indexed account, uint256 amount, uint256 reported);
     event Redeem(address indexed caller, address indexed receiver, uint256 amount, uint256 assets);
+    event RedeemSeized(address indexed caller, bytes32 indexed id, address indexed borrower, uint256 amount, uint256 assets, uint256 repaidUnits);
 
     /// STORAGE GETTERS ///
     function midnight() external view returns (address);
@@ -43,7 +48,6 @@ interface IReceivableToken is IERC20, IOracle {
 
     /// VIEW FUNCTIONS ///
     function totalSupply() external view returns (uint256);
-    function transientSupply() external view returns (uint256);
     function cash() external view returns (uint256);
 
     /// FUNCTIONS ///

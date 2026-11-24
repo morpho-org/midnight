@@ -13,9 +13,6 @@ import {MerkleProofLib} from "../src/periphery/receivable-token/libraries/Merkle
 import {IReceivableTokenFactory} from "../src/periphery/receivable-token/interfaces/IReceivableTokenFactory.sol";
 import {IReceivableToken} from "../src/periphery/receivable-token/interfaces/IReceivableToken.sol";
 import {Vm} from "../lib/forge-std/src/Vm.sol";
-import {FlashLiquidator} from "./helpers/FlashLiquidator.sol";
-import {MintReceiver} from "./helpers/MintReceiver.sol";
-import {TransientReceiver} from "./helpers/TransientReceiver.sol";
 
 contract ReceivableTokenTest is BaseTest {
     using UtilsLib for uint256;
@@ -466,115 +463,141 @@ contract ReceivableTokenTest is BaseTest {
         assertEq(token.balanceOf(lender), 1, "received");
     }
 
-    function testWhitelistingInHookDoesNotSettle() public {
-        _mint(100e18);
-        MintReceiver receiver = new MintReceiver();
-        vm.prank(minter);
-        token.setRoot(ROOT_C, MerkleProofLib.leaf(address(receiver), 0));
-        receiver.configure(ROOT_C, 0, emptyProof);
-
-        // Whitelisting itself in the hook does not settle the tokens received before the hook.
-        vm.prank(minter);
-        vm.expectRevert(IReceivableToken.TransientBalanceNotSettled.selector);
-        token.transfer(address(receiver), 100e18);
-    }
-
-    function testTransientReceiverSettlesInHook() public {
-        _mint(300e18);
-        _pay(token, 300e18);
-        TransientReceiver receiver = new TransientReceiver();
-        receiver.configure(100e18, lender, 200e18);
-
-        vm.prank(minter);
-        token.transfer(address(receiver), 300e18);
-
-        // During the hook, the receiver held the tokens transiently.
-        assertEq(receiver.observedBalance(), 300e18, "transient balance");
-        assertEq(receiver.observedTransientSupply(), 300e18, "transient supply");
-        // After the hook, everything is settled.
-        assertEq(loanToken.balanceOf(address(receiver)), 100e18, "redeemed");
-        assertEq(token.balanceOf(address(receiver)), 0, "transient balance cleared");
-        assertEq(token.balanceOf(lender), 200e18, "lender balance");
-        assertEq(token.transientSupply(), 0, "transient supply cleared");
-        assertEq(token.totalSupply(), 200e18, "total supply");
-    }
-
-    function testTransientReceiverMustSettle() public {
-        _mint(300e18);
-        _pay(token, 300e18);
-        TransientReceiver receiver = new TransientReceiver();
-        receiver.configure(100e18, lender, 100e18); // leaves 100 behind.
-
-        vm.prank(minter);
-        vm.expectRevert(IReceivableToken.TransientBalanceNotSettled.selector);
-        token.transfer(address(receiver), 300e18);
-    }
-
-    function testNonWhitelistedAccountWithoutCodeCannotReceive() public {
+    function testNonWhitelistedCannotReceive() public {
         _mint(1);
         vm.prank(minter);
-        vm.expectRevert();
+        vm.expectRevert(IReceivableToken.NotWhitelisted.selector);
         token.transfer(stranger, 1);
+
+        // Zero-value transfers succeed for any account.
+        vm.prank(minter);
+        token.transfer(stranger, 0);
     }
 
-    function testPermissionlessFlashLiquidation() public {
-        // Market with a liquidation incentive, so the liquidator earns something.
-        Market memory market = _market(LLTV);
-        bytes32 id = toId(market);
-        uint256 units = 600e18;
-        uint256 collateral = units.mulDivUp(WAD, LLTV);
+    function testTokenIsWhitelisted() public view {
+        assertTrue(token.isWhitelisted(address(token)), "token whitelisted");
+    }
 
+    /// LIQUIDATIONS ///
+
+    /// @dev Supplies collateral, sells debt on a market with a liquidation incentive and pays the receipts.
+    function _borrowAndPay(Market memory market) internal returns (uint256 units, uint256 collateral) {
+        units = 600e18;
+        collateral = units.mulDivUp(WAD, LLTV);
         _mint(collateral);
         vm.prank(minter);
         midnight.supplyCollateral(market, 0, collateral, minter);
         take(units, minter, _buyOffer(market));
         _pay(token, collateral);
+    }
+
+    function _liquidateThroughToken(Market memory market, uint256 repaidUnits) internal returns (uint256, uint256) {
+        vm.prank(stranger);
+        return midnight.liquidate(market, 0, 0, repaidUnits, minter, true, address(token), address(token), "");
+    }
+
+    function testPermissionlessLiquidationThroughToken() public {
+        Market memory market = _market(LLTV, address(token));
+        bytes32 id = toId(market);
+        (uint256 units, uint256 collateral) = _borrowAndPay(market);
 
         // A non-whitelisted liquidator with no capital liquidates after the incentive has fully ramped up.
         vm.warp(maturity + 1 hours);
-        FlashLiquidator flashLiquidator = new FlashLiquidator(address(midnight));
+        assertFalse(token.isWhitelisted(stranger), "liquidator not whitelisted");
         uint256 seized = units.mulDivDown(maxLif(LLTV, LIQUIDATION_CURSOR), WAD);
         vm.expectEmit(address(token));
-        emit IReceivableToken.Transfer(address(flashLiquidator), address(0), seized);
-        flashLiquidator.liquidate(market, units, minter);
+        emit IReceivableToken.Transfer(address(token), address(0), seized);
+        vm.expectEmit(address(token));
+        emit IReceivableToken.RedeemSeized(stranger, id, minter, seized, seized, units);
+        (uint256 seizedAssets, uint256 repaid) = _liquidateThroughToken(market, units);
+
+        assertEq(seizedAssets, seized, "seized");
+        assertEq(repaid, units, "repaid");
         assertEq(midnight.debt(id, minter), 0, "debt repaid");
         assertEq(midnight.collateral(id, minter, 0), collateral - seized, "collateral seized");
-        assertEq(loanToken.balanceOf(address(flashLiquidator)), seized - units, "liquidator profit");
-        assertEq(token.balanceOf(address(flashLiquidator)), 0, "liquidator holds no token");
-        assertEq(token.transientSupply(), 0, "no transient tokens left");
+        assertEq(loanToken.balanceOf(stranger), seized - units, "liquidator profit");
+        assertEq(token.balanceOf(address(token)), 0, "seized tokens burned");
+        assertEq(token.balanceOf(stranger), 0, "liquidator holds no token");
         assertEq(token.totalSupply(), collateral - seized, "supply");
+        assertEq(token.cash(), collateral - seized, "cash backs the remaining supply");
+        assertEq(loanToken.allowance(address(token), address(midnight)), 0, "allowance spent");
         assertEq(midnight.withdrawable(id), units, "lender can withdraw");
     }
 
     function testNonWhitelistedLiquidatorCannotKeepCollateral() public {
         Market memory market = _market(LLTV);
+        (uint256 units,) = _borrowAndPay(market);
+        vm.warp(maturity + 1 hours);
+
+        deal(address(loanToken), liquidator, units);
+        vm.prank(liquidator);
+        vm.expectRevert(IReceivableToken.NotWhitelisted.selector);
+        midnight.liquidate(market, 0, 0, units, minter, true, liquidator, address(0), "");
+    }
+
+    function testOnLiquidateOnlyMidnight() public {
+        Market memory market = _market(LLTV);
+        vm.expectRevert(IReceivableToken.NotMidnight.selector);
+        token.onLiquidate(stranger, toId(market), market, 0, 0, 0, minter, address(token), "", 0);
+    }
+
+    function testOnLiquidateRequiresTokenAsReceiver() public {
+        Market memory market = _market(LLTV);
+        (uint256 units,) = _borrowAndPay(market);
+        vm.warp(maturity + 1 hours);
+        _whitelistLiquidator();
+
+        vm.prank(stranger);
+        vm.expectRevert(IReceivableToken.InvalidLiquidation.selector);
+        midnight.liquidate(market, 0, 0, units, minter, true, liquidator, address(token), "");
+    }
+
+    function testOnLiquidateRequiresTokenAsCollateral() public {
+        // The token holds stray tokens of its own, which a liquidation of another collateral must not burn.
+        _mint(1e18);
+        vm.prank(minter);
+        token.transfer(address(token), 1e18);
+
+        Market memory market = _market(LLTV);
+        market.collateralParams[0].token = address(otherToken);
+        vm.prank(address(midnight));
+        vm.expectRevert(IReceivableToken.InvalidLiquidation.selector);
+        token.onLiquidate(stranger, toId(market), market, 0, 1e18, 0, minter, address(token), "", 0);
+    }
+
+    function testOnLiquidateRequiresAssetAsLoanToken() public {
+        Market memory market = _market(LLTV);
+        market.loanToken = address(otherToken);
+        vm.prank(address(midnight));
+        vm.expectRevert(IReceivableToken.InvalidLiquidation.selector);
+        token.onLiquidate(stranger, toId(market), market, 0, 0, 0, minter, address(token), "", 0);
+    }
+
+    function testOnLiquidateInsufficientProceeds() public {
+        // The oracle values the token above the rate, so the seized tokens redeem for less than the repaid units.
+        Market memory market = _market(LLTV);
+        (uint256 units,) = _borrowAndPay(market);
+        vm.warp(maturity + 1 hours);
+        vm.prank(minter);
+        token.setRate(WAD / 2);
+
+        vm.expectRevert(IReceivableToken.InsufficientProceeds.selector);
+        _liquidateThroughToken(market, units);
+    }
+
+    function testOnLiquidateInsufficientCash() public {
+        Market memory market = _market(LLTV, address(token));
         uint256 units = 600e18;
         uint256 collateral = units.mulDivUp(WAD, LLTV);
         _mint(collateral);
         vm.prank(minter);
         midnight.supplyCollateral(market, 0, collateral, minter);
         take(units, minter, _buyOffer(market));
-        _pay(token, collateral);
         vm.warp(maturity + 1 hours);
 
-        // A liquidator contract that does not dispose of the seized tokens in the hook.
-        FlashLiquidator flashLiquidator = new FlashLiquidator(address(midnight));
-        flashLiquidator.setKeep(true);
-        vm.expectRevert(IReceivableToken.TransientBalanceNotSettled.selector);
-        flashLiquidator.liquidate(market, units, minter);
-
-        // A plain address, which cannot implement the hook.
-        deal(address(loanToken), liquidator, units);
-        vm.prank(liquidator);
-        vm.expectRevert();
-        midnight.liquidate(market, 0, 0, units, minter, true, liquidator, address(0), "");
-
-        // The position is untouched, and the same liquidator succeeds once it settles.
-        assertEq(midnight.debt(toId(market), minter), units, "debt untouched");
-        flashLiquidator.setKeep(false);
-        flashLiquidator.liquidate(market, units, minter);
-        assertEq(midnight.debt(toId(market), minter), 0, "debt repaid");
-        assertEq(token.balanceOf(address(flashLiquidator)), 0, "liquidator holds no token");
+        // The receipts have not arrived.
+        vm.expectRevert(IReceivableToken.InsufficientCash.selector);
+        _liquidateThroughToken(market, units);
     }
 
     function testMidnightAlwaysWhitelisted() public {

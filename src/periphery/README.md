@@ -60,15 +60,16 @@ Redemptions before the owner updates the rate are first come, first served, like
 Any account with an allowance `mint`s tokens, up to `reported` under a report, where `reported` comes from Merkle roots set on the token by its owner (OpenZeppelin `StandardMerkleTree` layout with `(account, reported)` leaves, see `MerkleProofLib` in `receivable-token/libraries`).
 The owner allocates the receipts expected by the token between accounts this way, and receipts in excess of the outstanding tokens are extracted the same way, by minting within one's allowance and redeeming.
 
-Each token has an owner, who sets its reports. Whitelisted accounts are Midnight plus every account that has submitted a valid proof under any report, by calling `mint`, possibly with amount 0; the owner can whitelist a non-minter, such as a liquidator or a buyer that wants to keep tokens, by including a leaf with `reported` = 0.
-Whitelisting is permanent: leaving an account out of a later report does not remove it. Only whitelisted accounts hold tokens across transactions.
-Any other account can still receive tokens, but only transiently: the token credits them in transient storage, calls `onReceivableTokenReceived` on the receiver, and reverts if the receiver still holds tokens when the call returns.
-The receiver must redeem them or transfer them to a whitelisted account in that call, so accounts without code cannot receive tokens unless whitelisted.
-This keeps liquidations permissionless: Midnight transfers the seized tokens before pulling the repayment, so a liquidator redeems them in the hook and pays with the proceeds.
+Each token has an owner, who sets its reports. Whitelisted accounts are Midnight, the token itself, plus every account that has submitted a valid proof under any report, by calling `mint`, possibly with amount 0; the owner can whitelist a non-minter, such as a liquidator or a buyer that wants to keep tokens, by including a leaf with `reported` = 0.
+Whitelisting is permanent: leaving an account out of a later report does not remove it. Only whitelisted accounts can receive tokens; zero-value transfers to any account succeed, so a liquidation that only realizes bad debt works with any receiver.
 Midnight is always whitelisted, so nothing can freeze the tokens supplied as collateral on it.
 
-The contract does not interact with Midnight. Minters can sell the tokens, or supply them as collateral on any market listing them and sell debt against them.
-The debt is repaid either by the borrower, typically with a repay callback that withdraws and redeems the collateral once the receipts are in, or by a liquidator after maturity who then redeems the seized tokens.
+Minters can sell the tokens, or supply them as collateral on any market listing them and sell debt against them.
+The debt is repaid either by the borrower, typically with a repay callback that withdraws and redeems the collateral once the receipts are in, or by a liquidator after maturity.
+Liquidations stay permissionless through the token's liquidate callback: a liquidator calls `liquidate` with the token as `receiver` and `callback`, and `onLiquidate` burns the seized tokens, approves Midnight for the repaid units and sends the remaining assets to the liquidator, who needs no capital and never holds the token.
+It reverts if the seized tokens redeem for less than the repaid units, which cannot happen beyond rounding when the token is its own collateral oracle, or if the token lacks the cash.
+The token never re-enters Midnight during a transfer; it only acts in Midnight's liquidate callback.
+A whitelisted liquidator can also receive the seized tokens directly and redeem them later.
 A market can list up to 128 tokens, each with its own LLTV, so lenders diversify across tokens through markets rather than through pooled claims.
 
 ### `ReceivableTokenFactory`
