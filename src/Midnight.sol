@@ -113,7 +113,6 @@ import {IMidnight, Market, Offer, CollateralParams, MarketState, Position} from 
 /// @dev List of assumptions on tokens that guarantee that Midnight behaves as expected:
 /// - It should be ERC-20 compliant, except that it can omit return values on transfer and transferFrom. In particular, it should not revert because a transfer is no-op.
 /// - Midnight's balance of the token should only decrease on transfer and transferFrom.
-/// - It should not re-enter Midnight on transfer nor transferFrom.
 /// - Midnight must send/receive exactly the requested amount on transfers.
 /// @dev See LIVENESS for liveness guarantees.
 ///
