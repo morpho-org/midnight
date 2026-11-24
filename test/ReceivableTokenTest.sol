@@ -7,6 +7,7 @@ import {WAD} from "../src/libraries/ConstantsLib.sol";
 import {MAX_TICK, TickLib} from "../src/libraries/TickLib.sol";
 import {UtilsLib} from "../src/libraries/UtilsLib.sol";
 import {SafeTransferLib} from "../src/libraries/SafeTransferLib.sol";
+import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {IERC20} from "../src/periphery/receivable-token/interfaces/IERC20.sol";
 import {MerkleProofLib} from "../src/periphery/receivable-token/libraries/MerkleProofLib.sol";
@@ -591,7 +592,7 @@ contract ReceivableTokenTest is BaseTest {
         _liquidateThroughToken(market, units);
 
         vm.prank(stranger);
-        loanToken.approve(address(token), shortfall);
+        ERC20Lib.safeApprove(address(loanToken), address(token), shortfall);
         _liquidateThroughToken(market, units);
 
         assertEq(midnight.debt(id, minter), 0, "debt repaid");
@@ -608,7 +609,7 @@ contract ReceivableTokenTest is BaseTest {
 
         deal(address(loanToken), stranger, 1);
         vm.startPrank(stranger);
-        loanToken.approve(address(token), 1);
+        ERC20Lib.safeApprove(address(loanToken), address(token), 1);
         (uint256 seized, uint256 repaid) =
             midnight.liquidate(market, 0, 1, 0, minter, true, address(token), address(token), "");
         vm.stopPrank();
