@@ -582,13 +582,14 @@ contract ReceivableTokenTest is BaseTest {
         vm.prank(minter);
         token.setRate(WAD / 2);
 
-        // Without an approval, the liquidator cannot cover the shortfall.
-        vm.expectRevert();
-        _liquidateThroughToken(market, units);
-
         uint256 seized = units.mulDivDown(maxLif(LLTV, LIQUIDATION_CURSOR), WAD);
         uint256 shortfall = units - seized / 2;
         deal(address(loanToken), stranger, shortfall);
+
+        // Without an approval, the funded liquidator cannot cover the shortfall.
+        vm.expectRevert();
+        _liquidateThroughToken(market, units);
+
         vm.prank(stranger);
         loanToken.approve(address(token), shortfall);
         _liquidateThroughToken(market, units);

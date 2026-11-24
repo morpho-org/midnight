@@ -48,12 +48,11 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 /// LIQUIDATIONS
 /// @dev Liquidations stay permissionless through this contract's liquidate callback: a liquidator calls Midnight's
 /// liquidate with this contract as `receiver` and `callback`. Midnight transfers the seized tokens here, then calls
-/// onLiquidate, which burns them, approves Midnight for the repaid units and sends the remaining assets to the
-/// liquidator. The liquidator needs no capital and never holds the token.
+/// onLiquidate, which burns them, approves Midnight for the repaid units and settles the difference with the
+/// liquidator, who never holds the token.
 /// @dev If the seized tokens redeem for less than the repaid units, the liquidator pays the difference, so it must
-/// approve the token for the asset. When the token is its own collateral oracle, the difference is at most rounding,
-/// which matters only when the liquidation incentive is close to 1. The liquidation reverts if the contract does not
-/// hold enough cash.
+/// approve the token for the asset. When the token is its own collateral oracle, the difference is at most one unit
+/// of the asset from rounding. The liquidation reverts if the contract does not hold enough cash.
 /// @dev The callback only works on markets whose loan token is the asset. On other markets, only whitelisted
 /// accounts can receive seized tokens.
 /// @dev The token never re-enters Midnight during a transfer: it only acts in Midnight's liquidate callback.
