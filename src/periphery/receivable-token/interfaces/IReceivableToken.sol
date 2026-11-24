@@ -12,7 +12,6 @@ interface IReceivableToken is IERC20, IOracle, ILiquidateCallback {
     error InsufficientAllowance();
     error InsufficientBalance();
     error InsufficientCash();
-    error InsufficientProceeds();
     error InvalidLiquidation();
     error InvalidProof();
     error NotMidnight();

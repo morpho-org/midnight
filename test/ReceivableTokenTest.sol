@@ -573,16 +573,48 @@ contract ReceivableTokenTest is BaseTest {
         token.onLiquidate(stranger, toId(market), market, 0, 0, 0, minter, address(token), "", 0);
     }
 
-    function testOnLiquidateInsufficientProceeds() public {
+    function testOnLiquidateLiquidatorPaysShortfall() public {
         // The oracle values the token above the rate, so the seized tokens redeem for less than the repaid units.
         Market memory market = _market(LLTV);
+        bytes32 id = toId(market);
         (uint256 units,) = _borrowAndPay(market);
         vm.warp(maturity + 1 hours);
         vm.prank(minter);
         token.setRate(WAD / 2);
 
-        vm.expectRevert(IReceivableToken.InsufficientProceeds.selector);
+        // Without an approval, the liquidator cannot cover the shortfall.
+        vm.expectRevert();
         _liquidateThroughToken(market, units);
+
+        uint256 seized = units.mulDivDown(maxLif(LLTV, LIQUIDATION_CURSOR), WAD);
+        uint256 shortfall = units - seized / 2;
+        deal(address(loanToken), stranger, shortfall);
+        vm.prank(stranger);
+        loanToken.approve(address(token), shortfall);
+        _liquidateThroughToken(market, units);
+
+        assertEq(midnight.debt(id, minter), 0, "debt repaid");
+        assertEq(loanToken.balanceOf(stranger), 0, "liquidator paid the shortfall");
+    }
+
+    function testOnLiquidateRoundingShortfall() public {
+        // Right after maturity the incentive is close to 1, so rounding can leave the seized tokens just short.
+        Market memory market = _market(LLTV, address(token));
+        _borrowAndPay(market);
+        vm.prank(minter);
+        token.setRate(WAD / 3);
+        vm.warp(maturity + 1);
+
+        deal(address(loanToken), stranger, 1);
+        vm.startPrank(stranger);
+        loanToken.approve(address(token), 1);
+        (uint256 seized, uint256 repaid) =
+            midnight.liquidate(market, 0, 1, 0, minter, true, address(token), address(token), "");
+        vm.stopPrank();
+
+        assertEq(seized, 1, "seized");
+        assertEq(repaid, 1, "repaid");
+        assertEq(loanToken.balanceOf(stranger), 0, "liquidator paid the rounding");
     }
 
     function testOnLiquidateInsufficientCash() public {

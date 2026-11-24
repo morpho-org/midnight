@@ -50,8 +50,12 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 /// liquidate with this contract as `receiver` and `callback`. Midnight transfers the seized tokens here, then calls
 /// onLiquidate, which burns them, approves Midnight for the repaid units and sends the remaining assets to the
 /// liquidator. The liquidator needs no capital and never holds the token.
-/// @dev The liquidation reverts if the seized tokens redeem for less than the repaid units, which cannot happen
-/// beyond rounding when the token is its own collateral oracle, or if the contract does not hold enough cash.
+/// @dev If the seized tokens redeem for less than the repaid units, the liquidator pays the difference, so it must
+/// approve the token for the asset. When the token is its own collateral oracle, the difference is at most rounding,
+/// which matters only when the liquidation incentive is close to 1. The liquidation reverts if the contract does not
+/// hold enough cash.
+/// @dev The callback only works on markets whose loan token is the asset. On other markets, only whitelisted
+/// accounts can receive seized tokens.
 /// @dev The token never re-enters Midnight during a transfer: it only acts in Midnight's liquidate callback.
 ///
 /// USAGE
@@ -162,7 +166,7 @@ contract ReceivableToken is IReceivableToken {
     /// LIQUIDATE CALLBACK ///
 
     /// @dev Called by Midnight in a liquidation with this contract as `receiver` and `callback`. Burns the seized
-    /// tokens, approves Midnight for `repaidUnits` and sends the remaining assets to the liquidator (`caller`).
+    /// tokens, approves Midnight for `repaidUnits` and settles the difference with the liquidator (`caller`).
     function onLiquidate(
         address caller,
         bytes32 id,
@@ -182,13 +186,13 @@ contract ReceivableToken is IReceivableToken {
 
         uint256 assets = seizedAssets.mulDivDown(rate, WAD);
         require(assets <= cash(), InsufficientCash());
-        require(assets >= repaidUnits, InsufficientProceeds());
         _debit(address(this), seizedAssets);
         emit Transfer(address(this), address(0), seizedAssets);
         emit RedeemSeized(caller, id, borrower, seizedAssets, assets, repaidUnits);
 
         ERC20Lib.safeApprove(asset, midnight, repaidUnits);
-        SafeTransferLib.safeTransfer(asset, caller, assets - repaidUnits);
+        if (assets >= repaidUnits) SafeTransferLib.safeTransfer(asset, caller, assets - repaidUnits);
+        else SafeTransferLib.safeTransferFrom(asset, caller, address(this), repaidUnits - assets);
         return CALLBACK_SUCCESS;
     }
 

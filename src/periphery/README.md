@@ -67,7 +67,8 @@ Midnight is always whitelisted, so nothing can freeze the tokens supplied as col
 Minters can sell the tokens, or supply them as collateral on any market listing them and sell debt against them.
 The debt is repaid either by the borrower, typically with a repay callback that withdraws and redeems the collateral once the receipts are in, or by a liquidator after maturity.
 Liquidations stay permissionless through the token's liquidate callback: a liquidator calls `liquidate` with the token as `receiver` and `callback`, and `onLiquidate` burns the seized tokens, approves Midnight for the repaid units and sends the remaining assets to the liquidator, who needs no capital and never holds the token.
-It reverts if the seized tokens redeem for less than the repaid units, which cannot happen beyond rounding when the token is its own collateral oracle, or if the token lacks the cash.
+If the seized tokens redeem for less than the repaid units, the liquidator pays the difference, which is at most rounding when the token is its own collateral oracle and matters only when the liquidation incentive is close to 1. The liquidation reverts if the token lacks the cash.
+The callback only works on markets whose loan token is the asset; on other markets, only whitelisted accounts can receive seized tokens.
 The token never re-enters Midnight during a transfer; it only acts in Midnight's liquidate callback.
 A whitelisted liquidator can also receive the seized tokens directly and redeem them later.
 A market can list up to 128 tokens, each with its own LLTV, so lenders diversify across tokens through markets rather than through pooled claims.
