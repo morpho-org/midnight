@@ -153,6 +153,9 @@ Verification is performed according to the following modeling conventions:
 - bitmap operations are replaced by the ghost summaries in [`BitmapSummaries.spec`](specs/BitmapSummaries.spec), justified by [`Bitmap.spec`](specs/Bitmap.spec).
 - ERC20 tokens are assumed well-behaved, see the comments in the respective files for more detail.
 - unless a property is specifically about callbacks, external calls are assumed not to re-enter Midnight.
+  Single-call rules in `BalanceEffects`, `OnlyAuthorizedCanChange`, and `PostDropRealizableBadDebt` use non-reentrant summaries for callbacks and token transfers. `Solvency` also summarizes token transfers and the buy and sell callbacks this way, but separately models flash loan, liquidate, and repay callbacks.
+  Callbacks can re-enter in production. [`Reentrancy.spec`](specs/Reentrancy.spec) hooks every `CALL`, including token transfers, and checks that calls occur before the first modeled storage access or after the last modeled write. It abstracts `touchMarket` and `_updatePosition` and excludes the intentional post-call `tExchange` transient lock update.
+  At a call after the last modeled write, the outer entry point's modeled storage updates are already done; at an earlier call, no modeled storage has been read or written yet. Each reentrant call is an ordinary entry point subject to the same rules, so reentering via `transfer` or `transferFrom` grants no additional access to Midnight's storage compared to a callback.
 
 # Getting started
 
