@@ -75,7 +75,7 @@ Deploys `ReceivableToken`s with `CREATE2` from a caller-provided salt, and recor
 The factory is deployed with Midnight's address and passes it to every token it deploys, so Midnight is always whitelisted on them.
 Anyone creates a token with `createReceivableToken`, picking its owner, asset, name and symbol.
 
-Holders trust a token's owner, who determines who may mint how much and who can hold tokens at all through its reports, and the payers of the receivables.
+Holders trust the payers of the receivables and the token's owner, who sets minting allowances through reports and can add holders directly with `whitelist(account)`.
 
 ## Libraries
 
