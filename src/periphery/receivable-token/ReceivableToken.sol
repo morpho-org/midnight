@@ -55,7 +55,6 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 /// of the asset from rounding. The liquidation reverts if the contract does not hold enough cash.
 /// @dev The callback only works on markets whose loan token is the asset. On other markets, only whitelisted
 /// accounts can receive seized tokens.
-/// @dev The token never re-enters Midnight during a transfer: it only acts in Midnight's liquidate callback.
 ///
 /// USAGE
 /// @dev Accounts with an allowance mint tokens and can sell them, or supply them as collateral on any Midnight market
