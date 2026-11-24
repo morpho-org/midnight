@@ -192,7 +192,6 @@ contract ReceivableTokenTest is BaseTest {
         assertFalse(otherToken.isWhitelisted(minter), "whitelist is per token");
         assertEq(token.asset(), address(loanToken), "asset");
         assertEq(token.decimals(), 18, "decimals");
-        assertEq(token.rate(), WAD, "rate");
         assertEq(factory.midnight(), address(midnight), "factory midnight");
         assertEq(token.midnight(), address(midnight), "token midnight");
         assertTrue(otherToken.isWhitelisted(address(midnight)), "midnight whitelisted");
@@ -232,30 +231,10 @@ contract ReceivableTokenTest is BaseTest {
         assertEq(token.roots(ROOT_A), bytes32(uint256(1)), "root");
     }
 
-    /// RATE ///
+    /// PRICE ///
 
-    function testSetRate() public {
-        assertEq(token.rate(), WAD, "rate at creation");
-
-        vm.expectRevert(IReceivableToken.NotOwner.selector);
-        token.setRate(WAD / 2);
-
-        vm.startPrank(minter);
-        vm.expectRevert(IReceivableToken.RateTooHigh.selector);
-        token.setRate(WAD + 1);
-        vm.expectEmit(address(token));
-        emit IReceivableToken.SetRate(WAD / 2);
-        token.setRate(WAD / 2);
-        vm.stopPrank();
-        assertEq(token.rate(), WAD / 2, "rate");
-    }
-
-    function testPrice(uint256 newRate) public {
-        newRate = bound(newRate, 0, WAD);
+    function testPriceAtPar() public view {
         assertEq(token.price(), 1e36, "price at par");
-        vm.prank(minter);
-        token.setRate(newRate);
-        assertEq(token.price(), newRate * 1e18, "price tracks the rate");
     }
 
     /// MINT ///
@@ -363,55 +342,12 @@ contract ReceivableTokenTest is BaseTest {
         vm.expectEmit(address(token));
         emit IReceivableToken.Transfer(lender, address(0), amount);
         vm.expectEmit(address(token));
-        emit IReceivableToken.Redeem(lender, lender, amount, amount);
+        emit IReceivableToken.Redeem(lender, lender, amount);
         vm.prank(lender);
         token.redeem(amount, lender);
 
         assertEq(loanToken.balanceOf(lender), 10 * REPORTED + amount, "lender cash");
         assertEq(token.totalSupply(), 0, "supply");
-        assertEq(token.cash(), 0, "cash");
-    }
-
-    function testRedeemAtRate(uint256 amount, uint256 newRate) public {
-        amount = bound(amount, 1, REPORTED);
-        newRate = bound(newRate, 0, WAD);
-        _mint(amount);
-        _pay(token, amount);
-        vm.prank(minter);
-        token.setRate(newRate);
-
-        uint256 assets = amount.mulDivDown(newRate, WAD);
-        vm.prank(minter);
-        assertEq(token.redeem(amount, minter), assets, "assets returned");
-        assertEq(loanToken.balanceOf(minter), assets, "assets paid");
-        assertEq(token.balanceOf(minter), 0, "tokens burned");
-    }
-
-    function testRateCanGoBackUp() public {
-        _mint(100e18);
-        _pay(token, 100e18);
-        vm.startPrank(minter);
-        token.setRate(WAD / 2);
-        token.setRate(WAD);
-        uint256 assets = token.redeem(100e18, minter);
-        vm.stopPrank();
-        assertEq(assets, 100e18, "redeemed at the new rate");
-    }
-
-    function testRateDistributesRecoveryOverReported() public {
-        // Reported 1000, minted 600, received 500: the rate is 0.5.
-        _mint(600e18);
-        _pay(token, 500e18);
-        vm.prank(minter);
-        token.setRate(WAD / 2);
-
-        vm.prank(minter);
-        assertEq(token.redeem(600e18, minter), 300e18, "holders redeem at the rate");
-
-        // The unminted capacity is still extracted by minting and redeeming.
-        _mint(400e18);
-        vm.prank(minter);
-        assertEq(token.redeem(400e18, minter), 200e18, "unminted capacity redeemed");
         assertEq(token.cash(), 0, "cash");
     }
 
@@ -509,7 +445,7 @@ contract ReceivableTokenTest is BaseTest {
         vm.expectEmit(address(token));
         emit IReceivableToken.Transfer(address(token), address(0), seized);
         vm.expectEmit(address(token));
-        emit IReceivableToken.RedeemSeized(stranger, id, minter, seized, seized, units);
+        emit IReceivableToken.RedeemSeized(stranger, id, minter, seized, units);
         (uint256 seizedAssets, uint256 repaid) = _liquidateThroughToken(market, units);
 
         assertEq(seizedAssets, seized, "seized");
@@ -574,49 +510,30 @@ contract ReceivableTokenTest is BaseTest {
         token.onLiquidate(stranger, toId(market), market, 0, 0, 0, minter, address(token), "", 0);
     }
 
-    function testOnLiquidateLiquidatorPaysShortfall() public {
-        // The oracle values the token above the rate, so the seized tokens redeem for less than the repaid units.
-        Market memory market = _market(LLTV);
-        bytes32 id = toId(market);
+    function testOnLiquidateNeedsNoCapital(uint256 seizedAssets, uint256 elapsed) public {
+        // Even when the incentive is close to 1, right after maturity, the seized tokens cover the repaid units.
+        Market memory market = _market(LLTV, address(token));
         (uint256 units,) = _borrowAndPay(market);
-        vm.warp(maturity + 1 hours);
-        vm.prank(minter);
-        token.setRate(WAD / 2);
-
-        uint256 seized = units.mulDivDown(maxLif(LLTV, LIQUIDATION_CURSOR), WAD);
-        uint256 shortfall = units - seized / 2;
-        deal(address(loanToken), stranger, shortfall);
-
-        // Without an approval, the funded liquidator cannot cover the shortfall.
-        vm.expectRevert();
-        _liquidateThroughToken(market, units);
+        seizedAssets = bound(seizedAssets, 1, units);
+        elapsed = bound(elapsed, 1, 1 hours);
+        vm.warp(maturity + elapsed);
 
         vm.prank(stranger);
-        ERC20Lib.safeApprove(address(loanToken), address(token), shortfall);
-        _liquidateThroughToken(market, units);
-
-        assertEq(midnight.debt(id, minter), 0, "debt repaid");
-        assertEq(loanToken.balanceOf(stranger), 0, "liquidator paid the shortfall");
+        (uint256 seized, uint256 repaid) =
+            midnight.liquidate(market, 0, seizedAssets, 0, minter, true, address(token), address(token), "");
+        assertLe(repaid, seized, "repaid at most seized");
+        assertEq(loanToken.balanceOf(stranger), seized - repaid, "liquidator profit");
     }
 
-    function testOnLiquidateRoundingShortfall() public {
-        // Right after maturity the incentive is close to 1, so rounding can leave the seized tokens just short.
-        Market memory market = _market(LLTV, address(token));
-        _borrowAndPay(market);
-        vm.prank(minter);
-        token.setRate(WAD / 3);
+    function testOnLiquidateRevertsWhenOracleAbovePar() public {
+        Market memory market = _market(LLTV);
+        (uint256 units,) = _borrowAndPay(market);
         vm.warp(maturity + 1);
+        oracle1.setPrice(2e36);
 
-        deal(address(loanToken), stranger, 1);
-        vm.startPrank(stranger);
-        ERC20Lib.safeApprove(address(loanToken), address(token), 1);
-        (uint256 seized, uint256 repaid) =
-            midnight.liquidate(market, 0, 1, 0, minter, true, address(token), address(token), "");
-        vm.stopPrank();
-
-        assertEq(seized, 1, "seized");
-        assertEq(repaid, 1, "repaid");
-        assertEq(loanToken.balanceOf(stranger), 0, "liquidator paid the rounding");
+        // The repaid units exceed the seized tokens, so paying the liquidator underflows.
+        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11));
+        _liquidateThroughToken(market, units);
     }
 
     function testOnLiquidateInsufficientCash() public {
@@ -653,9 +570,8 @@ contract ReceivableTokenTest is BaseTest {
         assertEq(token.balanceOf(minter), collateral, "borrower got the tokens back");
     }
 
-    function testMarkdownMakesPositionsLiquidatable() public {
-        // A market using the token itself as the collateral oracle.
-        Market memory market = _market(LLTV, address(token));
+    function testZeroValueLiquidationToAnyReceiver() public {
+        Market memory market = _market(LLTV);
         bytes32 id = toId(market);
         uint256 units = 600e18;
         uint256 collateral = units.mulDivUp(WAD, LLTV);
@@ -666,9 +582,8 @@ contract ReceivableTokenTest is BaseTest {
         take(units, minter, _buyOffer(market));
         assertTrue(midnight.isHealthy(market, id, minter), "healthy at par");
 
-        // The owner marks the rate down and the position becomes liquidatable before maturity.
-        vm.prank(minter);
-        token.setRate(WAD / 2);
+        // The market's oracle marks the token down and the position becomes liquidatable before maturity.
+        oracle1.setPrice(0.5e36);
         assertFalse(midnight.isHealthy(market, id, minter), "unhealthy after markdown");
 
         // A (0, 0) liquidation realizes the bad debt without seizing collateral.
