@@ -24,7 +24,6 @@ contract ReceivableTokenTest is BaseTest {
     uint256 internal constant TICK = MAX_TICK - 400; // price < 1, multiple of the default tick spacing.
     bytes32 internal constant ROOT_A = keccak256("A");
     bytes32 internal constant ROOT_B = keccak256("B");
-    bytes32 internal constant ROOT_C = keccak256("C");
 
     address internal payer = makeAddr("payer");
     address internal stranger = makeAddr("stranger");
@@ -37,7 +36,6 @@ contract ReceivableTokenTest is BaseTest {
     bytes32[] internal proof; // minter on token.
     bytes32[] internal otherProof; // otherMinter on otherToken (single leaf, empty proof).
     bytes32[] internal lenderProof; // lender on token.
-    bytes32[] internal emptyProof; // proof of a leaf in a single-leaf root.
     uint256 internal maturity;
 
     function setUp() public override {
@@ -66,14 +64,10 @@ contract ReceivableTokenTest is BaseTest {
         vm.startPrank(minter);
         token.setRoot(ROOT_A, root);
         token.setRoot(ROOT_B, root);
-        token.setRoot(ROOT_C, MerkleProofLib.leaf(liquidator, 0));
+        token.whitelist(lender);
         vm.stopPrank();
         vm.prank(otherMinter);
         otherToken.setRoot(ROOT_A, otherLeaf);
-
-        // The lender is whitelisted by proving its leaf, without minting.
-        vm.prank(lender);
-        token.whitelist(ROOT_A, LENDER_REPORTED, lenderProof);
 
         deal(address(loanToken), lender, 10 * REPORTED);
         deal(address(loanToken), payer, 10 * REPORTED);
@@ -124,10 +118,9 @@ contract ReceivableTokenTest is BaseTest {
         token.mint(ROOT_A, amount, REPORTED, proof);
     }
 
-    /// @dev The liquidator is whitelisted by proving its `reported` = 0 leaf under ROOT_C, without minting.
     function _whitelistLiquidator() internal {
-        vm.prank(liquidator);
-        token.whitelist(ROOT_C, 0, emptyProof);
+        vm.prank(minter);
+        token.whitelist(liquidator);
     }
 
     /// @dev Receipts are plain transfers to the token.
@@ -184,7 +177,7 @@ contract ReceivableTokenTest is BaseTest {
         assertTrue(address(token) != address(otherToken), "distinct");
         assertEq(token.owner(), minter, "owner");
         assertFalse(token.isWhitelisted(minter), "minter whitelisted on first mint");
-        assertTrue(token.isWhitelisted(lender), "lender whitelisted by proving its leaf");
+        assertTrue(token.isWhitelisted(lender), "lender whitelisted by owner");
         assertFalse(otherToken.isWhitelisted(minter), "whitelist is per token");
         assertEq(token.asset(), address(loanToken), "asset");
         assertEq(token.decimals(), 18, "decimals");
@@ -363,21 +356,21 @@ contract ReceivableTokenTest is BaseTest {
     /// WHITELIST ///
 
     function testWhitelistWithoutMinting() public {
-        assertFalse(token.isWhitelisted(minter), "not whitelisted");
+        assertFalse(token.isWhitelisted(stranger), "not whitelisted");
         vm.expectEmit(address(token));
-        emit IReceivableToken.Whitelist(minter);
+        emit IReceivableToken.Whitelist(stranger);
         vm.prank(minter);
-        token.whitelist(ROOT_A, REPORTED, proof);
-        assertTrue(token.isWhitelisted(minter), "whitelisted");
-        assertEq(token.balanceOf(minter), 0, "balance");
+        token.whitelist(stranger);
+        assertTrue(token.isWhitelisted(stranger), "whitelisted");
+        assertEq(token.balanceOf(stranger), 0, "balance");
         assertEq(token.totalSupply(), 0, "supply");
-        assertEq(token.minted(ROOT_A, minter), 0, "minted");
+        assertEq(token.minted(ROOT_A, stranger), 0, "minted");
     }
 
-    function testWhitelistInvalidProof() public {
+    function testWhitelistOnlyOwner() public {
         vm.prank(stranger);
-        vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        token.whitelist(ROOT_A, REPORTED, proof);
+        vm.expectRevert(IReceivableToken.NotOwner.selector);
+        token.whitelist(stranger);
         assertFalse(token.isWhitelisted(stranger), "stranger not whitelisted");
     }
 

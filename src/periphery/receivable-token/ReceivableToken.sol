@@ -29,10 +29,9 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 /// bear the shortfall.
 ///
 /// HOLDERS
-/// @dev Whitelisted accounts are Midnight, this contract, plus every account that has submitted a valid proof under
-/// any report by calling `whitelist` or `mint`. The owner can let a non-minter, such as a liquidator or a buyer that
-/// wants to keep tokens, whitelist themselves by including a leaf with `reported` = 0 in a report. Whitelisting is
-/// permanent: leaving an account out of a later report does not remove it.
+/// @dev Whitelisted accounts are Midnight, this contract, accounts the owner whitelists via `whitelist`, and
+/// accounts that successfully call `mint`. Whitelisting is permanent: leaving an account out of a later report
+/// does not remove it.
 /// @dev Only whitelisted accounts can receive tokens. Zero-value transfers to any account succeed, so a liquidation
 /// that only realizes bad debt works with any receiver.
 /// @dev Midnight, set by the factory, is always whitelisted, so nothing can freeze the tokens supplied as
@@ -56,7 +55,7 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 /// callback that withdraws and redeems the collateral once the receipts are in, or by a liquidator after maturity.
 ///
 /// TRUST
-/// @dev The owner fully determines who may mint how much, and who can hold tokens at all through its reports.
+/// @dev The owner determines who may mint and how much through its reports, and can whitelist other holders.
 /// Holders trust the owner and the payers of the receivables.
 contract ReceivableToken is IReceivableToken {
     /// STORAGE ///
@@ -102,27 +101,24 @@ contract ReceivableToken is IReceivableToken {
         emit SetRoot(rootId, newRoot);
     }
 
-    /// MINTER FUNCTIONS ///
-
-    /// @dev Whitelists the caller permanently without minting tokens.
-    /// @dev `reported` and `proof` must match the report's current root, for the leaf (caller, reported).
-    function whitelist(bytes32 rootId, uint256 reported, bytes32[] memory proof) public {
-        bytes32 leaf = MerkleProofLib.leaf(msg.sender, reported);
-        require(MerkleProofLib.verify(proof, roots[rootId], leaf), InvalidProof());
-
-        if (!_isWhitelisted[msg.sender]) {
-            _isWhitelisted[msg.sender] = true;
-            emit Whitelist(msg.sender);
-        }
+    /// @dev Whitelists `account` permanently without minting tokens.
+    function whitelist(address account) external {
+        require(msg.sender == owner, NotOwner());
+        _whitelist(account);
     }
 
+    /// MINTER FUNCTIONS ///
+
     /// @dev Mints `amount` tokens to the caller, within its allowance under the report, and whitelists the caller.
+    /// @dev `reported` and `proof` must match the report's current root, for the leaf (caller, reported).
     function mint(bytes32 rootId, uint256 amount, uint256 reported, bytes32[] memory proof) external {
-        whitelist(rootId, reported, proof);
+        bytes32 leaf = MerkleProofLib.leaf(msg.sender, reported);
+        require(MerkleProofLib.verify(proof, roots[rootId], leaf), InvalidProof());
         uint256 newMinted = minted[rootId][msg.sender] + amount;
         require(newMinted <= reported, ExceedsReceivables());
         minted[rootId][msg.sender] = newMinted;
 
+        _whitelist(msg.sender);
         emit Mint(rootId, msg.sender, amount, reported);
 
         _credit(msg.sender, amount);
@@ -173,7 +169,7 @@ contract ReceivableToken is IReceivableToken {
 
     /// VIEW FUNCTIONS ///
 
-    /// @dev Midnight and this contract are always whitelisted; other accounts once they have proven a leaf in a report.
+    /// @dev Midnight and this contract are always whitelisted; other accounts are whitelisted via `whitelist` or `mint`.
     function isWhitelisted(address account) public view returns (bool) {
         return account == midnight || account == address(this) || _isWhitelisted[account];
     }
@@ -208,6 +204,13 @@ contract ReceivableToken is IReceivableToken {
     }
 
     /// HELPERS ///
+
+    function _whitelist(address account) internal {
+        if (!_isWhitelisted[account]) {
+            _isWhitelisted[account] = true;
+            emit Whitelist(account);
+        }
+    }
 
     function _transfer(address from, address to, uint256 amount) internal {
         _debit(from, amount);

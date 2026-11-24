@@ -57,7 +57,7 @@ Redemptions are first come, first served: if the receipts fall short, the last h
 Any account with an allowance `mint`s tokens, up to `reported` under a report, where `reported` comes from Merkle roots set on the token by its owner (OpenZeppelin `StandardMerkleTree` layout with `(account, reported)` leaves, see `MerkleProofLib` in `receivable-token/libraries`).
 The owner allocates the receipts expected by the token between accounts this way, and receipts in excess of the outstanding tokens are extracted the same way, by minting within one's allowance and redeeming.
 
-Each token has an owner, who sets its reports. Whitelisted accounts are Midnight, the token itself, and accounts that submit a valid proof by calling `whitelist` or `mint`. The owner can include a leaf with `reported` = 0 so a liquidator or buyer can whitelist themselves without minting.
+Midnight and the token itself are always whitelisted. The owner can whitelist other accounts with `whitelist(account)`, without a Merkle proof or minting. Accounts that successfully call `mint` are also whitelisted.
 Whitelisting is permanent: leaving an account out of a later report does not remove it. Only whitelisted accounts can receive tokens; zero-value transfers to any account succeed, so a liquidation that only realizes bad debt works with any receiver.
 Midnight is always whitelisted, so nothing can freeze the tokens supplied as collateral on it.
 
