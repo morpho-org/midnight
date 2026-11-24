@@ -16,13 +16,10 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 /// @dev Receipts are paid in the asset directly to this contract, by plain transfers. Each token is redeemable for one
 /// unit of the asset as long as the contract holds it.
 ///
-/// REPORTS
-/// @dev The owner publishes reports identified by a `rootId`: Merkle roots of `(account, reported)` leaves, where
-/// `reported` is the cumulative amount of tokens that `account` may mint under the report. The owner allocates the
-/// receipts expected by the token between accounts this way. Reports should be monotone: a new receivable increases
-/// `reported`, a receipt does not decrease it.
-/// @dev Under a report, an account can have minted at most `reported`. Receipts in excess of the outstanding tokens
-/// are extracted the same way: by minting within one's allowance and redeeming.
+/// REPORT
+/// @dev The immutable `root` commits to a report of `(account, reported)` leaves, where `reported` is the cumulative
+/// amount that `account` may mint. Excess receipts can only be extracted by minting within the fixed allowances
+/// and redeeming.
 ///
 /// REDEMPTIONS
 /// @dev Tokens redeem one for one, first come, first served: if the receipts fall short, the last holders to redeem
@@ -30,8 +27,7 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 ///
 /// HOLDERS
 /// @dev Whitelisted accounts are Midnight, this contract, accounts the owner whitelists via `whitelist`, and
-/// accounts that successfully call `mint`. Whitelisting is permanent: leaving an account out of a later report
-/// does not remove it.
+/// accounts that successfully call `mint`. Whitelisting is permanent.
 /// @dev Only whitelisted accounts can receive tokens. Zero-value transfers to any account succeed, so a liquidation
 /// that only realizes bad debt works with any receiver.
 /// @dev Midnight, set by the factory, is always whitelisted, so nothing can freeze the tokens supplied as
@@ -55,51 +51,46 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 /// callback that withdraws and redeems the collateral once the receipts are in, or by a liquidator after maturity.
 ///
 /// TRUST
-/// @dev The owner determines who may mint and how much through its reports, and can whitelist other holders.
-/// Holders trust the owner and the payers of the receivables.
+/// @dev The report fixes who may mint and how much. Holders trust the owner to whitelist other holders and the
+/// payers to pay the receivables.
 contract ReceivableToken is IReceivableToken {
     /// STORAGE ///
     address public immutable midnight;
     address public immutable asset;
+    address public immutable owner;
     uint8 public immutable decimals;
+    bytes32 public immutable root;
 
     string public name;
     string public symbol;
-    address public owner;
     mapping(address account => bool) internal _isWhitelisted;
-    mapping(bytes32 rootId => bytes32) public roots;
     uint256 public totalSupply;
     mapping(address account => uint256) public balanceOf;
     mapping(address owner => mapping(address spender => uint256)) public allowance;
-    /// @dev Tokens minted by the account under the report.
-    mapping(bytes32 rootId => mapping(address account => uint256)) public minted;
+    /// @dev Total tokens minted by the account.
+    mapping(address account => uint256) public minted;
 
     /// CONSTRUCTOR ///
 
-    constructor(address _midnight, address _asset, address _owner, string memory _name, string memory _symbol) {
+    constructor(
+        address _midnight,
+        address _asset,
+        address _owner,
+        string memory _name,
+        string memory _symbol,
+        bytes32 _root
+    ) {
         midnight = _midnight;
         asset = _asset;
-        decimals = IERC20(_asset).decimals();
         owner = _owner;
+        decimals = IERC20(_asset).decimals();
+        root = _root;
         name = _name;
         symbol = _symbol;
-        emit Constructor(_midnight, _asset, _owner, _name, _symbol, decimals);
+        emit Constructor(_midnight, _asset, _owner, _name, _symbol, decimals, _root);
     }
 
-    /// OWNER FUNCTIONS ///
-
-    function setOwner(address newOwner) external {
-        require(msg.sender == owner, NotOwner());
-        owner = newOwner;
-        emit SetOwner(newOwner);
-    }
-
-    /// @dev Leaves are MerkleProofLib.leaf(account, reported).
-    function setRoot(bytes32 rootId, bytes32 newRoot) external {
-        require(msg.sender == owner, NotOwner());
-        roots[rootId] = newRoot;
-        emit SetRoot(rootId, newRoot);
-    }
+    /// OWNER FUNCTION ///
 
     /// @dev Whitelists `account` permanently.
     function whitelist(address account) external {
@@ -110,16 +101,16 @@ contract ReceivableToken is IReceivableToken {
     /// MINTER FUNCTIONS ///
 
     /// @dev Mints `amount` tokens to the caller, within its allowance under the report, and whitelists the caller.
-    /// @dev `reported` and `proof` must match the report's current root, for the leaf (caller, reported).
-    function mint(bytes32 rootId, uint256 amount, uint256 reported, bytes32[] memory proof) external {
+    /// @dev `reported` and `proof` must match `root` for the leaf (caller, reported).
+    function mint(uint256 amount, uint256 reported, bytes32[] memory proof) external {
         bytes32 leaf = MerkleProofLib.leaf(msg.sender, reported);
-        require(MerkleProofLib.verify(proof, roots[rootId], leaf), InvalidProof());
-        uint256 newMinted = minted[rootId][msg.sender] + amount;
+        require(MerkleProofLib.verify(proof, root, leaf), InvalidProof());
+        uint256 newMinted = minted[msg.sender] + amount;
         require(newMinted <= reported, ExceedsReceivables());
-        minted[rootId][msg.sender] = newMinted;
+        minted[msg.sender] = newMinted;
 
         _whitelist(msg.sender);
-        emit Mint(rootId, msg.sender, amount, reported);
+        emit Mint(msg.sender, amount, reported);
 
         _credit(msg.sender, amount);
         emit Transfer(address(0), msg.sender, amount);

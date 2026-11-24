@@ -22,8 +22,6 @@ contract ReceivableTokenTest is BaseTest {
     uint256 internal constant OTHER_REPORTED = 500e18;
     uint256 internal constant LENDER_REPORTED = 200e18;
     uint256 internal constant TICK = MAX_TICK - 400; // price < 1, multiple of the default tick spacing.
-    bytes32 internal constant ROOT_A = keccak256("A");
-    bytes32 internal constant ROOT_B = keccak256("B");
 
     address internal payer = makeAddr("payer");
     address internal stranger = makeAddr("stranger");
@@ -48,26 +46,21 @@ contract ReceivableTokenTest is BaseTest {
         // Midnight's test tokens do not expose decimals.
         vm.mockCall(address(loanToken), abi.encodeWithSelector(IERC20.decimals.selector), abi.encode(uint8(18)));
         factory = IReceivableTokenFactory(deployCode("ReceivableTokenFactory.sol", abi.encode(address(midnight))));
-        token = IReceivableToken(
-            factory.createReceivableToken(minter, address(loanToken), "Receivable A", "rA", bytes32(0))
-        );
-        otherToken = IReceivableToken(
-            factory.createReceivableToken(otherMinter, address(loanToken), "Receivable B", "rB", bytes32(0))
-        );
         // Roots are per token: the token's has two leaves, the other token's a single one.
         bytes32 leaf = MerkleProofLib.leaf(minter, REPORTED);
         bytes32 lenderLeaf = MerkleProofLib.leaf(lender, LENDER_REPORTED);
         bytes32 otherLeaf = MerkleProofLib.leaf(otherMinter, OTHER_REPORTED);
         bytes32 root = _hashPair(leaf, lenderLeaf);
+        token = IReceivableToken(
+            factory.createReceivableToken(minter, address(loanToken), "Receivable A", "rA", root, bytes32(0))
+        );
+        otherToken = IReceivableToken(
+            factory.createReceivableToken(otherMinter, address(loanToken), "Receivable B", "rB", otherLeaf, bytes32(0))
+        );
         proof.push(lenderLeaf);
         lenderProof.push(leaf);
-        vm.startPrank(minter);
-        token.setRoot(ROOT_A, root);
-        token.setRoot(ROOT_B, root);
+        vm.prank(minter);
         token.whitelist(lender);
-        vm.stopPrank();
-        vm.prank(otherMinter);
-        otherToken.setRoot(ROOT_A, otherLeaf);
 
         deal(address(loanToken), lender, 10 * REPORTED);
         deal(address(loanToken), payer, 10 * REPORTED);
@@ -115,7 +108,7 @@ contract ReceivableTokenTest is BaseTest {
 
     function _mint(uint256 amount) internal {
         vm.prank(minter);
-        token.mint(ROOT_A, amount, REPORTED, proof);
+        token.mint(amount, REPORTED, proof);
     }
 
     function _whitelistLiquidator() internal {
@@ -139,9 +132,11 @@ contract ReceivableTokenTest is BaseTest {
     }
 
     function testCreateReceivableTokenEvent() public {
+        bytes32 root = token.root();
         vm.recordLogs();
         vm.prank(stranger);
-        address created = factory.createReceivableToken(minter, address(loanToken), "Fresh", "FRS", bytes32(uint256(1)));
+        address created =
+            factory.createReceivableToken(minter, address(loanToken), "Fresh", "FRS", root, bytes32(uint256(1)));
         Vm.Log[] memory logs = vm.getRecordedLogs();
         Vm.Log memory creation = logs[logs.length - 1];
         assertEq(creation.emitter, address(factory), "emitter");
@@ -150,7 +145,7 @@ contract ReceivableTokenTest is BaseTest {
         assertEq(creation.topics[1], bytes32(uint256(uint160(minter))), "owner");
         assertEq(creation.topics[2], bytes32(uint256(uint160(address(loanToken)))), "asset");
         assertEq(creation.topics[3], bytes32(uint256(uint160(created))), "token");
-        assertEq(creation.data, abi.encode(bytes32(uint256(1)), "Fresh", "FRS", stranger), "data");
+        assertEq(creation.data, abi.encode(bytes32(uint256(1)), "Fresh", "FRS", root, stranger), "data");
     }
 
     function testTransferFromAllowance(uint256 amount) public {
@@ -184,50 +179,49 @@ contract ReceivableTokenTest is BaseTest {
         assertEq(factory.midnight(), address(midnight), "factory midnight");
         assertEq(token.midnight(), address(midnight), "token midnight");
         assertTrue(otherToken.isWhitelisted(address(midnight)), "midnight whitelisted");
+        bytes32 root = _hashPair(MerkleProofLib.leaf(minter, REPORTED), MerkleProofLib.leaf(lender, LENDER_REPORTED));
+        bytes32 otherRoot = MerkleProofLib.leaf(otherMinter, OTHER_REPORTED);
+        assertEq(token.root(), root, "root");
+        assertEq(otherToken.root(), otherRoot, "other root");
 
         // Same owner, asset and salt with the same parameters: already deployed. Another salt: another token.
         vm.expectRevert();
-        factory.createReceivableToken(minter, address(loanToken), "Receivable A", "rA", bytes32(0));
+        factory.createReceivableToken(minter, address(loanToken), "Receivable A", "rA", root, bytes32(0));
         address created =
-            factory.createReceivableToken(stranger, address(loanToken), "Fresh", "FRS", bytes32(uint256(1)));
+            factory.createReceivableToken(stranger, address(loanToken), "Fresh", "FRS", root, bytes32(uint256(1)));
         assertTrue(factory.isReceivableToken(created), "fresh registered");
         assertEq(IReceivableToken(created).owner(), stranger, "fresh owner");
+
+        address differentRoot =
+            factory.createReceivableToken(minter, address(loanToken), "Receivable A", "rA", otherRoot, bytes32(0));
+        assertTrue(differentRoot != address(token), "root changes CREATE2 address");
     }
 
     function testDecimalsMirrorAsset() public {
+        bytes32 root = token.root();
         vm.mockCall(address(loanToken), abi.encodeWithSelector(IERC20.decimals.selector), abi.encode(uint8(6)));
         vm.expectEmit();
-        emit IReceivableToken.Constructor(address(midnight), address(loanToken), minter, "Six", "SIX", 6);
+        emit IReceivableToken.Constructor(address(midnight), address(loanToken), minter, "Six", "SIX", 6, root);
         IReceivableToken created = IReceivableToken(
-            factory.createReceivableToken(minter, address(loanToken), "Six", "SIX", bytes32(uint256(6)))
+            factory.createReceivableToken(minter, address(loanToken), "Six", "SIX", root, bytes32(uint256(6)))
         );
         assertEq(created.decimals(), 6, "decimals");
 
         vm.clearMockedCalls();
         vm.expectRevert();
-        factory.createReceivableToken(minter, address(loanToken), "None", "NONE", bytes32(uint256(7)));
-    }
-
-    function testSetters() public {
-        vm.expectRevert(IReceivableToken.NotOwner.selector);
-        token.setOwner(address(this));
-        vm.expectRevert(IReceivableToken.NotOwner.selector);
-        token.setRoot(ROOT_A, bytes32(0));
-        vm.prank(minter);
-        token.setOwner(address(this));
-        token.setRoot(ROOT_A, bytes32(uint256(1)));
-        assertEq(token.owner(), address(this), "owner");
-        assertEq(token.roots(ROOT_A), bytes32(uint256(1)), "root");
+        factory.createReceivableToken(minter, address(loanToken), "None", "NONE", root, bytes32(uint256(7)));
     }
 
     /// MINT ///
 
     function testMint(uint256 amount) public {
         amount = bound(amount, 1, REPORTED);
+        vm.expectEmit(address(token));
+        emit IReceivableToken.Mint(minter, amount, REPORTED);
         _mint(amount);
         assertEq(token.balanceOf(minter), amount, "balance");
         assertEq(token.totalSupply(), amount, "supply");
-        assertEq(token.minted(ROOT_A, minter), amount, "minted");
+        assertEq(token.minted(minter), amount, "minted");
     }
 
     function testMintUpToCapacity() public {
@@ -237,33 +231,36 @@ contract ReceivableTokenTest is BaseTest {
         _mint(1);
     }
 
-    function testMintCapacityIsPerReport() public {
+    function testRedeemingDoesNotRestoreMintingCapacity() public {
         _mint(REPORTED);
+        _pay(token, REPORTED + 1);
         vm.prank(minter);
-        token.mint(ROOT_B, REPORTED, REPORTED, proof);
-        assertEq(token.balanceOf(minter), 2 * REPORTED, "balance");
+        token.redeem(REPORTED, minter);
+        assertEq(token.cash(), 1, "excess receipts");
+        vm.expectRevert(IReceivableToken.ExceedsReceivables.selector);
+        _mint(1);
     }
 
     function testMintOtherMinter() public {
         vm.prank(otherMinter);
-        otherToken.mint(ROOT_A, OTHER_REPORTED, OTHER_REPORTED, otherProof);
+        otherToken.mint(OTHER_REPORTED, OTHER_REPORTED, otherProof);
         assertEq(otherToken.balanceOf(otherMinter), OTHER_REPORTED, "balance");
 
         // Roots are per token: the minter's proof is not valid on the other token.
         vm.prank(minter);
         vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        otherToken.mint(ROOT_A, 1, REPORTED, proof);
+        otherToken.mint(1, REPORTED, proof);
     }
 
     function testMintByAnotherAccountWithAllowance() public {
         vm.prank(lender);
-        token.mint(ROOT_A, LENDER_REPORTED, LENDER_REPORTED, lenderProof);
+        token.mint(LENDER_REPORTED, LENDER_REPORTED, lenderProof);
         assertEq(token.balanceOf(lender), LENDER_REPORTED, "lender balance");
-        assertEq(token.minted(ROOT_A, lender), LENDER_REPORTED, "lender minted");
+        assertEq(token.minted(lender), LENDER_REPORTED, "lender minted");
 
         vm.prank(lender);
         vm.expectRevert(IReceivableToken.ExceedsReceivables.selector);
-        token.mint(ROOT_A, 1, LENDER_REPORTED, lenderProof);
+        token.mint(1, LENDER_REPORTED, lenderProof);
 
         // Allowances are per account: the minter's is untouched.
         _mint(REPORTED);
@@ -273,22 +270,20 @@ contract ReceivableTokenTest is BaseTest {
     function testMintInvalidProof() public {
         vm.startPrank(minter);
         vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        token.mint(ROOT_A, 1, REPORTED + 1, proof);
+        token.mint(1, REPORTED + 1, proof);
         vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        token.mint(ROOT_A, 1, REPORTED, lenderProof);
-        vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        token.mint(keccak256("unknown"), 1, REPORTED, proof);
+        token.mint(1, REPORTED, lenderProof);
         vm.stopPrank();
 
         // A leaf only works for its own account.
         vm.prank(lender);
         vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        token.mint(ROOT_A, 1, REPORTED, proof);
+        token.mint(1, REPORTED, proof);
 
         // An invalid proof does not whitelist the caller.
         vm.prank(stranger);
         vm.expectRevert(IReceivableToken.InvalidProof.selector);
-        token.mint(ROOT_A, 1, REPORTED, proof);
+        token.mint(1, REPORTED, proof);
         assertFalse(token.isWhitelisted(stranger), "stranger not whitelisted");
     }
 
@@ -364,7 +359,7 @@ contract ReceivableTokenTest is BaseTest {
         assertTrue(token.isWhitelisted(stranger), "whitelisted");
         assertEq(token.balanceOf(stranger), 0, "balance");
         assertEq(token.totalSupply(), 0, "supply");
-        assertEq(token.minted(ROOT_A, stranger), 0, "minted");
+        assertEq(token.minted(stranger), 0, "minted");
     }
 
     function testWhitelistOnlyOwner() public {
@@ -390,11 +385,12 @@ contract ReceivableTokenTest is BaseTest {
         }
     }
 
-    function testWhitelistingIsPermanent() public {
+    function testWhitelistIsIdempotent() public {
         _mint(1);
-        // The owner replaces the root with one that does not contain the lender.
+        vm.recordLogs();
         vm.prank(minter);
-        token.setRoot(ROOT_A, MerkleProofLib.leaf(minter, REPORTED));
+        token.whitelist(lender);
+        assertEq(vm.getRecordedLogs().length, 0, "no second Whitelist");
 
         assertTrue(token.isWhitelisted(lender), "still whitelisted");
         vm.prank(minter);
