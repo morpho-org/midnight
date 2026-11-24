@@ -54,11 +54,11 @@ Receipts are paid in the asset directly to the token contract, by plain transfer
 Each token is redeemable for one unit of the asset as long as the contract holds it.
 Redemptions are first come, first served: if the receipts fall short, the last holders to redeem bear the shortfall.
 
-Any account with an allowance `mint`s tokens, up to `reported` under a report, where `reported` comes from Merkle roots set on the token by its owner (OpenZeppelin `StandardMerkleTree` layout with `(account, reported)` leaves, see `MerkleProofLib` in `receivable-token/libraries`).
-The owner allocates the receipts expected by the token between accounts this way, and receipts in excess of the outstanding tokens are extracted the same way, by minting within one's allowance and redeeming.
+The token's immutable Merkle root commits to a single report of minting allowances (OpenZeppelin `StandardMerkleTree` layout with `(account, reported)` leaves, see `MerkleProofLib` in `receivable-token/libraries`). Each account can mint up to its cumulative allowance, `reported`.
+Excess receipts can only be extracted by minting within the remaining fixed allowances and redeeming. Receipts beyond the total allowances cannot be withdrawn.
 
 Midnight and the token itself are always whitelisted. The owner can whitelist other accounts with `whitelist(account)`. Accounts that successfully call `mint` are also whitelisted.
-Whitelisting is permanent: leaving an account out of a later report does not remove it. Only whitelisted accounts can receive tokens; zero-value transfers to any account succeed, so a liquidation that only realizes bad debt works with any receiver.
+Whitelisting is permanent. Only whitelisted accounts can receive tokens; zero-value transfers to any account succeed, so a liquidation that only realizes bad debt works with any receiver.
 Midnight is always whitelisted, so nothing can freeze the tokens supplied as collateral on it.
 
 Minters can sell the tokens, or supply them as collateral on any market listing them and sell debt against them.
@@ -73,9 +73,9 @@ A market can list up to 128 tokens, each with its own LLTV, so lenders diversify
 
 Deploys `ReceivableToken`s with `CREATE2` from a caller-provided salt, and records them in `isReceivableToken`.
 The factory is deployed with Midnight's address and passes it to every token it deploys, so Midnight is always whitelisted on them.
-Anyone creates a token with `createReceivableToken`, picking its owner, asset, name and symbol.
+Anyone creates a token with `createReceivableToken`, picking its owner, asset, name, symbol and report root.
 
-Holders trust the payers of the receivables and the token's owner, who sets minting allowances through reports and can add holders directly with `whitelist(account)`.
+Holders trust the payers of the receivables and the token's owner, who can add holders directly with `whitelist(account)`.
 
 ## Libraries
 
