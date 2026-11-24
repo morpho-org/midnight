@@ -45,8 +45,8 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 /// assets, to the liquidator, who never holds the token.
 /// @dev With an oracle valuing the token at one unit of the asset, the repaid units never exceed the seized tokens,
 /// since the liquidation incentive is at least 1, so the liquidator needs no capital. The liquidation reverts if the
-/// repaid units exceed the seized tokens, which needs an oracle price above the incentive, or if the contract does not
-/// hold enough cash.
+/// repaid units exceed the seized tokens, which can happen once the oracle values the token above one unit of the
+/// asset, or if the contract does not hold enough cash.
 /// @dev The callback only works on markets whose loan token is the asset. On other markets, only whitelisted
 /// accounts can receive seized tokens.
 ///
