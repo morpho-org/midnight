@@ -30,8 +30,8 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 ///
 /// HOLDERS
 /// @dev Whitelisted accounts are Midnight, this contract, plus every account that has submitted a valid proof under
-/// any report, by calling `mint`, possibly with amount 0. The owner can whitelist a non-minter, such as a liquidator
-/// or a buyer that wants to keep tokens, by including a leaf with `reported` = 0 in a report. Whitelisting is
+/// any report by calling `whitelist` or `mint`. The owner can let a non-minter, such as a liquidator or a buyer that
+/// wants to keep tokens, whitelist themselves by including a leaf with `reported` = 0 in a report. Whitelisting is
 /// permanent: leaving an account out of a later report does not remove it.
 /// @dev Only whitelisted accounts can receive tokens. Zero-value transfers to any account succeed, so a liquidation
 /// that only realizes bad debt works with any receiver.
@@ -104,21 +104,24 @@ contract ReceivableToken is IReceivableToken {
 
     /// MINTER FUNCTIONS ///
 
-    /// @dev Mints `amount` tokens to the caller, within its allowance under the report.
+    /// @dev Whitelists the caller permanently without minting tokens.
     /// @dev `reported` and `proof` must match the report's current root, for the leaf (caller, reported).
-    /// @dev Whitelists the caller permanently. Calling `mint` with `amount` = 0 is the way to get whitelisted
-    /// without minting.
-    function mint(bytes32 rootId, uint256 amount, uint256 reported, bytes32[] memory proof) external {
+    function whitelist(bytes32 rootId, uint256 reported, bytes32[] memory proof) public {
         bytes32 leaf = MerkleProofLib.leaf(msg.sender, reported);
         require(MerkleProofLib.verify(proof, roots[rootId], leaf), InvalidProof());
-        uint256 newMinted = minted[rootId][msg.sender] + amount;
-        require(newMinted <= reported, ExceedsReceivables());
-        minted[rootId][msg.sender] = newMinted;
 
         if (!_isWhitelisted[msg.sender]) {
             _isWhitelisted[msg.sender] = true;
             emit Whitelist(msg.sender);
         }
+    }
+
+    /// @dev Mints `amount` tokens to the caller, within its allowance under the report, and whitelists the caller.
+    function mint(bytes32 rootId, uint256 amount, uint256 reported, bytes32[] memory proof) external {
+        whitelist(rootId, reported, proof);
+        uint256 newMinted = minted[rootId][msg.sender] + amount;
+        require(newMinted <= reported, ExceedsReceivables());
+        minted[rootId][msg.sender] = newMinted;
 
         emit Mint(rootId, msg.sender, amount, reported);
 

@@ -48,6 +48,7 @@ interface IReceivableToken is IERC20, ILiquidateCallback {
     /// FUNCTIONS ///
     function setOwner(address newOwner) external;
     function setRoot(bytes32 rootId, bytes32 newRoot) external;
+    function whitelist(bytes32 rootId, uint256 reported, bytes32[] memory proof) external;
     function mint(bytes32 rootId, uint256 amount, uint256 reported, bytes32[] memory proof) external;
     function redeem(uint256 amount, address receiver) external;
     // forgefmt: disable-end

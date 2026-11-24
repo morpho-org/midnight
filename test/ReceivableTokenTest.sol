@@ -73,7 +73,7 @@ contract ReceivableTokenTest is BaseTest {
 
         // The lender is whitelisted by proving its leaf, without minting.
         vm.prank(lender);
-        token.mint(ROOT_A, 0, LENDER_REPORTED, lenderProof);
+        token.whitelist(ROOT_A, LENDER_REPORTED, lenderProof);
 
         deal(address(loanToken), lender, 10 * REPORTED);
         deal(address(loanToken), payer, 10 * REPORTED);
@@ -127,7 +127,7 @@ contract ReceivableTokenTest is BaseTest {
     /// @dev The liquidator is whitelisted by proving its `reported` = 0 leaf under ROOT_C, without minting.
     function _whitelistLiquidator() internal {
         vm.prank(liquidator);
-        token.mint(ROOT_C, 0, 0, emptyProof);
+        token.whitelist(ROOT_C, 0, emptyProof);
     }
 
     /// @dev Receipts are plain transfers to the token.
@@ -362,11 +362,30 @@ contract ReceivableTokenTest is BaseTest {
 
     /// WHITELIST ///
 
+    function testWhitelistWithoutMinting() public {
+        assertFalse(token.isWhitelisted(minter), "not whitelisted");
+        vm.expectEmit(address(token));
+        emit IReceivableToken.Whitelist(minter);
+        vm.prank(minter);
+        token.whitelist(ROOT_A, REPORTED, proof);
+        assertTrue(token.isWhitelisted(minter), "whitelisted");
+        assertEq(token.balanceOf(minter), 0, "balance");
+        assertEq(token.totalSupply(), 0, "supply");
+        assertEq(token.minted(ROOT_A, minter), 0, "minted");
+    }
+
+    function testWhitelistInvalidProof() public {
+        vm.prank(stranger);
+        vm.expectRevert(IReceivableToken.InvalidProof.selector);
+        token.whitelist(ROOT_A, REPORTED, proof);
+        assertFalse(token.isWhitelisted(stranger), "stranger not whitelisted");
+    }
+
     function testMintWhitelists() public {
         assertFalse(token.isWhitelisted(minter), "not whitelisted");
         vm.expectEmit(address(token));
         emit IReceivableToken.Whitelist(minter);
-        _mint(0);
+        _mint(1);
         assertTrue(token.isWhitelisted(minter), "whitelisted");
 
         // A second mint does not emit Whitelist again.
