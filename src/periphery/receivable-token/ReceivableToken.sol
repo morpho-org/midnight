@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Morpho Association
 pragma solidity 0.8.34;
 
-import {ORACLE_PRICE_SCALE, CALLBACK_SUCCESS} from "../../libraries/ConstantsLib.sol";
+import {CALLBACK_SUCCESS} from "../../libraries/ConstantsLib.sol";
 import {Market} from "../../interfaces/IMidnight.sol";
 import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {ERC20Lib} from "../libraries/ERC20Lib.sol";
@@ -26,8 +26,7 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 ///
 /// REDEMPTIONS
 /// @dev Tokens redeem one for one, first come, first served: if the receipts fall short, the last holders to redeem
-/// bear the shortfall. The price is constant, so a shortfall does not make positions using the token as collateral
-/// oracle liquidatable before maturity.
+/// bear the shortfall.
 ///
 /// HOLDERS
 /// @dev Whitelisted accounts are Midnight, this contract, plus every account that has submitted a valid proof under
@@ -44,9 +43,10 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 /// liquidate with this contract as `receiver` and `callback`. Midnight transfers the seized tokens here, then calls
 /// onLiquidate, which burns them, approves Midnight for the repaid units and sends the rest of the seized amount, in
 /// assets, to the liquidator, who never holds the token.
-/// @dev When the token is its own collateral oracle, the repaid units never exceed the seized tokens, since the
-/// liquidation incentive is at least 1, so the liquidator needs no capital. The liquidation reverts if an oracle
-/// values the token above one unit of the asset, or if the contract does not hold enough cash.
+/// @dev With an oracle valuing the token at one unit of the asset, the repaid units never exceed the seized tokens,
+/// since the liquidation incentive is at least 1, so the liquidator needs no capital. The liquidation reverts if the
+/// repaid units exceed the seized tokens, which needs an oracle price above the incentive, or if the contract does not
+/// hold enough cash.
 /// @dev The callback only works on markets whose loan token is the asset. On other markets, only whitelisted
 /// accounts can receive seized tokens.
 ///
@@ -178,13 +178,6 @@ contract ReceivableToken is IReceivableToken {
     /// @dev Receipts held by the contract.
     function cash() public view returns (uint256) {
         return IERC20(asset).balanceOf(address(this));
-    }
-
-    /// @dev The price of one token in `asset`, scaled by 1e36, so the token can be its own collateral oracle on
-    /// Midnight markets whose loan token is `asset` (token and asset have the same decimals). Not valid for other
-    /// loan tokens.
-    function price() external pure returns (uint256) {
-        return ORACLE_PRICE_SCALE;
     }
 
     /// ERC20 ///

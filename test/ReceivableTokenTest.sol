@@ -92,13 +92,9 @@ contract ReceivableTokenTest is BaseTest {
     }
 
     function _market(uint256 lltv) internal view returns (Market memory) {
-        return _market(lltv, address(oracle1));
-    }
-
-    function _market(uint256 lltv, address oracle) internal view returns (Market memory) {
         CollateralParams[] memory collateralParams = new CollateralParams[](1);
         collateralParams[0] = CollateralParams({
-            token: address(token), lltv: lltv, liquidationCursor: LIQUIDATION_CURSOR, oracle: oracle
+            token: address(token), lltv: lltv, liquidationCursor: LIQUIDATION_CURSOR, oracle: address(oracle1)
         });
         return Market({
             chainId: block.chainid,
@@ -229,12 +225,6 @@ contract ReceivableTokenTest is BaseTest {
         token.setRoot(ROOT_A, bytes32(uint256(1)));
         assertEq(token.owner(), address(this), "owner");
         assertEq(token.roots(ROOT_A), bytes32(uint256(1)), "root");
-    }
-
-    /// PRICE ///
-
-    function testPriceAtPar() public view {
-        assertEq(token.price(), 1e36, "price at par");
     }
 
     /// MINT ///
@@ -434,7 +424,7 @@ contract ReceivableTokenTest is BaseTest {
     }
 
     function testPermissionlessLiquidationThroughToken() public {
-        Market memory market = _market(LLTV, address(token));
+        Market memory market = _market(LLTV);
         bytes32 id = toId(market);
         (uint256 units, uint256 collateral) = _borrowAndPay(market);
 
@@ -512,7 +502,7 @@ contract ReceivableTokenTest is BaseTest {
 
     function testOnLiquidateNeedsNoCapital(uint256 seizedAssets, uint256 elapsed) public {
         // Even when the incentive is close to 1, right after maturity, the seized tokens cover the repaid units.
-        Market memory market = _market(LLTV, address(token));
+        Market memory market = _market(LLTV);
         (uint256 units,) = _borrowAndPay(market);
         seizedAssets = bound(seizedAssets, 1, units);
         elapsed = bound(elapsed, 1, 1 hours);
@@ -531,13 +521,13 @@ contract ReceivableTokenTest is BaseTest {
         vm.warp(maturity + 1);
         oracle1.setPrice(2e36);
 
-        // The repaid units exceed the seized tokens, so paying the liquidator underflows.
+        // Above the incentive, the repaid units exceed the seized tokens, so paying the liquidator underflows.
         vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11));
         _liquidateThroughToken(market, units);
     }
 
     function testOnLiquidateInsufficientCash() public {
-        Market memory market = _market(LLTV, address(token));
+        Market memory market = _market(LLTV);
         uint256 units = 600e18;
         uint256 collateral = units.mulDivUp(WAD, LLTV);
         _mint(collateral);

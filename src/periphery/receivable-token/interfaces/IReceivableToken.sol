@@ -3,10 +3,9 @@
 pragma solidity >=0.5.0;
 
 import {IERC20} from "./IERC20.sol";
-import {IOracle} from "../../../interfaces/IOracle.sol";
 import {ILiquidateCallback} from "../../../interfaces/ICallbacks.sol";
 
-interface IReceivableToken is IERC20, IOracle, ILiquidateCallback {
+interface IReceivableToken is IERC20, ILiquidateCallback {
     /// ERRORS ///
     error ExceedsReceivables();
     error InsufficientAllowance();

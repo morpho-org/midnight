@@ -53,7 +53,6 @@ A claim on the receipts paid to the token contract, meant to be used as collater
 Receipts are paid in the asset directly to the token contract, by plain transfers.
 Each token is redeemable for one unit of the asset as long as the contract holds it.
 Redemptions are first come, first served: if the receipts fall short, the last holders to redeem bear the shortfall.
-The token is its own collateral oracle on Midnight markets whose loan token is the asset, at a constant price of one unit of the asset, so a shortfall does not make those positions liquidatable before maturity.
 
 Any account with an allowance `mint`s tokens, up to `reported` under a report, where `reported` comes from Merkle roots set on the token by its owner (OpenZeppelin `StandardMerkleTree` layout with `(account, reported)` leaves, see `MerkleProofLib` in `receivable-token/libraries`).
 The owner allocates the receipts expected by the token between accounts this way, and receipts in excess of the outstanding tokens are extracted the same way, by minting within one's allowance and redeeming.
@@ -65,7 +64,7 @@ Midnight is always whitelisted, so nothing can freeze the tokens supplied as col
 Minters can sell the tokens, or supply them as collateral on any market listing them and sell debt against them.
 The debt is repaid either by the borrower, typically with a repay callback that withdraws and redeems the collateral once the receipts are in, or by a liquidator after maturity.
 Liquidations stay permissionless through the token's liquidate callback: a liquidator calls `liquidate` with the token as `receiver` and `callback`, and `onLiquidate` burns the seized tokens, approves Midnight for the repaid units and sends the rest of the seized amount, in assets, to the liquidator, who never holds the token.
-When the token is its own collateral oracle, the repaid units never exceed the seized tokens, since the liquidation incentive is at least 1, so the liquidator needs no capital. The liquidation reverts if an oracle values the token above one unit of the asset, or if the token lacks the cash.
+With an oracle valuing the token at one unit of the asset, the repaid units never exceed the seized tokens, since the liquidation incentive is at least 1, so the liquidator needs no capital. The liquidation reverts if the repaid units exceed the seized tokens, which needs an oracle price above the incentive, or if the token lacks the cash.
 The callback only works on markets whose loan token is the asset; on other markets, only whitelisted accounts can receive seized tokens.
 A whitelisted liquidator can also receive the seized tokens directly and redeem them later.
 A market can list up to 128 tokens, each with its own LLTV, so lenders diversify across tokens through markets rather than through pooled claims.
