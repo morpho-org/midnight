@@ -10,6 +10,8 @@ Parameters
 Licensor:             Morpho Association
 
 Licensed Work:        Morpho Midnight core contract (src/Midnight.sol)
+                      and ReceivableToken source and tests
+                      (src/periphery/receivable-token/ and test/ReceivableTokenTest.sol)
                       The Licensed Work is (c) 2026 Morpho Association
 
 Additional Use Grant: Any uses listed and defined at
