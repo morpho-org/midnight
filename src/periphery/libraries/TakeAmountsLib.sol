@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Morpho Association
-pragma solidity ^0.8.0;
+pragma solidity >=0.8.0;
 
 import {IMidnight, Offer} from "../../interfaces/IMidnight.sol";
 import {UtilsLib} from "../../libraries/UtilsLib.sol";

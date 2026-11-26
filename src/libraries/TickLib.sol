@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Morpho Association
-pragma solidity ^0.8.0;
+pragma solidity >=0.8.0;
 
 int256 constant LN_ONE_PLUS_DELTA = 0.004987541511039073e18; // floor(ln(1.005) * 1e18)
 uint256 constant MAX_TICK = 6744;

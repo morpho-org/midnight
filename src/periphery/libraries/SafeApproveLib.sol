@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Morpho Association
-pragma solidity ^0.8.0;
+pragma solidity >=0.8.0;
 
 interface IERC20Approve {
     function allowance(address owner, address spender) external view returns (uint256);
