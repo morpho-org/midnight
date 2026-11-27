@@ -405,6 +405,128 @@ contract ReceivableTokenTest is BaseTest {
         assertTrue(token.isWhitelisted(address(token)), "token whitelisted");
     }
 
+    /// REPAYMENTS ///
+
+    function _repayThroughToken(Market memory market, uint256 units) internal {
+        vm.prank(minter);
+        midnight.repay(market, units, minter, address(token), abi.encode(uint256(0)));
+    }
+
+    function _authorizeRepay() internal {
+        vm.prank(minter);
+        midnight.setIsAuthorized(address(token), true, minter);
+    }
+
+    function testFullRepayThroughToken() public {
+        Market memory market = _market(LLTV);
+        bytes32 id = toId(market);
+        (uint256 units, uint256 collateral) = _borrowAndPay(market);
+        uint256 balanceBefore = loanToken.balanceOf(minter);
+        _authorizeRepay();
+
+        vm.expectEmit(address(token));
+        emit IReceivableToken.Transfer(address(token), address(0), units);
+        vm.expectEmit(address(token));
+        emit IReceivableToken.RedeemRepaid(id, minter, units);
+        _repayThroughToken(market, units);
+
+        assertEq(midnight.debt(id, minter), 0, "debt repaid");
+        assertEq(midnight.collateral(id, minter, 0), collateral - units, "remaining collateral");
+        assertEq(token.balanceOf(address(token)), 0, "tokens burned");
+        assertEq(token.totalSupply(), collateral - units, "supply");
+        assertEq(token.cash(), collateral - units, "cash");
+        assertEq(loanToken.balanceOf(minter), balanceBefore, "borrower assets untouched");
+        assertEq(loanToken.allowance(address(token), address(midnight)), 0, "approval spent");
+        assertEq(midnight.withdrawable(id), units, "withdrawable");
+    }
+
+    function testPartialRepayThroughToken(uint256 repaid) public {
+        Market memory market = _market(LLTV);
+        bytes32 id = toId(market);
+        (uint256 units, uint256 collateral) = _borrowAndPay(market);
+        repaid = bound(repaid, 1, units - 1);
+        _authorizeRepay();
+        _repayThroughToken(market, repaid);
+        assertEq(midnight.debt(id, minter), units - repaid, "remaining debt");
+        assertEq(midnight.collateral(id, minter, 0), collateral - repaid, "remaining collateral");
+        assertTrue(midnight.isHealthy(market, id, minter), "healthy");
+    }
+
+    function testOnRepayOnlyMidnight() public {
+        Market memory market = _market();
+        vm.expectRevert(IReceivableToken.NotMidnight.selector);
+        token.onRepay(toId(market), market, 0, minter, abi.encode(uint256(0)));
+    }
+
+    function testOnRepayRequiresTokenAsCollateral() public {
+        Market memory market = _market();
+        market.collateralParams[0].token = address(otherToken);
+        vm.expectRevert(IReceivableToken.InvalidRepayment.selector);
+        _repayThroughToken(market, 0);
+    }
+
+    function testOnRepayRequiresAssetAsLoanToken() public {
+        Market memory market = _market();
+        market.loanToken = address(otherToken);
+        vm.expectRevert(IReceivableToken.InvalidRepayment.selector);
+        _repayThroughToken(market, 0);
+    }
+
+    function testOnRepayInsufficientCash() public {
+        Market memory market = _market(LLTV);
+        (uint256 units,) = _borrowAndPay(market);
+        _authorizeRepay();
+        deal(address(loanToken), address(token), units - 1);
+        vm.expectRevert(IReceivableToken.InsufficientCash.selector);
+        _repayThroughToken(market, units);
+        assertEq(midnight.debt(toId(market), minter), units, "debt unchanged");
+    }
+
+    function testOnRepayMalformedData() public {
+        Market memory market = _market();
+        vm.prank(minter);
+        vm.expectRevert();
+        midnight.repay(market, 0, minter, address(token), "");
+    }
+
+    function testOnRepayRequiresAuthorization() public {
+        Market memory market = _market(LLTV);
+        (uint256 units,) = _borrowAndPay(market);
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        _repayThroughToken(market, units);
+    }
+
+    function testOnRepayCannotSelectVictim() public {
+        Market memory market = _market(LLTV);
+        (uint256 units, uint256 collateral) = _borrowAndPay(market);
+        _authorizeRepay();
+        vm.prank(minter);
+        token.mint(ROOT_B, collateral, REPORTED, proof);
+        vm.prank(stranger);
+        midnight.setIsAuthorized(minter, true, stranger);
+        vm.prank(minter);
+        midnight.supplyCollateral(market, 0, collateral, stranger);
+        take(units, stranger, _buyOffer(market));
+        vm.prank(stranger);
+        midnight.setIsAuthorized(address(token), true, stranger);
+        assertFalse(token.isWhitelisted(stranger), "borrower has no whitelist leaf");
+
+        vm.prank(stranger);
+        midnight.repay(market, units, stranger, address(token), abi.encode(uint256(0), minter));
+        bytes32 id = toId(market);
+        assertEq(midnight.debt(id, stranger), 0, "own debt repaid");
+        assertEq(midnight.collateral(id, stranger, 0), collateral - units, "own collateral redeemed");
+        assertEq(midnight.debt(id, minter), units, "victim debt unchanged");
+        assertEq(midnight.collateral(id, minter, 0), collateral, "victim collateral unchanged");
+    }
+
+    function testOnRepayZeroUnits() public {
+        Market memory market = _market();
+        _authorizeRepay();
+        _repayThroughToken(market, 0);
+        assertEq(token.cash(), 0, "no cash needed");
+    }
+
     /// LIQUIDATIONS ///
 
     /// @dev Supplies collateral, sells debt on a market with a liquidation incentive and pays the receipts.

@@ -3,7 +3,7 @@
 pragma solidity 0.8.34;
 
 import {CALLBACK_SUCCESS} from "../../libraries/ConstantsLib.sol";
-import {Market} from "../../interfaces/IMidnight.sol";
+import {IMidnight, Market} from "../../interfaces/IMidnight.sol";
 import {SafeTransferLib} from "../../libraries/SafeTransferLib.sol";
 import {ERC20Lib} from "../libraries/ERC20Lib.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
@@ -52,8 +52,12 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 ///
 /// USAGE
 /// @dev Accounts with an allowance mint tokens and can sell them, or supply them as collateral on any Midnight market
-/// that lists them and sell debt against them. The debt is repaid either by the borrower, typically with a repay
-/// callback that withdraws and redeems the collateral once the receipts are in, or by a liquidator after maturity.
+/// that lists them and sell debt against them. The debt is repaid either by the borrower through this contract's
+/// repay callback once the receipts are in, or by a liquidator after maturity.
+/// @dev The borrower first authorizes this contract on Midnight, then calls repay with this contract as `callback`
+/// and the ABI-encoded collateral index as data. onRepay withdraws and burns the borrower's tokens and approves
+/// Midnight for the repaid units. No owner whitelisting is needed. The callback only works on markets whose loan
+/// token is the asset and reverts if the contract does not hold enough cash.
 ///
 /// TRUST
 /// @dev The owner fully determines who may mint how much, and who can hold tokens at all through its reports.
@@ -165,6 +169,29 @@ contract ReceivableToken is IReceivableToken {
 
         ERC20Lib.safeApprove(asset, midnight, repaidUnits);
         SafeTransferLib.safeTransfer(asset, caller, seizedAssets - repaidUnits);
+        return CALLBACK_SUCCESS;
+    }
+
+    /// REPAY CALLBACK ///
+
+    /// @dev Called by Midnight with this contract as `callback`. Withdraws and burns `units` tokens from
+    /// `onBehalf`'s collateral and approves Midnight for the repaid units. Data is the ABI-encoded collateral index.
+    function onRepay(bytes32 id, Market memory market, uint256 units, address onBehalf, bytes memory data)
+        external
+        returns (bytes32)
+    {
+        require(msg.sender == midnight, NotMidnight());
+        uint256 collateralIndex = abi.decode(data, (uint256));
+        require(market.collateralParams[collateralIndex].token == address(this), InvalidRepayment());
+        require(market.loanToken == asset, InvalidRepayment());
+        require(units <= cash(), InsufficientCash());
+
+        IMidnight(midnight).withdrawCollateral(market, collateralIndex, units, onBehalf, address(this));
+        _debit(address(this), units);
+        emit Transfer(address(this), address(0), units);
+        emit RedeemRepaid(id, onBehalf, units);
+
+        ERC20Lib.safeApprove(asset, midnight, units);
         return CALLBACK_SUCCESS;
     }
 

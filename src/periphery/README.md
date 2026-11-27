@@ -62,24 +62,15 @@ Whitelisting is permanent: leaving an account out of a later report does not rem
 Midnight is always whitelisted, so nothing can freeze the tokens supplied as collateral on it.
 
 Minters can sell the tokens, or supply them as collateral on any market listing them and sell debt against them.
-The debt is repaid either by the borrower, typically with a repay callback that withdraws and redeems the collateral once the receipts are in (the callback must be whitelisted to receive the withdrawn tokens), or by a liquidator after maturity.
+The debt is repaid either by the borrower through the token's repay callback once the receipts are in, or by a liquidator after maturity.
+The borrower first calls `midnight.setIsAuthorized(token, true, borrower)`, then calls `midnight.repay(market, units, borrower, token, abi.encode(collateralIndex))`.
+The token's `onRepay` withdraws and burns `units` of the borrower's collateral and approves Midnight for the repaid units. No owner whitelisting is needed.
+The repay callback only works on markets whose loan token is the asset and reverts if the token lacks the cash.
 Liquidations stay permissionless through the token's liquidate callback: a liquidator calls `liquidate` with the token as `receiver` and `callback`, and `onLiquidate` burns the seized tokens, approves Midnight for the repaid units and sends the rest of the seized amount, in assets, to the liquidator, who never holds the token.
 With an oracle valuing the token at one unit of the asset, the repaid units never exceed the seized tokens, since the liquidation incentive is at least 1, so the liquidator needs no capital. The liquidation reverts if the repaid units exceed the seized tokens, which can happen once the oracle values the token above one unit of the asset, or if the token lacks the cash.
 The callback only works on markets whose loan token is the asset; on other markets, only whitelisted accounts can receive seized tokens.
 A whitelisted liquidator can also receive the seized tokens directly and redeem them later.
 A market can list up to 128 tokens, each with its own LLTV, so lenders diversify across tokens through markets rather than through pooled claims.
-
-### `ReceivableRepayer`
-
-Repays a borrower's debt by withdrawing and redeeming their receivable collateral inside Midnight's repay callback.
-The collateral token's asset must match the market's loan token, its rate must be nonzero, and it must hold enough cash.
-Only the collateral index is read from callback data; collateral is always withdrawn from the borrower being repaid.
-
-The borrower first calls `midnight.setIsAuthorized(repayer, true, borrower)`, then calls
-`midnight.repay(market, units, borrower, repayer, abi.encode(collateralIndex))`.
-The repayer withdraws the collateral amount rounded up at the current rate and redeems it for exactly `units` loan
-tokens, since the rate is at most WAD, then approves Midnight for exactly `units`.
-The repayer redeems inside the token's receiver hook.
 
 ### `ReceivableTokenFactory`
 
