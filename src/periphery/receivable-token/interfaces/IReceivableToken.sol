@@ -3,9 +3,9 @@
 pragma solidity >=0.5.0;
 
 import {IERC20} from "./IERC20.sol";
-import {ILiquidateCallback} from "../../../interfaces/ICallbacks.sol";
+import {ILiquidateCallback, IRepayCallback} from "../../../interfaces/ICallbacks.sol";
 
-interface IReceivableToken is IERC20, ILiquidateCallback {
+interface IReceivableToken is IERC20, ILiquidateCallback, IRepayCallback {
     /// ERRORS ///
     error ExceedsReceivables();
     error InsufficientAllowance();
@@ -13,6 +13,7 @@ interface IReceivableToken is IERC20, ILiquidateCallback {
     error InsufficientCash();
     error InvalidLiquidation();
     error InvalidProof();
+    error InvalidRepayment();
     error NotMidnight();
     error NotOwner();
     error NotWhitelisted();
@@ -28,6 +29,7 @@ interface IReceivableToken is IERC20, ILiquidateCallback {
     event Mint(bytes32 indexed rootId, address indexed account, uint256 amount, uint256 reported);
     event Redeem(address indexed caller, address indexed receiver, uint256 amount);
     event RedeemSeized(address indexed caller, bytes32 indexed id, address indexed borrower, uint256 amount, uint256 repaidUnits);
+    event RedeemRepaid(bytes32 indexed id, address indexed onBehalf, uint256 units);
 
     /// STORAGE GETTERS ///
     function midnight() external view returns (address);
