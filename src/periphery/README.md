@@ -57,7 +57,7 @@ Redemptions are first come, first served: if the receipts fall short, the last h
 Any account with an allowance `mint`s tokens, up to `reported` under a report, where `reported` comes from Merkle roots set on the token by its owner (OpenZeppelin `StandardMerkleTree` layout with `(account, reported)` leaves, see `MerkleProofLib` in `receivable-token/libraries`).
 The owner allocates the receipts expected by the token between accounts this way, and receipts in excess of the outstanding tokens are extracted the same way, by minting within one's allowance and redeeming.
 
-Each token has an owner, who sets its reports. Whitelisted accounts are Midnight, the token itself, plus every account that has submitted a valid proof under any report, by calling `mint`, possibly with amount 0; the owner can whitelist a non-minter, such as a liquidator or a buyer that wants to keep tokens, by including a leaf with `reported` = 0.
+Midnight and the token itself are always whitelisted. The owner can whitelist other accounts with `whitelist(account)`. Accounts that successfully call `mint` are also whitelisted.
 Whitelisting is permanent: leaving an account out of a later report does not remove it. Only whitelisted accounts can receive tokens; zero-value transfers to any account succeed, so a liquidation that only realizes bad debt works with any receiver.
 Midnight is always whitelisted, so nothing can freeze the tokens supplied as collateral on it.
 
@@ -75,7 +75,7 @@ Deploys `ReceivableToken`s with `CREATE2` from a caller-provided salt, and recor
 The factory is deployed with Midnight's address and passes it to every token it deploys, so Midnight is always whitelisted on them.
 Anyone creates a token with `createReceivableToken`, picking its owner, asset, name and symbol.
 
-Holders trust a token's owner, who determines who may mint how much and who can hold tokens at all through its reports, and the payers of the receivables.
+Holders trust the payers of the receivables and the token's owner, who sets minting allowances through reports and can add holders directly with `whitelist(account)`.
 
 ## Libraries
 
