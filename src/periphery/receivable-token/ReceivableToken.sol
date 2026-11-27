@@ -51,13 +51,15 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 /// callback that withdraws and redeems the collateral once the receipts are in, or by a liquidator after maturity.
 ///
 /// TRUST
-/// @dev The report fixes who may mint and how much. Holders trust the owner to whitelist other holders and the
-/// payers to pay the receivables.
+/// @dev The report fixes who may mint and how much. Holders trust `signer` (verified by the factory over all
+/// deployment parameters), `owner` to whitelist other holders, and the payers to pay the receivables.
+/// @dev `midnight` and `signer` are only guaranteed for tokens registered in `ReceivableTokenFactory.isReceivableToken`.
 contract ReceivableToken is IReceivableToken {
     /// STORAGE ///
     address public immutable midnight;
     address public immutable asset;
     address public immutable owner;
+    address public immutable signer;
     uint8 public immutable decimals;
     bytes32 public immutable root;
 
@@ -76,6 +78,7 @@ contract ReceivableToken is IReceivableToken {
         address _midnight,
         address _asset,
         address _owner,
+        address _signer,
         string memory _name,
         string memory _symbol,
         bytes32 _root
@@ -83,11 +86,12 @@ contract ReceivableToken is IReceivableToken {
         midnight = _midnight;
         asset = _asset;
         owner = _owner;
+        signer = _signer;
         decimals = IERC20(_asset).decimals();
         root = _root;
         name = _name;
         symbol = _symbol;
-        emit Constructor(_midnight, _asset, _owner, _name, _symbol, decimals, _root);
+        emit Constructor(_midnight, _asset, _owner, _signer, _name, _symbol, decimals, _root);
     }
 
     /// OWNER FUNCTION ///

@@ -11,9 +11,18 @@ import {ERC20Lib} from "../src/periphery/libraries/ERC20Lib.sol";
 import {BaseTest, LLTV, LIQUIDATION_CURSOR} from "./BaseTest.sol";
 import {IERC20} from "../src/periphery/receivable-token/interfaces/IERC20.sol";
 import {MerkleProofLib} from "../src/periphery/receivable-token/libraries/MerkleProofLib.sol";
-import {IReceivableTokenFactory} from "../src/periphery/receivable-token/interfaces/IReceivableTokenFactory.sol";
+import {
+    IReceivableTokenFactory,
+    Signature,
+    CREATE_RECEIVABLE_TOKEN_TYPEHASH,
+    EIP712_DOMAIN_TYPEHASH
+} from "../src/periphery/receivable-token/interfaces/IReceivableTokenFactory.sol";
 import {IReceivableToken} from "../src/periphery/receivable-token/interfaces/IReceivableToken.sol";
 import {Vm} from "../lib/forge-std/src/Vm.sol";
+
+bytes constant CREATE_RECEIVABLE_TOKEN_TYPE =
+    "CreateReceivableToken(address owner,address asset,string name,string symbol,bytes32 root,uint256 nonce)";
+bytes constant EIP712_DOMAIN_TYPE = "EIP712Domain(uint256 chainId,address verifyingContract)";
 
 contract ReceivableTokenTest is BaseTest {
     using UtilsLib for uint256;
@@ -25,6 +34,10 @@ contract ReceivableTokenTest is BaseTest {
 
     address internal payer = makeAddr("payer");
     address internal stranger = makeAddr("stranger");
+    address internal signer;
+    uint256 internal signerKey;
+    address internal otherSigner;
+    uint256 internal otherSignerKey;
     address internal minter;
     address internal otherMinter;
 
@@ -38,6 +51,8 @@ contract ReceivableTokenTest is BaseTest {
 
     function setUp() public override {
         super.setUp();
+        (signer, signerKey) = makeAddrAndKey("signer");
+        (otherSigner, otherSignerKey) = makeAddrAndKey("otherSigner");
         minter = borrower;
         otherMinter = otherBorrower;
         midnight.enableLltv(WAD);
@@ -51,11 +66,10 @@ contract ReceivableTokenTest is BaseTest {
         bytes32 lenderLeaf = MerkleProofLib.leaf(lender, LENDER_REPORTED);
         bytes32 otherLeaf = MerkleProofLib.leaf(otherMinter, OTHER_REPORTED);
         bytes32 root = _hashPair(leaf, lenderLeaf);
-        token = IReceivableToken(
-            factory.createReceivableToken(minter, address(loanToken), "Receivable A", "rA", root, bytes32(0))
-        );
+        token =
+            IReceivableToken(_createToken(signer, signerKey, minter, address(loanToken), "Receivable A", "rA", root));
         otherToken = IReceivableToken(
-            factory.createReceivableToken(otherMinter, address(loanToken), "Receivable B", "rB", otherLeaf, bytes32(0))
+            _createToken(otherSigner, otherSignerKey, otherMinter, address(loanToken), "Receivable B", "rB", otherLeaf)
         );
         proof.push(lenderLeaf);
         lenderProof.push(leaf);
@@ -69,6 +83,49 @@ contract ReceivableTokenTest is BaseTest {
     }
 
     /// HELPERS ///
+
+    function _signCreate(
+        uint256 key,
+        address verifyingFactory,
+        uint256 chainId,
+        address owner,
+        address asset,
+        string memory name,
+        string memory symbol,
+        bytes32 root,
+        uint256 nonce
+    ) internal pure returns (Signature memory) {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                CREATE_RECEIVABLE_TOKEN_TYPEHASH,
+                owner,
+                asset,
+                keccak256(bytes(name)),
+                keccak256(bytes(symbol)),
+                root,
+                nonce
+            )
+        );
+        bytes32 domainSeparator = keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, chainId, verifyingFactory));
+        bytes32 digest = keccak256(bytes.concat("\x19\x01", domainSeparator, structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, digest);
+        return Signature({v: v, r: r, s: s});
+    }
+
+    function _createToken(
+        address _signer,
+        uint256 key,
+        address owner,
+        address asset,
+        string memory name,
+        string memory symbol,
+        bytes32 root
+    ) internal returns (address) {
+        uint256 nonce = factory.nonces(_signer);
+        Signature memory sig =
+            _signCreate(key, address(factory), block.chainid, owner, asset, name, symbol, root, nonce);
+        return factory.createReceivableToken(_signer, owner, asset, name, symbol, root, nonce, sig);
+    }
 
     function _hashPair(bytes32 a, bytes32 b) internal pure returns (bytes32) {
         return a < b ? keccak256(bytes.concat(a, b)) : keccak256(bytes.concat(b, a));
@@ -124,6 +181,14 @@ contract ReceivableTokenTest is BaseTest {
 
     /// FACTORY ///
 
+    function testCreateReceivableTokenTypeHash() public pure {
+        assertEq(CREATE_RECEIVABLE_TOKEN_TYPEHASH, keccak256(CREATE_RECEIVABLE_TOKEN_TYPE), "typehash");
+    }
+
+    function testEip712DomainTypeHash() public pure {
+        assertEq(EIP712_DOMAIN_TYPEHASH, keccak256(EIP712_DOMAIN_TYPE), "domain typehash");
+    }
+
     function testFactoryConstructorEvent() public {
         vm.expectEmit();
         emit IReceivableTokenFactory.Constructor(address(midnight));
@@ -133,19 +198,23 @@ contract ReceivableTokenTest is BaseTest {
 
     function testCreateReceivableTokenEvent() public {
         bytes32 root = token.root();
+        uint256 nonce = factory.nonces(signer);
+        Signature memory sig = _signCreate(
+            signerKey, address(factory), block.chainid, minter, address(loanToken), "Fresh", "FRS", root, nonce
+        );
         vm.recordLogs();
         vm.prank(stranger);
         address created =
-            factory.createReceivableToken(minter, address(loanToken), "Fresh", "FRS", root, bytes32(uint256(1)));
+            factory.createReceivableToken(signer, minter, address(loanToken), "Fresh", "FRS", root, nonce, sig);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         Vm.Log memory creation = logs[logs.length - 1];
         assertEq(creation.emitter, address(factory), "emitter");
         assertEq(creation.topics.length, 4, "topics");
         assertEq(creation.topics[0], IReceivableTokenFactory.CreateReceivableToken.selector, "event");
-        assertEq(creation.topics[1], bytes32(uint256(uint160(minter))), "owner");
+        assertEq(creation.topics[1], bytes32(uint256(uint160(signer))), "signer");
         assertEq(creation.topics[2], bytes32(uint256(uint160(address(loanToken)))), "asset");
         assertEq(creation.topics[3], bytes32(uint256(uint160(created))), "token");
-        assertEq(creation.data, abi.encode(bytes32(uint256(1)), "Fresh", "FRS", root, stranger), "data");
+        assertEq(creation.data, abi.encode(minter, "Fresh", "FRS", root, nonce, stranger), "data");
     }
 
     function testTransferFromAllowance(uint256 amount) public {
@@ -171,6 +240,10 @@ contract ReceivableTokenTest is BaseTest {
         assertEq(token.symbol(), "rA", "symbol");
         assertTrue(address(token) != address(otherToken), "distinct");
         assertEq(token.owner(), minter, "owner");
+        assertEq(token.signer(), signer, "signer");
+        assertEq(otherToken.signer(), otherSigner, "other signer");
+        assertEq(factory.nonces(signer), 1, "signer nonce");
+        assertEq(factory.nonces(otherSigner), 1, "otherSigner nonce");
         assertFalse(token.isWhitelisted(minter), "minter whitelisted on first mint");
         assertTrue(token.isWhitelisted(lender), "lender whitelisted by owner");
         assertFalse(otherToken.isWhitelisted(minter), "whitelist is per token");
@@ -184,32 +257,104 @@ contract ReceivableTokenTest is BaseTest {
         assertEq(token.root(), root, "root");
         assertEq(otherToken.root(), otherRoot, "other root");
 
-        // Same owner, asset and salt with the same parameters: already deployed. Another salt: another token.
-        vm.expectRevert();
-        factory.createReceivableToken(minter, address(loanToken), "Receivable A", "rA", root, bytes32(0));
+        // Replaying nonce 0 reverts with InvalidNonce.
+        Signature memory replaySig = _signCreate(
+            signerKey, address(factory), block.chainid, minter, address(loanToken), "Receivable A", "rA", root, 0
+        );
+        vm.expectRevert(IReceivableTokenFactory.InvalidNonce.selector);
+        factory.createReceivableToken(signer, minter, address(loanToken), "Receivable A", "rA", root, 0, replaySig);
+
+        // Next sequential nonce succeeds, even when submitted by a stranger.
+        Signature memory nextSig = _signCreate(
+            signerKey, address(factory), block.chainid, stranger, address(loanToken), "Fresh", "FRS", root, 1
+        );
+        vm.prank(stranger);
         address created =
-            factory.createReceivableToken(stranger, address(loanToken), "Fresh", "FRS", root, bytes32(uint256(1)));
+            factory.createReceivableToken(signer, stranger, address(loanToken), "Fresh", "FRS", root, 1, nextSig);
         assertTrue(factory.isReceivableToken(created), "fresh registered");
         assertEq(IReceivableToken(created).owner(), stranger, "fresh owner");
+        assertEq(IReceivableToken(created).signer(), signer, "fresh signer");
+        assertEq(factory.nonces(signer), 2, "signer nonce incremented");
+    }
 
-        address differentRoot =
-            factory.createReceivableToken(minter, address(loanToken), "Receivable A", "rA", otherRoot, bytes32(0));
-        assertTrue(differentRoot != address(token), "root changes CREATE2 address");
+    function testCreateReceivableTokenInvalidNonce() public {
+        bytes32 root = token.root();
+        Signature memory sig = _signCreate(
+            signerKey, address(factory), block.chainid, minter, address(loanToken), "Wrong Nonce", "WN", root, 2
+        );
+        vm.expectRevert(IReceivableTokenFactory.InvalidNonce.selector);
+        factory.createReceivableToken(signer, minter, address(loanToken), "Wrong Nonce", "WN", root, 2, sig);
+        assertEq(factory.nonces(signer), 1, "nonce unchanged");
+    }
+
+    function testCreateReceivableTokenInvalidSignature() public {
+        bytes32 root = token.root();
+        uint256 nonce = factory.nonces(signer);
+        Signature memory validSig = _signCreate(
+            signerKey, address(factory), block.chainid, minter, address(loanToken), "Signed", "SIG", root, nonce
+        );
+
+        // Wrong signer key.
+        Signature memory wrongKeySig = _signCreate(
+            otherSignerKey, address(factory), block.chainid, minter, address(loanToken), "Signed", "SIG", root, nonce
+        );
+        vm.expectRevert(IReceivableTokenFactory.InvalidSignature.selector);
+        factory.createReceivableToken(signer, minter, address(loanToken), "Signed", "SIG", root, nonce, wrongKeySig);
+
+        // ecrecover returns address(0) when v is invalid.
+        Signature memory zeroSig = Signature({v: 0, r: validSig.r, s: validSig.s});
+        vm.expectRevert(IReceivableTokenFactory.InvalidSignature.selector);
+        factory.createReceivableToken(signer, minter, address(loanToken), "Signed", "SIG", root, nonce, zeroSig);
+
+        // Tampered parameters all fail signature verification.
+        vm.expectRevert(IReceivableTokenFactory.InvalidSignature.selector);
+        factory.createReceivableToken(signer, stranger, address(loanToken), "Signed", "SIG", root, nonce, validSig);
+
+        vm.expectRevert(IReceivableTokenFactory.InvalidSignature.selector);
+        factory.createReceivableToken(signer, minter, address(otherToken), "Signed", "SIG", root, nonce, validSig);
+
+        vm.expectRevert(IReceivableTokenFactory.InvalidSignature.selector);
+        factory.createReceivableToken(signer, minter, address(loanToken), "Tampered", "SIG", root, nonce, validSig);
+
+        vm.expectRevert(IReceivableTokenFactory.InvalidSignature.selector);
+        factory.createReceivableToken(signer, minter, address(loanToken), "Signed", "TMP", root, nonce, validSig);
+
+        bytes32 otherRoot = otherToken.root();
+        vm.expectRevert(IReceivableTokenFactory.InvalidSignature.selector);
+        factory.createReceivableToken(signer, minter, address(loanToken), "Signed", "SIG", otherRoot, nonce, validSig);
+
+        // Wrong chainId in domain separator.
+        Signature memory wrongChainSig = _signCreate(
+            signerKey, address(factory), block.chainid + 1, minter, address(loanToken), "Signed", "SIG", root, nonce
+        );
+        vm.expectRevert(IReceivableTokenFactory.InvalidSignature.selector);
+        factory.createReceivableToken(signer, minter, address(loanToken), "Signed", "SIG", root, nonce, wrongChainSig);
+
+        // Wrong factory (verifyingContract) in domain separator.
+        Signature memory wrongFactorySig =
+            _signCreate(signerKey, stranger, block.chainid, minter, address(loanToken), "Signed", "SIG", root, nonce);
+        vm.expectRevert(IReceivableTokenFactory.InvalidSignature.selector);
+        factory.createReceivableToken(signer, minter, address(loanToken), "Signed", "SIG", root, nonce, wrongFactorySig);
+
+        assertEq(factory.nonces(signer), nonce, "nonce unchanged");
     }
 
     function testDecimalsMirrorAsset() public {
         bytes32 root = token.root();
         vm.mockCall(address(loanToken), abi.encodeWithSelector(IERC20.decimals.selector), abi.encode(uint8(6)));
         vm.expectEmit();
-        emit IReceivableToken.Constructor(address(midnight), address(loanToken), minter, "Six", "SIX", 6, root);
-        IReceivableToken created = IReceivableToken(
-            factory.createReceivableToken(minter, address(loanToken), "Six", "SIX", root, bytes32(uint256(6)))
-        );
+        emit IReceivableToken.Constructor(address(midnight), address(loanToken), minter, signer, "Six", "SIX", 6, root);
+        IReceivableToken created =
+            IReceivableToken(_createToken(signer, signerKey, minter, address(loanToken), "Six", "SIX", root));
         assertEq(created.decimals(), 6, "decimals");
 
         vm.clearMockedCalls();
+        uint256 nonce = factory.nonces(signer);
+        Signature memory sig = _signCreate(
+            signerKey, address(factory), block.chainid, minter, address(loanToken), "None", "NONE", root, nonce
+        );
         vm.expectRevert();
-        factory.createReceivableToken(minter, address(loanToken), "None", "NONE", root, bytes32(uint256(7)));
+        factory.createReceivableToken(signer, minter, address(loanToken), "None", "NONE", root, nonce, sig);
     }
 
     /// MINT ///

@@ -71,11 +71,12 @@ A market can list up to 128 tokens, each with its own LLTV, so lenders diversify
 
 ### `ReceivableTokenFactory`
 
-Deploys `ReceivableToken`s with `CREATE2` from a caller-provided salt, and records them in `isReceivableToken`.
+Deploys `ReceivableToken`s with `CREATE2` from EIP-712 signed parameters, and records them in `isReceivableToken`.
 The factory is deployed with Midnight's address and passes it to every token it deploys, so Midnight is always whitelisted on them.
-Anyone creates a token with `createReceivableToken`, picking its asset, name, symbol, and immutable owner and report root.
+Anyone can call `createReceivableToken` with a valid `signer` signature over `(owner, asset, name, symbol, root, nonce)` bound to `(chainId, factory)`.
+The factory enforces one sequential nonce per signer (`nonces[signer]`), derives the `CREATE2` salt from `(signer, nonce)`, and stores `signer` as an immutable on the deployed token.
 
-Holders trust the payers of the receivables and the token's owner, who can add holders directly with `whitelist(account)`.
+Holders verify `factory.isReceivableToken(token)` before trusting `token.signer()` or `token.midnight()`, and trust `signer`, `owner` (who can add holders directly with `whitelist(account)`), and the payers of the receivables.
 
 ## Libraries
 
