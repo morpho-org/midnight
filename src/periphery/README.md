@@ -51,24 +51,22 @@ Calldata is limited to 1,000,000 bytes.
 A claim on the receipts paid to the token contract, meant to be used as collateral on Midnight.
 
 Receipts are paid in the asset directly to the token contract, by plain transfers.
-Each token is redeemable for `rate` units of the asset as long as the contract holds them.
-The owner sets `rate` to the expected recovery over the total reported amount, minted or not, so receipts beyond the outstanding tokens are still extracted by minting and redeeming.
-For example, with 100 reported, 60 minted and 50 received, a rate of 0.5 lets the holders' 60 redeem for 30 and the minter mint the remaining 40 and redeem for 20; computing the rate over the outstanding tokens only would let the holders take the cash due to the unminted capacity.
-The token is its own collateral oracle on Midnight markets whose loan token is the asset, so a markdown makes those positions liquidatable and realizes the uncovered debt as bad debt shared by the market's lenders.
-Redemptions before the owner updates the rate are first come, first served, like oracle lag before a liquidation.
+Each token is redeemable for one unit of the asset as long as the contract holds it.
+Redemptions are first come, first served: if the receipts fall short, the last holders to redeem bear the shortfall.
 
 Any account with an allowance `mint`s tokens, up to `reported` under a report, where `reported` comes from Merkle roots set on the token by its owner (OpenZeppelin `StandardMerkleTree` layout with `(account, reported)` leaves, see `MerkleProofLib` in `receivable-token/libraries`).
 The owner allocates the receipts expected by the token between accounts this way, and receipts in excess of the outstanding tokens are extracted the same way, by minting within one's allowance and redeeming.
 
-Each token has an owner, who sets its reports. Whitelisted accounts are Midnight plus every account that has submitted a valid proof under any report, by calling `mint`, possibly with amount 0; the owner can whitelist a non-minter, such as a liquidator or a buyer that wants to keep tokens, by including a leaf with `reported` = 0.
-Whitelisting is permanent: leaving an account out of a later report does not remove it. Only whitelisted accounts hold tokens across transactions.
-Any other account can still receive tokens, but only transiently: the token credits them in transient storage, calls `onReceivableTokenReceived` on the receiver, and reverts if the receiver still holds tokens when the call returns.
-The receiver must redeem them or transfer them to a whitelisted account in that call, so accounts without code cannot receive tokens unless whitelisted.
-This keeps liquidations permissionless: Midnight transfers the seized tokens before pulling the repayment, so a liquidator redeems them in the hook and pays with the proceeds.
+Each token has an owner, who sets its reports. Whitelisted accounts are Midnight, the token itself, plus every account that has submitted a valid proof under any report, by calling `mint`, possibly with amount 0; the owner can whitelist a non-minter, such as a liquidator or a buyer that wants to keep tokens, by including a leaf with `reported` = 0.
+Whitelisting is permanent: leaving an account out of a later report does not remove it. Only whitelisted accounts can receive tokens; zero-value transfers to any account succeed, so a liquidation that only realizes bad debt works with any receiver.
 Midnight is always whitelisted, so nothing can freeze the tokens supplied as collateral on it.
 
-The contract does not interact with Midnight. Minters can sell the tokens, or supply them as collateral on any market listing them and sell debt against them.
-The debt is repaid either by the borrower, typically with a repay callback that withdraws and redeems the collateral once the receipts are in, or by a liquidator after maturity who then redeems the seized tokens.
+Minters can sell the tokens, or supply them as collateral on any market listing them and sell debt against them.
+The debt is repaid either by the borrower, typically with a repay callback that withdraws and redeems the collateral once the receipts are in (the callback must be whitelisted to receive the withdrawn tokens), or by a liquidator after maturity.
+Liquidations stay permissionless through the token's liquidate callback: a liquidator calls `liquidate` with the token as `receiver` and `callback`, and `onLiquidate` burns the seized tokens, approves Midnight for the repaid units and sends the rest of the seized amount, in assets, to the liquidator, who never holds the token.
+With an oracle valuing the token at one unit of the asset, the repaid units never exceed the seized tokens, since the liquidation incentive is at least 1, so the liquidator needs no capital. The liquidation reverts if the repaid units exceed the seized tokens, which can happen once the oracle values the token above one unit of the asset, or if the token lacks the cash.
+The callback only works on markets whose loan token is the asset; on other markets, only whitelisted accounts can receive seized tokens.
+A whitelisted liquidator can also receive the seized tokens directly and redeem them later.
 A market can list up to 128 tokens, each with its own LLTV, so lenders diversify across tokens through markets rather than through pooled claims.
 
 ### `ReceivableRepayer`
@@ -90,21 +88,6 @@ The factory is deployed with Midnight's address and passes it to every token it 
 Anyone creates a token with `createReceivableToken`, picking its owner, asset, name and symbol.
 
 Holders trust a token's owner, who determines who may mint how much and who can hold tokens at all through its reports, and the payers of the receivables.
-
-### `WhitelistEnterGate`
-
-An enter gate that restricts which accounts can increase their credit or debt in a Midnight market.
-
-Each side (credit, debt) has its own whitelist: only whitelisted accounts can enter on that side.
-Each side has its own role setter, who grants or revokes the whitelister role on that side.
-Whitelisters edit the lists directly with `setIsWhitelisted` or allow to edit the list by EIP-712 signatures used by `setIsWhitelistedWithSig`.
-`setIsWhitelistedWithSig` is a no-op instead of a revert when the signed nonce is stale and the account is already set to the signed value.
-A side can be made open at deployment, letting any account enter on that side (forever).
-
-### `WhitelistEnterGateFactory`
-
-Deploys a deterministic `WhitelistEnterGate` using `CREATE2` with a salt derived from the caller and a caller-provided pre-salt.
-The factory records gates in `isWhitelistEnterGate`.
 
 ## Libraries
 
