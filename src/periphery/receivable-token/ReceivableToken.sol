@@ -39,7 +39,8 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 /// collateral on Midnight.
 ///
 /// LIQUIDATIONS
-/// @dev Liquidations stay permissionless through this contract's liquidate callback: a liquidator calls Midnight's
+/// @dev Liquidators need no token whitelisting through this contract's liquidate callback; the market's liquidator
+/// gate still applies. A liquidator calls Midnight's
 /// liquidate with this contract as `receiver` and `callback`. Midnight transfers the seized tokens here, then calls
 /// onLiquidate, which burns them, approves Midnight for the repaid units and sends the rest of the seized amount, in
 /// assets, to the liquidator, who never holds the token.
