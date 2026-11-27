@@ -199,6 +199,8 @@ contract ReceivableToken is IReceivableToken {
             require(allowed >= amount, InsufficientAllowance());
             allowance[from][msg.sender] = allowed - amount;
             emit Approval(from, msg.sender, allowed - amount);
+        } else {
+            emit Approval(from, msg.sender, allowed);
         }
         _transfer(from, to, amount);
         return true;

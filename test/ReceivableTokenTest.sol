@@ -177,6 +177,19 @@ contract ReceivableTokenTest is BaseTest {
         token.transferFrom(minter, lender, REPORTED - amount + 1);
     }
 
+    function testTransferFromUnlimitedAllowance(uint256 amount) public {
+        amount = bound(amount, 0, REPORTED);
+        _mint(REPORTED);
+        vm.prank(minter);
+        token.approve(stranger, type(uint256).max);
+        vm.expectEmit(address(token));
+        emit IReceivableToken.Approval(minter, stranger, type(uint256).max);
+        vm.prank(stranger);
+        token.transferFrom(minter, lender, amount);
+        assertEq(token.allowance(minter, stranger), type(uint256).max, "allowance");
+        assertEq(token.balanceOf(lender), amount, "transferred");
+    }
+
     function testCreateReceivableToken() public {
         assertTrue(factory.isReceivableToken(address(token)), "isReceivableToken");
         assertEq(token.name(), "Receivable A", "name");
