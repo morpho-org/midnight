@@ -52,12 +52,14 @@ import {IReceivableToken} from "./interfaces/IReceivableToken.sol";
 ///
 /// USAGE
 /// @dev Accounts with an allowance mint tokens and can sell them, or supply them as collateral on any Midnight market
-/// that lists them and sell debt against them. The debt is repaid either by the borrower through this contract's
-/// repay callback once the receipts are in, or by a liquidator after maturity.
+/// that lists them and sell debt against them. Borrowers can repay directly with loan tokens or through this
+/// contract's repay callback once the receipts are in. Liquidators can liquidate undercollateralized positions,
+/// or positions with debt after maturity, subject to Midnight's liquidation lock and the market's liquidator gate.
 /// @dev The borrower first authorizes this contract on Midnight, then calls repay with this contract as `callback`
 /// and the ABI-encoded collateral index as data. onRepay withdraws and burns the borrower's tokens and approves
 /// Midnight for the repaid units. No owner whitelisting is needed. The callback only works on markets whose loan
 /// token is the asset and reverts if the contract does not hold enough cash.
+/// @dev A partial repayment reverts if withdrawing the redeemed collateral leaves the position unhealthy.
 ///
 /// TRUST
 /// @dev The owner fully determines who may mint how much, and who can hold tokens at all through its reports.

@@ -5,7 +5,7 @@ pragma solidity >=0.5.0;
 interface IReceivableTokenFactory {
     // forgefmt: disable-start
     /// EVENTS ///
-    event Constructor(address midnight);
+    event Constructor(address indexed midnight);
     event CreateReceivableToken(address indexed owner, address indexed asset, bytes32 salt, address indexed newReceivableToken, string name, string symbol, address caller);
 
     /// FUNCTIONS ///

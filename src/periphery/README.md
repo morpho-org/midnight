@@ -62,10 +62,12 @@ Whitelisting is permanent: leaving an account out of a later report does not rem
 Midnight is always whitelisted, so nothing can freeze the tokens supplied as collateral on it.
 
 Minters can sell the tokens, or supply them as collateral on any market listing them and sell debt against them.
-The debt is repaid either by the borrower through the token's repay callback once the receipts are in, or by a liquidator after maturity.
+Borrowers can repay directly with loan tokens or through the token's repay callback once the receipts are in.
+Liquidators can liquidate undercollateralized positions, or positions with debt after maturity, subject to Midnight's liquidation lock and the market's liquidator gate.
 The borrower first calls `midnight.setIsAuthorized(token, true, borrower)`, then calls `midnight.repay(market, units, borrower, token, abi.encode(collateralIndex))`.
 The token's `onRepay` withdraws and burns `units` of the borrower's collateral and approves Midnight for the repaid units. No owner whitelisting is needed.
 The repay callback only works on markets whose loan token is the asset and reverts if the token lacks the cash.
+A partial repayment reverts if withdrawing the redeemed collateral leaves the position unhealthy.
 Liquidations stay permissionless through the token's liquidate callback: a liquidator calls `liquidate` with the token as `receiver` and `callback`, and `onLiquidate` burns the seized tokens, approves Midnight for the repaid units and sends the rest of the seized amount, in assets, to the liquidator, who never holds the token.
 With an oracle valuing the token at one unit of the asset, the repaid units never exceed the seized tokens, since the liquidation incentive is at least 1, so the liquidator needs no capital. The liquidation reverts if the repaid units exceed the seized tokens, which can happen once the oracle values the token above one unit of the asset, or if the token lacks the cash.
 The callback only works on markets whose loan token is the asset; on other markets, only whitelisted accounts can receive seized tokens.

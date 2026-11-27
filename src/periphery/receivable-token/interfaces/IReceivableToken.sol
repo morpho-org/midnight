@@ -12,8 +12,8 @@ interface IReceivableToken is IERC20, ILiquidateCallback, IRepayCallback {
     error InsufficientBalance();
     error InsufficientCash();
     error InvalidLiquidation();
-    error InvalidRepayment();
     error InvalidProof();
+    error InvalidRepayment();
     error NotMidnight();
     error NotOwner();
     error NotWhitelisted();
